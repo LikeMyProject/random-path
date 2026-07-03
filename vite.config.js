@@ -23,4 +23,4 @@ const pwaConfig = {
   },
 }
 
-export default defineConfig({ plugins: [vue(), VitePWA(pwaConfig)] })
+export default defineConfig({ base: '/random-path/', plugins: [vue(), VitePWA(pwaConfig)] })
