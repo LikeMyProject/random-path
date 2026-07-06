@@ -17,8 +17,8 @@ let flashTimer = null, flashCount = 0
 const zoom = ref(1), panX = ref(0), panY = ref(0)
 let dragging = false, dragStart = { x: 0, y: 0 }, panStart = { x: 0, y: 0 }
 
-function zoomIn() { zoom.value = Math.min(4, zoom.value * 1.5) }
-function zoomOut() { zoom.value = Math.max(1, zoom.value / 1.5); if (zoom.value <= 1) { panX.value = 0; panY.value = 0 } }
+function zoomIn() { zoom.value = Math.min(20, zoom.value * 2) }
+function zoomOut() { zoom.value = Math.max(1, zoom.value / 2); if (zoom.value <= 1) { panX.value = 0; panY.value = 0 } }
 function resetView() { zoom.value = 1; panX.value = 0; panY.value = 0 }
 
 function flashMarker(index) {
@@ -147,8 +147,8 @@ function onMouseDown(e) {
 }
 function onMouseMove(e) {
   if (!dragging) return
-  panX.value = panStart.x + (e.clientX - dragStart.x)
-  panY.value = panStart.y + (e.clientY - dragStart.y)
+  panX.value = panStart.x - (e.clientX - dragStart.x)
+  panY.value = panStart.y - (e.clientY - dragStart.y)
 }
 function onMouseUp() { dragging = false }
 function onTouchStart(e) {
@@ -159,8 +159,8 @@ function onTouchStart(e) {
 }
 function onTouchMove(e) {
   if (!dragging) return
-  panX.value = panStart.x + (e.touches[0].clientX - dragStart.x)
-  panY.value = panStart.y + (e.touches[0].clientY - dragStart.y)
+  panX.value = panStart.x - (e.touches[0].clientX - dragStart.x)
+  panY.value = panStart.y - (e.touches[0].clientY - dragStart.y)
 }
 function onTouchEnd() { dragging = false }
 
@@ -175,7 +175,7 @@ watch(() => [props.segments, props.waypoints, props.supplyPoints, props.highligh
       @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseUp"
       @touchstart.prevent="onTouchStart" @touchmove.prevent="onTouchMove" @touchend="onTouchEnd" />
     <div class="zoom-btns">
-      <button class="zbtn" @click="zoomIn" :disabled="zoom>=4" title="放大">＋</button>
+      <button class="zbtn" @click="zoomIn" :disabled="zoom>=20" title="放大">＋</button>
       <button class="zbtn" @click="zoomOut" :disabled="zoom<=1" title="缩小">－</button>
       <button v-if="zoom>1" class="zbtn reset" @click="resetView" title="重置">↺</button>
     </div>
