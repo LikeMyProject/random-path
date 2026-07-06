@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { parsePolyline } from '../utils/math.js'
-const props = defineProps({ segments: Array, waypoints: Array, home: Object, work: Object })
+const props = defineProps({ segments: Array, waypoints: Array, home: Object, work: Object, supplyPoints: Array })
 const cvs = ref(null)
 const W = 720, H = 440, P = 40
 function draw() {
@@ -38,10 +38,15 @@ function draw() {
   })
   if (props.home) { ctx.beginPath(); ctx.arc(tx(props.home.lng), ty(props.home.lat), 6, 0, Math.PI*2); ctx.fillStyle = '#22c55e'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke() }
   if (props.work) { ctx.beginPath(); ctx.arc(tx(props.work.lng), ty(props.work.lat), 6, 0, Math.PI*2); ctx.fillStyle = '#f0a870'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke() }
+  if (props.supplyPoints) props.supplyPoints.forEach(sp => {
+    const x = tx(sp.lng), y = ty(sp.lat), s = 3.5
+    ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath()
+    ctx.fillStyle = 'rgba(124,58,237,0.55)'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8; ctx.stroke()
+  })
   ctx.fillStyle = '#a898b8'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('↑ N', w - P + 4, P - 4)
 }
 onMounted(draw)
-watch(() => [props.segments, props.waypoints], () => nextTick(draw), { deep: true })
+watch(() => [props.segments, props.waypoints, props.supplyPoints], () => nextTick(draw), { deep: true })
 </script>
 <template>
   <canvas ref="cvs" class="route-thumb" />

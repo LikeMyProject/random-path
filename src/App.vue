@@ -66,4 +66,6 @@ input:focus,select:focus{outline:none;border-color:#f08ca4;box-shadow:0 0 0 3px 
 .addr-quick{margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .addr-quick span{font-size:10px;color:#a898b8;font-weight:600}
 footer{text-align:center;padding:16px;color:#8cb8a8;font-size:10px;font-weight:500}
+.supply-chips{display:flex;flex-wrap:wrap;gap:4px}
+.supply-chip{display:inline-block;background:linear-gradient(135deg,#f5f3ff,#ede9fe);color:#7c3aed;border:1px solid #ddd6fe;border-radius:6px;padding:3px 8px;font-size:10px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 </style>
