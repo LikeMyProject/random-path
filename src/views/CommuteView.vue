@@ -86,6 +86,13 @@ function downloadGpx() { if (result.value && homeObj.value && workObj.value) { c
 
 const showAddrModal = ref(false), newAddr = ref({ alias: '', name: '', lng: '', lat: '' })
 function saveNewAddr() { const a = newAddr.value; if (!a.alias || !a.name || !a.lng || !a.lat) { toast('请填写完整', 'warn'); return }; addresses[a.alias] = { name: a.name, lng: parseFloat(a.lng), lat: parseFloat(a.lat) }; saveAddresses(addresses); newAddr.value = { alias: '', name: '', lng: '', lat: '' }; showAddrModal.value = false; toast('地址已保存') }
+async function geocodeNewAddr() {
+  const n = newAddr.value.name; if (!n.trim()) { toast('请先输入名称', 'warn'); return }
+  toast('正在查询坐标…')
+  const r = await geocode(n)
+  if (r) { newAddr.value.lng = r.lng; newAddr.value.lat = r.lat; newAddr.value.name = r.name; toast('已获取坐标') }
+  else toast('未找到该地点', 'warn')
+}
 </script>
 
 <template>
@@ -159,7 +166,9 @@ function saveNewAddr() { const a = newAddr.value; if (!a.alias || !a.name || !a.
   <div class="modal" v-if="showAddrModal" @click.self="showAddrModal=false">
     <div class="inner">
       <h3>添加新地址</h3>
-      <input v-model="newAddr.alias" placeholder="别名，如：家、公司、钟楼"><input v-model="newAddr.name" placeholder="完整名称，如：泰华金茂国际"><input v-model="newAddr.lng" placeholder="经度 (lng)"><input v-model="newAddr.lat" placeholder="纬度 (lat)">
+      <input v-model="newAddr.alias" placeholder="别名，如：家、公司、钟楼">
+      <div class="row"><input v-model="newAddr.name" placeholder="完整名称，如：泰华金茂国际" style="flex:1"><button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0" @click="geocodeNewAddr">🔍 查询坐标</button></div>
+      <input v-model="newAddr.lng" placeholder="经度 (lng)"><input v-model="newAddr.lat" placeholder="纬度 (lat)">
       <p style="font-size:12px;color:#a898b8;margin-bottom:10px">坐标：<a href="https://lbs.amap.com/tools/picker" target="_blank">高德坐标拾取器</a></p>
       <div class="btn-row"><button class="btn btn-secondary" @click="showAddrModal=false">取消</button><button class="btn btn-primary" @click="saveNewAddr">保存</button></div>
     </div>

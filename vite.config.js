@@ -26,7 +26,7 @@ const pwaConfig = {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   return {
-    base: '/random-path/',
+    base: env.VITE_BASE || '/',
     plugins: [vue(), VitePWA(pwaConfig)]
   }
 })
