@@ -65,94 +65,102 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
   const padLat = Math.max((maxA - minA) * 0.15, 0.005), padLng = Math.max((maxL - minL) * 0.15, 0.005)
   const mnLa = minA - padLat, mxLa = maxA + padLat, mnLo = minL - padLng, mxLo = maxL + padLng
   const rL = mxLo - mnLo || 0.01, rA = mxLa - mnLa || 0.01
-
-  const z = zoom.value
-  const sc = Math.min((w-P*2)/rL, (h-P*2)/rA) * z
-  const ox = (w - rL * sc) / 2 + panX.value, oy = (h - rA * sc) / 2 + panY.value
+  const sc = Math.min((w-P*2)/rL, (h-P*2)/rA)
+  const ox = (w - rL * sc) / 2, oy = (h - rA * sc) / 2
   const tx = l => ox + (l - mnLo) * sc, ty = a => oy + (mxLa - a) * sc
 
+  // fixed background (always full size)
   ctx.fillStyle = '#faf7fc'; ctx.fillRect(0, 0, w, h)
+
+  // apply zoom/pan as canvas transform (only affects route content)
+  ctx.save()
+  const z = zoom.value
+  ctx.translate(w/2 + panX.value, h/2 + panY.value)
+  ctx.scale(z, z)
+  ctx.translate(-w/2, -h/2)
 
   // route polylines
   if (props.segments) props.segments.forEach(s => {
     const pts = parsePolyline(s.polyline); if (pts.length < 2) return
-    ctx.strokeStyle = 'rgba(240,140,164,0.25)'; ctx.lineWidth = 7 * z; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    ctx.strokeStyle = 'rgba(240,140,164,0.25)'; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     ctx.beginPath(); ctx.moveTo(tx(pts[0].lng), ty(pts[0].lat)); for (let i = 1; i < pts.length; i++) ctx.lineTo(tx(pts[i].lng), ty(pts[i].lat)); ctx.stroke()
-    ctx.strokeStyle = '#f08ca4'; ctx.lineWidth = 3 * z
+    ctx.strokeStyle = '#f08ca4'; ctx.lineWidth = 3
     ctx.beginPath(); ctx.moveTo(tx(pts[0].lng), ty(pts[0].lat)); for (let i = 1; i < pts.length; i++) ctx.lineTo(tx(pts[i].lng), ty(pts[i].lat)); ctx.stroke()
   })
-
-  const mrkR = 5 * z, lblFont = Math.max(9, 10 * z)
 
   // waypoints
   if (props.waypoints) props.waypoints.forEach((w, i) => {
     const x = tx(w.lng), y = ty(w.lat)
-    ctx.beginPath(); ctx.arc(x, y, mrkR, 0, Math.PI*2)
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2)
     ctx.fillStyle = '#8cb8a8'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke()
-    if (z < 2.5) {
-      ctx.fillStyle = '#5e5468'; ctx.font = `bold ${lblFont}px sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
-      ctx.fillText('途经' + (i+1), x + 7, y - 2)
-    }
+    ctx.fillStyle = '#5e5468'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+    ctx.fillText('途经' + (i+1), x + 7, y - 2)
   })
 
   // start
   if (props.home) {
     const x = tx(props.home.lng), y = ty(props.home.lat)
-    ctx.beginPath(); ctx.arc(x, y, 7 * z, 0, Math.PI*2); ctx.fillStyle = '#22c55e'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
-    ctx.fillStyle = '#166534'; ctx.font = `bold ${lblFont}px sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2); ctx.fillStyle = '#22c55e'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
+    ctx.fillStyle = '#166534'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
     ctx.fillText('起', x + 9, y + 4)
   }
 
   // end
   if (props.work) {
     const x = tx(props.work.lng), y = ty(props.work.lat)
-    ctx.beginPath(); ctx.arc(x, y, 7 * z, 0, Math.PI*2); ctx.fillStyle = '#f0a870'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
-    ctx.fillStyle = '#9a3412'; ctx.font = `bold ${lblFont}px sans-serif`; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2); ctx.fillStyle = '#f0a870'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
+    ctx.fillStyle = '#9a3412'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'
     ctx.fillText('终', x + 9, y + 4)
   }
 
   // supply points - purple circles
   const pos = []
-  const supR = 6.5 * z
   if (props.supplyPoints) props.supplyPoints.forEach((sp, i) => {
     const x = tx(sp.lng), y = ty(sp.lat)
     pos.push({ x, y })
     const isFlashing = flashInfo.index === i
     const flashScale = isFlashing ? (flashInfo.flash === 1 ? 1.8 : flashInfo.flash === 2 ? 2.5 : 1) : 1
-    const r = supR * flashScale
+    const r = 6.5 * flashScale
     if (isFlashing) {
-      // outer glow ring
-      ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 16 * z
+      ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 16
       ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI*2)
       ctx.fillStyle = 'rgba(251,191,36,0.3)'; ctx.fill()
       ctx.shadowBlur = 0
     }
-    ctx.shadowColor = isFlashing ? '#f59e0b' : '#7c3aed'; ctx.shadowBlur = isFlashing ? 12 * z : 8 * z
+    ctx.shadowColor = isFlashing ? '#f59e0b' : '#7c3aed'; ctx.shadowBlur = isFlashing ? 12 : 8
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2)
     ctx.fillStyle = isFlashing ? '#f59e0b' : '#7c3aed'; ctx.fill()
     ctx.shadowBlur = 0
     ctx.strokeStyle = '#fff'; ctx.lineWidth = isFlashing ? 3 : 2; ctx.stroke()
-    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(9, 10 * z * flashScale)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(9, 10 * flashScale)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText(i + 1, x, y)
   })
   supplyPositions.value = pos
 
-  // north arrow
+  // restore transform (back to fixed coordinates)
+  ctx.restore()
+
+  // north arrow (fixed position, outside zoom/pan)
   ctx.fillStyle = '#a898b8'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'
   ctx.fillText('↑ 北', w - P + 4, P - 4)
 }
 
-// click on supply markers
+// click on supply markers (account for zoom/pan transform)
 function onCanvasClick(e) {
   const cv = cvs.value; if (!cv) return
   const rect = cv.getBoundingClientRect()
   const sx = cv.width / (cv.clientWidth * (window.devicePixelRatio || 1))
   const sy = cv.height / (cv.clientHeight * (window.devicePixelRatio || 1))
-  const cx = (e.clientX - rect.left) * sx, cy = (e.clientY - rect.top) * sy
-  const hitR = 14 * zoom.value
+  const cx = (e.clientX - rect.left) * sx
+  const cy = (e.clientY - rect.top) * sy
+  const w = cv.clientWidth || 360, h = 320
+  const z = zoom.value
+  // inverse transform: screen → drawing coords
+  const dx = (cx - w/2 - panX.value) / z + w/2
+  const dy = (cy - h/2 - panY.value) / z + h/2
   for (let i = 0; i < supplyPositions.value.length; i++) {
     const { x, y } = supplyPositions.value[i]
-    if (Math.sqrt((cx - x) ** 2 + (cy - y) ** 2) < hitR) {
+    if (Math.sqrt((dx - x) ** 2 + (dy - y) ** 2) < 14) {
       emit('supply-click', i)
       return
     }
