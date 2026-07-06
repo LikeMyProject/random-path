@@ -161,8 +161,8 @@ function onMouseDown(e) {
 }
 function onMouseMove(e) {
   if (!dragging) return
-  panX.value = panStart.x - (e.clientX - dragStart.x)
-  panY.value = panStart.y - (e.clientY - dragStart.y)
+  panX.value = panStart.x + (e.clientX - dragStart.x)
+  panY.value = panStart.y + (e.clientY - dragStart.y)
 }
 function onMouseUp() { dragging = false }
 function onTouchStart(e) {
@@ -173,8 +173,8 @@ function onTouchStart(e) {
 }
 function onTouchMove(e) {
   if (!dragging) return
-  panX.value = panStart.x - (e.touches[0].clientX - dragStart.x)
-  panY.value = panStart.y - (e.touches[0].clientY - dragStart.y)
+  panX.value = panStart.x + (e.touches[0].clientX - dragStart.x)
+  panY.value = panStart.y + (e.touches[0].clientY - dragStart.y)
 }
 function onTouchEnd() { dragging = false }
 
