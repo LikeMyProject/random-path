@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { loadAddresses } from '../composables/useStorage.js'
-import { fetchBicyclingRoute, searchPOIs } from '../composables/useAMap.js'
-import { parsePolyline, samplePoints } from '../utils/math.js'
+import { fetchBicyclingRoute } from '../composables/useAMap.js'
 import { rateDifficulty } from '../composables/useScoring.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
 import { nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
@@ -109,7 +108,8 @@ const customStart = ref({ name: '', lng: '', lat: '' })
 const waypoints = ref([])
 const loading = ref(false), tryInfo = ref(''), progress = ref(0)
 const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
-const SUPPLY_POI_TYPES = '080100|010100|060000|050000', SUPPLY_RADIUS = 800, SUPPLY_LIMIT = 15, MAX_SAMPLES = 5
+const supplyPoints = ref([]), supplyLoading = ref(false)
+let supplyCoords = [], supplySearched = 0
 
 let st = null
 function onStartInput() { clearTimeout(st); st = setTimeout(() => searchAddress(customStart.value.name), 200) }
@@ -187,31 +187,42 @@ function downloadGpx() {
   a.click(); URL.revokeObjectURL(a.href)
 }
 
-async function searchSupplyPoints(segments) {
-  const allCoords = []
-  for (const seg of segments) { if (seg.polyline) allCoords.push(...parsePolyline(seg.polyline)) }
-  if (allCoords.length < 2) return []
-  const nSamples = Math.max(3, Math.min(MAX_SAMPLES, Math.ceil(allCoords.length / 15)))
-  const sampled = samplePoints(allCoords, nSamples)
-  const results = []
-  for (const pt of sampled) {
-    results.push(await searchPOIs(pt.lng, pt.lat, SUPPLY_POI_TYPES, SUPPLY_RADIUS, SUPPLY_LIMIT))
-    await new Promise(r => setTimeout(r, 500))
+async function searchSupply() {
+  if (supplyLoading.value) return
+  // first click: sample the route polyline
+  if (supplyCoords.length === 0) {
+    const segs = result.value?.segments
+    if (!segs) return
+    const all = []; const { parsePolyline, samplePoints } = await import('../utils/math.js')
+    for (const seg of segs) { if (seg.polyline) all.push(...parsePolyline(seg.polyline)) }
+    if (all.length >= 2) supplyCoords = samplePoints(all, Math.min(9, Math.ceil(all.length / 15)))
   }
-  const seen = new Set(); const merged = []
-  for (const batch of results) {
-    for (const poi of batch) {
-      const key = `${poi.name}|${poi.lng.toFixed(4)}|${poi.lat.toFixed(4)}`
-      if (!seen.has(key)) { seen.add(key); merged.push(poi) }
+  if (supplySearched >= supplyCoords.length) { toast('已搜索全部区域', 'warn'); return }
+  supplyLoading.value = true
+  const batch = supplyCoords.slice(supplySearched, supplySearched + 3)
+  try {
+    const { searchPOIs } = await import('../composables/useAMap.js')
+    const seen = new Set(supplyPoints.value.map(p => `${p.name}|${p.lng.toFixed(4)}|${p.lat.toFixed(4)}`))
+    for (const pt of batch) {
+      const pois = await searchPOIs(pt.lng, pt.lat, '080100|010100|060000|050000', 800, 15)
+      for (const poi of pois) {
+        const key = `${poi.name}|${poi.lng.toFixed(4)}|${poi.lat.toFixed(4)}`
+        if (!seen.has(key)) { seen.add(key); supplyPoints.value.push(poi) }
+      }
+      await new Promise(r => setTimeout(r, 1000))
     }
-  }
-  return merged
+    supplySearched += batch.length
+    toast(`找到 ${supplyPoints.value.length} 个补给点`)
+  } catch(e) { toast('搜索失败，请稍后重试', 'warn') }
+  supplyLoading.value = false
 }
 
 async function generate() {
   const pts = fullPoints.value
   if (pts.length < 2) { toast('至少需要起终点', 'warn'); return }
   loading.value = true; resultShow.value = false; progress.value = 0; tryInfo.value = '正在拉取路线数据…'
+  // reset supply state
+  supplyPoints.value = []; supplyCoords = []; supplySearched = 0
   try {
     let td = 0, tt = 0; const segs = []
     for (let i = 0; i < pts.length - 1; i++) {
@@ -220,27 +231,14 @@ async function generate() {
       segs.push({ ...seg, from: pts[i], to: pts[i + 1], idx: i })
       progress.value = 30 + (i / (pts.length - 1)) * 40
       tryInfo.value = `正在获取第${i+1}段路线…`
-      if (i < pts.length - 2) await new Promise(r => setTimeout(r, 600))
     }
     const wps = pts.slice(1, -1)
-    if (wps.length > 0) { tryInfo.value = '正在获取途经点地名…'; for (const wp of wps) { wp.poiName = await nameWaypoint(wp.lng, wp.lat); await new Promise(r => setTimeout(r, 600)) } }
+    if (wps.length > 0) { tryInfo.value = '正在获取途经点地名…'; for (const wp of wps) { wp.poiName = await nameWaypoint(wp.lng, wp.lat); await new Promise(r => setTimeout(r, 200)) } }
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
-    result.value = { waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null, supplyPoints: [] }
+    result.value = { waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null }
     resultShow.value = true
-    loadSupplyPointsInBackground(segs)
   } catch (e) { toast('错误: ' + e.message, 'err') }
   loading.value = false
-}
-
-async function loadSupplyPointsInBackground(segs) {
-  await new Promise(r => setTimeout(r, 3000))
-  try {
-    const sp = await searchSupplyPoints(segs)
-    if (sp.length > 0 && result.value) {
-      result.value.supplyPoints = sp
-      tryInfo.value = `找到 ${sp.length} 个沿途补给点`
-    }
-  } catch(e) { console.warn('补给点搜索失败:', e) }
 }
 </script>
 
@@ -314,7 +312,7 @@ async function loadSupplyPointsInBackground(segs) {
       <div class="stat"><div class="val">{{ Math.round(result.totalDuration/60) }}</div><div class="lbl">预计 分钟</div></div>
       <div class="stat"><div class="val small" :style="{color:diffObj?.color}">{{ diffObj?.label }}</div><div class="lbl">难度</div></div>
     </div>
-    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :supplyPoints="result.supplyPoints" :home="fullPoints[0]" :work="fullPoints[fullPoints.length-1]" />
+    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :supplyPoints="supplyPoints" :home="fullPoints[0]" :work="fullPoints[fullPoints.length-1]" />
     <div class="route-thumb-legend"><span>🟢 起点</span><span>🟠 终点</span><span>🔵 途经点</span><span>🟣 补给点</span><span>⬆ 北</span></div>
     <div class="route-summary"><strong>{{ fullPoints[0]?.name }}</strong> → {{ result.waypoints.map((w,i) => w.poiName || w.name || '途经点'+(i+1)).join(' → ') || '直达' }} → <strong>{{ fullPoints[fullPoints.length-1]?.name }}</strong></div>
     <div class="collapse-toggle" :class="{open:collapseOpen}" @click="collapseOpen=!collapseOpen"><span class="arrow">▶</span> 详细数据</div>
@@ -325,11 +323,14 @@ async function loadSupplyPointsInBackground(segs) {
         <div class="stat"><div class="val small">{{ result.waypoints.length }}</div><div class="lbl">途经点</div></div>
       </div>
       <div class="segments"><div class="seg" v-for="(seg,i) in result.segments" :key="i"><span class="seg-detail">第{{ i+1 }}段: {{ fullPoints[i]?.name }} → {{ fullPoints[i+1]?.name }}</span><span class="seg-nums">{{ (seg.distance/1000).toFixed(1) }}km · {{ Math.round(seg.duration/60) }}min</span></div></div>
-      <div v-if="result.supplyPoints?.length" style="margin-top:12px;border-top:1px dashed #ece0ec;padding-top:10px">
-        <div style="font-size:12px;font-weight:700;color:#5e5468;margin-bottom:6px">💧 沿途补给点 ({{ result.supplyPoints.length }})</div>
-        <div class="supply-chips"><span v-for="(sp, i) in result.supplyPoints" :key="i" class="supply-chip" :title="sp.type">{{ sp.name }}</span></div>
+      <div v-if="supplyPoints.length" style="margin-top:12px;border-top:1px dashed #ece0ec;padding-top:10px">
+        <div style="font-size:12px;font-weight:700;color:#5e5468;margin-bottom:6px">💧 沿途补给点 ({{ supplyPoints.length }})</div>
+        <div class="supply-chips"><span v-for="(sp, i) in supplyPoints" :key="i" class="supply-chip" :title="sp.type">{{ sp.name }}</span></div>
       </div>
     </div>
+    <button class="btn btn-supply" @click="searchSupply" :disabled="supplyLoading">
+      {{ supplyLoading ? '搜索中…' : supplyPoints.length ? '🔄 加载更多补给点' : '🔍 搜索沿途补给点' }}
+    </button>
     <button class="btn btn-nav" @click="openNav">开始导航</button>
     <div class="nav-link-box"><div class="label">高德导航链接（可复制）：</div><div class="url">{{ navUrl }}</div></div>
     <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button></div>

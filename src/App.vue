@@ -68,4 +68,6 @@ input:focus,select:focus{outline:none;border-color:#f08ca4;box-shadow:0 0 0 3px 
 footer{text-align:center;padding:16px;color:#8cb8a8;font-size:10px;font-weight:500}
 .supply-chips{display:flex;flex-wrap:wrap;gap:4px}
 .supply-chip{display:inline-block;background:linear-gradient(135deg,#f5f3ff,#ede9fe);color:#7c3aed;border:1px solid #ddd6fe;border-radius:6px;padding:3px 8px;font-size:10px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.btn-supply{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;box-shadow:0 3px 12px rgba(124,58,237,0.3);margin-bottom:8px}
+.btn-supply:disabled{opacity:.5;pointer-events:none}
 </style>
