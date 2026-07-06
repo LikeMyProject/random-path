@@ -220,9 +220,10 @@ async function generate() {
       segs.push({ ...seg, from: pts[i], to: pts[i + 1], idx: i })
       progress.value = 30 + (i / (pts.length - 1)) * 40
       tryInfo.value = `正在获取第${i+1}段路线…`
+      if (i < pts.length - 2) await new Promise(r => setTimeout(r, 600))
     }
     const wps = pts.slice(1, -1)
-    if (wps.length > 0) { tryInfo.value = '正在获取途经点地名…'; for (const wp of wps) { wp.poiName = await nameWaypoint(wp.lng, wp.lat); await new Promise(r => setTimeout(r, 200)) } }
+    if (wps.length > 0) { tryInfo.value = '正在获取途经点地名…'; for (const wp of wps) { wp.poiName = await nameWaypoint(wp.lng, wp.lat); await new Promise(r => setTimeout(r, 600)) } }
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = { waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null, supplyPoints: [] }
     resultShow.value = true
