@@ -21,20 +21,25 @@ function zoomIn() { zoom.value = Math.min(20, zoom.value * 2) }
 function zoomOut() { zoom.value = Math.max(1, zoom.value / 2); if (zoom.value <= 1) { panX.value = 0; panY.value = 0 } }
 function resetView() { zoom.value = 1; panX.value = 0; panY.value = 0 }
 
+// flash states: -1=hidden, 0=normal, 1=big, 2=bigger
 function flashMarker(index) {
   if (flashTimer) { clearInterval(flashTimer); flashCount = 0 }
   if (index < 0) { draw(); return }
+  // auto-reset zoom and scroll into view
+  resetView()
+  nextTick(() => { cvs.value?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }) })
   flashCount = 0
+  const steps = [1, 2, 1, 2, 1, 2, 0] // big→bigger→big→bigger→big→bigger→normal
   flashTimer = setInterval(() => {
+    draw(flashCount < steps.length ? { index, flash: steps[flashCount] } : { index: -1, flash: 0 })
     flashCount++
-    draw(flashCount % 2 === 0 ? index : -1)
-    if (flashCount >= 6) { clearInterval(flashTimer); flashTimer = null; draw() }
-  }, 160)
+    if (flashCount > steps.length) { clearInterval(flashTimer); flashTimer = null; draw() }
+  }, 200)
 }
 
 watch(() => props.highlightIndex, (idx) => flashMarker(idx))
 
-function draw(hideIndex = -1) {
+function draw(flashInfo = { index: -1, flash: 0 }) {
   const cv = cvs.value; if (!cv) return
   const dpr = window.devicePixelRatio || 1
   const w = cv.clientWidth || 360, h = 320
@@ -105,13 +110,22 @@ function draw(hideIndex = -1) {
   if (props.supplyPoints) props.supplyPoints.forEach((sp, i) => {
     const x = tx(sp.lng), y = ty(sp.lat)
     pos.push({ x, y })
-    if (hideIndex === i) return
-    ctx.shadowColor = '#7c3aed'; ctx.shadowBlur = 8 * z
-    ctx.beginPath(); ctx.arc(x, y, supR, 0, Math.PI*2)
-    ctx.fillStyle = '#7c3aed'; ctx.fill()
+    const isFlashing = flashInfo.index === i
+    const flashScale = isFlashing ? (flashInfo.flash === 1 ? 1.8 : flashInfo.flash === 2 ? 2.5 : 1) : 1
+    const r = supR * flashScale
+    if (isFlashing) {
+      // outer glow ring
+      ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 16 * z
+      ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI*2)
+      ctx.fillStyle = 'rgba(251,191,36,0.3)'; ctx.fill()
+      ctx.shadowBlur = 0
+    }
+    ctx.shadowColor = isFlashing ? '#f59e0b' : '#7c3aed'; ctx.shadowBlur = isFlashing ? 12 * z : 8 * z
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2)
+    ctx.fillStyle = isFlashing ? '#f59e0b' : '#7c3aed'; ctx.fill()
     ctx.shadowBlur = 0
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke()
-    ctx.fillStyle = '#fff'; ctx.font = `bold ${lblFont}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = isFlashing ? 3 : 2; ctx.stroke()
+    ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(9, 10 * z * flashScale)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText(i + 1, x, y)
   })
   supplyPositions.value = pos

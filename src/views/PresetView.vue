@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { loadAddresses } from '../composables/useStorage.js'
 import { fetchBicyclingRoute } from '../composables/useAMap.js'
 import { rateDifficulty } from '../composables/useScoring.js'
@@ -109,7 +109,7 @@ const waypoints = ref([])
 const loading = ref(false), tryInfo = ref(''), progress = ref(0)
 const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
 const supplyPoints = ref([]), supplyLoading = ref(false), highlightSupply = ref(-1)
-function onSupplyChipClick(i) { highlightSupply.value = i }
+function onSupplyChipClick(i) { highlightSupply.value = -1; nextTick(() => { highlightSupply.value = i }) }
 function onSupplyMarkerClick(i) { highlightSupply.value = i; const sp = supplyPoints.value[i]; if (sp) toast(sp.name) }
 let supplyCoords = [], supplySearched = 0
 
