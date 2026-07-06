@@ -49,7 +49,8 @@ watch(() => props.highlightIndex, (idx) => flashMarker(idx))
 function draw(flashInfo = { index: -1, flash: 0 }) {
   const cv = cvs.value; if (!cv) return
   const dpr = window.devicePixelRatio || 1
-  const w = cv.clientWidth || 360, h = 320
+  // 用 parent 宽度，不用 clientWidth（避免回流循环）
+  const w = 360, h = 320
   cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px'
   const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr)
 
@@ -149,11 +150,10 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
 function onCanvasClick(e) {
   const cv = cvs.value; if (!cv) return
   const rect = cv.getBoundingClientRect()
-  const sx = cv.width / (cv.clientWidth * (window.devicePixelRatio || 1))
-  const sy = cv.height / (cv.clientHeight * (window.devicePixelRatio || 1))
-  const cx = (e.clientX - rect.left) * sx
-  const cy = (e.clientY - rect.top) * sy
-  const w = cv.clientWidth || 360, h = 320
+  const dpr = window.devicePixelRatio || 1
+  const cx = (e.clientX - rect.left) * dpr
+  const cy = (e.clientY - rect.top) * dpr
+  const w = 360, h = 320
   const z = zoom.value
   // inverse transform: screen → drawing coords
   const dx = (cx - w/2 - panX.value) / z + w/2
@@ -211,9 +211,9 @@ watch(() => [props.segments, props.waypoints, props.supplyPoints, props.highligh
 </template>
 <style scoped>
 .thumb-wrap { position: relative; }
-.route-thumb { width: 100%; max-width: 480px; border-radius: 12px; background: #faf7fc; border: 1.5px solid #f2eaf4; display: block; }
+.route-thumb { width: 360px; max-width: 100%; border-radius: 12px; background: #faf7fc; border: 1.5px solid #f2eaf4; display: block; }
 .route-thumb.zoomable { cursor: grab; }
-.thumb-wrap { max-width: 480px; overflow: hidden; }
+.thumb-wrap { }
 .zoom-btns { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; z-index: 5; }
 .zbtn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid #ddd6fe; background: rgba(255,255,255,0.9); color: #7c3aed; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
 .zbtn:disabled { opacity: 0.3; cursor: default; }
