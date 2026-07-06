@@ -108,7 +108,9 @@ const customStart = ref({ name: '', lng: '', lat: '' })
 const waypoints = ref([])
 const loading = ref(false), tryInfo = ref(''), progress = ref(0)
 const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
-const supplyPoints = ref([]), supplyLoading = ref(false)
+const supplyPoints = ref([]), supplyLoading = ref(false), highlightSupply = ref(-1)
+function onSupplyChipClick(i) { highlightSupply.value = i }
+function onSupplyMarkerClick(i) { highlightSupply.value = i; const sp = supplyPoints.value[i]; if (sp) toast(sp.name) }
 let supplyCoords = [], supplySearched = 0
 
 let st = null
@@ -313,7 +315,7 @@ async function generate() {
       <div class="stat"><div class="val">{{ Math.round(result.totalDuration/60) }}</div><div class="lbl">预计 分钟</div></div>
       <div class="stat"><div class="val small" :style="{color:diffObj?.color}">{{ diffObj?.label }}</div><div class="lbl">难度</div></div>
     </div>
-    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :supplyPoints="supplyPoints" :home="fullPoints[0]" :work="fullPoints[fullPoints.length-1]" />
+    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :supplyPoints="supplyPoints" :highlightIndex="highlightSupply" :home="fullPoints[0]" :work="fullPoints[fullPoints.length-1]" @supply-click="onSupplyMarkerClick" />
     <div class="route-thumb-legend"><span>🟢 起点</span><span>🟠 终点</span><span>🔵 途经点</span><span>🟣 补给点</span><span>⬆ 北</span></div>
     <div class="route-summary"><strong>{{ fullPoints[0]?.name }}</strong> → {{ result.waypoints.map((w,i) => w.poiName || w.name || '途经点'+(i+1)).join(' → ') || '直达' }} → <strong>{{ fullPoints[fullPoints.length-1]?.name }}</strong></div>
     <div class="collapse-toggle" :class="{open:collapseOpen}" @click="collapseOpen=!collapseOpen"><span class="arrow">▶</span> 详细数据</div>
@@ -326,7 +328,7 @@ async function generate() {
       <div class="segments"><div class="seg" v-for="(seg,i) in result.segments" :key="i"><span class="seg-detail">第{{ i+1 }}段: {{ fullPoints[i]?.name }} → {{ fullPoints[i+1]?.name }}</span><span class="seg-nums">{{ (seg.distance/1000).toFixed(1) }}km · {{ Math.round(seg.duration/60) }}min</span></div></div>
       <div v-if="supplyPoints.length" style="margin-top:12px;border-top:1px dashed #ece0ec;padding-top:10px">
         <div style="font-size:12px;font-weight:700;color:#5e5468;margin-bottom:6px">💧 沿途补给点 ({{ supplyPoints.length }})</div>
-        <div class="supply-chips"><span v-for="(sp, i) in supplyPoints" :key="i" class="supply-chip" :title="sp.type">{{ i+1 }}. {{ sp.name }}</span></div>
+        <div class="supply-chips"><span v-for="(sp, i) in supplyPoints" :key="i" class="supply-chip" :class="{active: highlightSupply===i}" :title="sp.type" @click="onSupplyChipClick(i)">{{ i+1 }}. {{ sp.name }}</span></div>
       </div>
     </div>
     <button class="btn btn-supply" @click="searchSupply" :disabled="supplyLoading">
