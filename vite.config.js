@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -23,4 +23,10 @@ const pwaConfig = {
   },
 }
 
-export default defineConfig({ base: '/random-path/', plugins: [vue(), VitePWA(pwaConfig)] })
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd())
+  return {
+    base: env.VITE_BASE || '/',
+    plugins: [vue(), VitePWA(pwaConfig)]
+  }
+})
