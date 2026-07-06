@@ -17,8 +17,15 @@ let flashTimer = null, flashCount = 0
 const zoom = ref(1), panX = ref(0), panY = ref(0)
 let dragging = false, lastX = 0, lastY = 0
 
-function zoomIn() { zoom.value = Math.min(20, zoom.value * 2) }
-function zoomOut() { zoom.value = Math.max(1, zoom.value / 2); if (zoom.value <= 1) { panX.value = 0; panY.value = 0 } }
+function zoomIn() {
+  const r = Math.min(20, zoom.value * 2) / zoom.value
+  panX.value *= r; panY.value *= r; zoom.value *= r
+}
+function zoomOut() {
+  const r = Math.max(1, zoom.value / 2) / zoom.value
+  panX.value *= r; panY.value *= r; zoom.value *= r
+  if (zoom.value <= 1) { panX.value = 0; panY.value = 0 }
+}
 function resetView() { zoom.value = 1; panX.value = 0; panY.value = 0 }
 
 // flash states: -1=hidden, 0=normal, 1=big, 2=bigger
