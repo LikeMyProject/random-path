@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { haversine } from '../utils/math.js'
 import { geocode } from '../composables/useAMap.js'
-import { loadAddresses, saveAddresses, saveHistory } from '../composables/useStorage.js'
+import { loadAddresses, saveAddresses, deleteAddress, saveHistory } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
 import { tryGenerateRoute, MAX_RETRIES, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
 import { rateDifficulty } from '../composables/useScoring.js'
@@ -33,7 +33,7 @@ function selectSugg(i) { const p = pickSuggestion(i); if (!p) return; if (active
 function pickAddr(a, t) { const ad = addresses[a]; if (!ad) return; if (t === 'from') from.value = { name: ad.name, lng: ad.lng, lat: ad.lat }; else to.value = { name: ad.name, lng: ad.lng, lat: ad.lat }; toast(a) }
 async function doGeocode(t) {
   const n = t === 'from' ? from.value.name : to.value.name; if (!n.trim()) { toast('请输入地名', 'warn'); return }
-  const r = await geocode(n, '西安'); if (r) { if (t === 'from') from.value = { name: r.name, lng: r.lng, lat: r.lat }; else to.value = { name: r.name, lng: r.lng, lat: r.lat }; toast('已获取坐标') } else toast('未找到该地点', 'warn')
+  const r = await geocode(n, '西安'); if (r) { if (t === 'from') from.value = { name: r.name, lng: r.lng, lat: r.lat }; else to.value = { name: r.name, lng: r.lng, lat: r.lat }; toast('已获取坐标 ✅') } else toast('未找到该地点，请尝试更具体的名称（如"钟楼"→"西安钟楼"）', 'warn')
 }
 function locateMe(target) {
   if (!navigator.geolocation) { toast('浏览器不支持定位', 'warn'); return }
@@ -86,37 +86,38 @@ function downloadGpx() { if (result.value && homeObj.value && workObj.value) { c
 
 const showAddrModal = ref(false), newAddr = ref({ alias: '', name: '', lng: '', lat: '' })
 function saveNewAddr() { const a = newAddr.value; if (!a.alias || !a.name || !a.lng || !a.lat) { toast('请填写完整', 'warn'); return }; addresses[a.alias] = { name: a.name, lng: parseFloat(a.lng), lat: parseFloat(a.lat) }; saveAddresses(addresses); newAddr.value = { alias: '', name: '', lng: '', lat: '' }; showAddrModal.value = false; toast('地址已保存') }
+function deleteSavedAddr(alias) { if (!confirm(`确定删除地址「${alias}」吗？`)) return; if (deleteAddress(alias)) { toast(`已删除「${alias}」`) } else { toast('删除失败', 'warn') } }
 async function geocodeNewAddr() {
-  const n = newAddr.value.name; if (!n.trim()) { toast('请先输入名称', 'warn'); return }
-  toast('正在查询坐标…')
-  const r = await geocode(n)
-  if (r) { newAddr.value.lng = r.lng; newAddr.value.lat = r.lat; newAddr.value.name = r.name; toast('已获取坐标') }
-  else toast('未找到该地点', 'warn')
+  const n = newAddr.value.name; if (!n.trim()) { toast('请先输入地址名称', 'warn'); return }
+  toast('正在查询坐标（西安市范围）…')
+  const r = await geocode(n, '西安')
+  if (r) { newAddr.value.lng = String(r.lng); newAddr.value.lat = String(r.lat); newAddr.value.name = r.name; toast('已获取坐标 ✅') }
+  else toast('未找到该地点，请尝试更具体的名称（如"钟楼"→"西安钟楼"）', 'warn')
 }
 </script>
 
 <template>
 <div>
   <div class="card">
-    <div class="addr-quick"><span>起点地址簿：</span><button v-for="(v,k) in addresses" :key="k" class="btn btn-sm" style="background:#334155;color:#e2e8f0;font-size:10px;margin:1px" @click="pickAddr(k,'from')">{{ k }}</button><button class="btn btn-sm" style="background:#f08ca4;color:#fff;font-size:10px" @click="showAddrModal=true">+添加</button></div>
+    <div class="addr-quick"><span>起点地址簿：</span><button v-for="(v,k) in addresses" :key="k" class="btn btn-sm" style="background:#334155;color:#e2e8f0;font-size:10px;margin:1px" @click="pickAddr(k,'from')">{{ k }}</button><button class="btn btn-sm" style="background:#f08ca4;color:#fff;font-size:10px" @click="showAddrModal=true">+管理</button></div>
     <label style="font-size:12px;color:#8a8098;font-weight:600">起点</label>
     <div class="row" style="position:relative">
-      <input v-model="from.name" placeholder="地名" style="flex:1" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
+      <input v-model="from.name" placeholder="输入地名搜索（如：西安钟楼）" style="flex:1" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
       <button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="doGeocode('from')">🔍</button>
       <button class="btn btn-sm" style="background:#42a5f5;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="locateMe('from')">📍</button>
       <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop"><div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)"><span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span></div></div>
     </div>
-    <div class="row"><input v-model="from.lng" type="number" step="0.000001" placeholder="经度" style="flex:1"><input v-model="from.lat" type="number" step="0.000001" placeholder="纬度" style="flex:1"></div>
+    <div class="row"><input v-model="from.lng" type="number" step="0.000001" placeholder="经度（自动填入或手动输入）" style="flex:1"><input v-model="from.lat" type="number" step="0.000001" placeholder="纬度（自动填入或手动输入）" style="flex:1"></div>
 
     <div class="addr-quick" style="margin-top:10px"><span>终点地址簿：</span><button v-for="(v,k) in addresses" :key="k" class="btn btn-sm" style="background:#334155;color:#e2e8f0;font-size:10px;margin:1px" @click="pickAddr(k,'to')">{{ k }}</button></div>
     <label style="font-size:12px;color:#8a8098;font-weight:600;margin-top:6px">终点</label>
     <div class="row" style="position:relative">
-      <input v-model="to.name" placeholder="地名" style="flex:1" @input="onNameInput('to')" @focus="onNameInput('to')" @blur="setTimeout(closeSuggest,200)">
+      <input v-model="to.name" placeholder="输入地名搜索（如：西安钟楼）" style="flex:1" @input="onNameInput('to')" @focus="onNameInput('to')" @blur="setTimeout(closeSuggest,200)">
       <button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="doGeocode('to')">🔍</button>
       <button class="btn btn-sm" style="background:#42a5f5;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="locateMe('to')">📍</button>
       <div v-if="showSuggest && activeSuggest==='to'" class="suggest-drop"><div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)"><span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span></div></div>
     </div>
-    <div class="row"><input v-model="to.lng" type="number" step="0.000001" placeholder="经度" style="flex:1"><input v-model="to.lat" type="number" step="0.000001" placeholder="纬度" style="flex:1"></div>
+    <div class="row"><input v-model="to.lng" type="number" step="0.000001" placeholder="经度（自动填入或手动输入）" style="flex:1"><input v-model="to.lat" type="number" step="0.000001" placeholder="纬度（自动填入或手动输入）" style="flex:1"></div>
 
     <div class="row" style="margin-top:10px">
       <label style="font-size:12px">扇区:</label>
@@ -165,12 +166,25 @@ async function geocodeNewAddr() {
 
   <div class="modal" v-if="showAddrModal" @click.self="showAddrModal=false">
     <div class="inner">
-      <h3>添加新地址</h3>
-      <input v-model="newAddr.alias" placeholder="别名，如：家、公司、钟楼">
-      <div class="row"><input v-model="newAddr.name" placeholder="完整名称，如：泰华金茂国际" style="flex:1"><button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0" @click="geocodeNewAddr">🔍 查询坐标</button></div>
-      <input v-model="newAddr.lng" placeholder="经度 (lng)"><input v-model="newAddr.lat" placeholder="纬度 (lat)">
-      <p style="font-size:12px;color:#a898b8;margin-bottom:10px">坐标：<a href="https://lbs.amap.com/tools/picker" target="_blank">高德坐标拾取器</a></p>
-      <div class="btn-row"><button class="btn btn-secondary" @click="showAddrModal=false">取消</button><button class="btn btn-primary" @click="saveNewAddr">保存</button></div>
+      <h3>管理地址簿</h3>
+      <!-- 已有地址列表 -->
+      <div v-if="Object.keys(addresses).length>0" style="margin-bottom:10px;max-height:150px;overflow-y:auto">
+        <div v-for="(v,k) in addresses" :key="k" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:3px 0;background:#faf7fc;border-radius:8px;font-size:12px">
+          <span><strong>{{ k }}</strong> — {{ v.name }} <span style="color:#a898b8;font-size:10px">({{ typeof v.lng==='number' ? v.lng.toFixed(4) : v.lng }}, {{ typeof v.lat==='number' ? v.lat.toFixed(4) : v.lat }})</span></span>
+          <button class="btn btn-sm" style="background:#ff5252;color:#fff;font-size:9px;padding:2px 6px;flex-shrink:0;margin-left:8px" @click="deleteSavedAddr(k)">🗑</button>
+        </div>
+      </div>
+      <div v-else style="text-align:center;color:#a898b8;font-size:12px;margin-bottom:10px">还没有保存的地址哦~</div>
+      <hr style="border:none;border-top:1px dashed #ece0ec;margin:10px 0">
+      <h3 style="font-size:13px;color:#8a8098;margin-bottom:4px">添加新地址</h3>
+      <label style="font-size:11px;color:#a898b8">① 别名（用于快捷选择）</label>
+      <input v-model="newAddr.alias" placeholder="如：家、公司、钟楼">
+      <label style="font-size:11px;color:#a898b8">② 地址名称（用于搜索定位）</label>
+      <div class="row"><input v-model="newAddr.name" placeholder="如：西安钟楼" style="flex:1"><button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0" @click="geocodeNewAddr">🔍 查询坐标</button></div>
+      <label style="font-size:11px;color:#a898b8">③ 坐标（查询后自动填入，也可手动修改）</label>
+      <input v-model="newAddr.lng" placeholder="经度"><input v-model="newAddr.lat" placeholder="纬度">
+      <p style="font-size:11px;color:#a898b8;margin-bottom:10px">💡 先填名称 → 点「查询坐标」自动获取经纬度。搜索不准可手动修改坐标，或使用 <a href="https://lbs.amap.com/tools/picker" target="_blank">高德坐标拾取器</a></p>
+      <div class="btn-row"><button class="btn btn-secondary" @click="showAddrModal=false">关闭</button><button class="btn btn-primary" @click="saveNewAddr">保存地址</button></div>
     </div>
   </div>
 </div>

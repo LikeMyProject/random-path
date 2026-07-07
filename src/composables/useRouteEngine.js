@@ -22,10 +22,11 @@ export function generateWaypoints(o, d, mode, recent, lastDist, minD, maxD) {
   const bl = sd * 1.35; const em = Math.max(minD, bl)
   const td = em + Math.random() * Math.max(0, maxD - em)
   const en = Math.max(0, td - bl); const opw = c > 0 ? (en / c) / 1.6 : 0
-  const bc = Math.max(0.015, Math.min(0.35, opw / sd))
+  // 大幅降低偏移比例上限，避免途经点偏出主路过远导致折返
+  const bc = Math.max(0.008, Math.min(0.08, opw / sd))
   for (let i = 0; i < c; i++) {
-    const pr = (i + 1) / (c + 1); const cf = bc * (0.6 + Math.random() * 0.8)
-    const od = Math.max(200, Math.min(8000, cf * sd))
+    const pr = (i + 1) / (c + 1); const cf = bc * (0.5 + Math.random() * 0.6)
+    const od = Math.max(150, Math.min(2000, cf * sd))
     const mp = destinationPoint(o, sd * pr, bb)
     wps.push(destinationPoint(mp, od, bb + 90 * sign))
   }
@@ -64,10 +65,10 @@ function polylineOverlap(segA, segB, thresholdMeters = 300) {
 function checkBacktrack(segments) {
   for (let i = 0; i < segments.length; i++) {
     const ratio = detourRatio(segments[i])
-    if (ratio > 2.5) return { bad: true, reason: `第${i+1}段绕路比${ratio.toFixed(1)}` }
+    if (ratio > 2.0) return { bad: true, reason: `第${i+1}段绕路比${ratio.toFixed(1)}` }
   }
   for (let i = 0; i < segments.length - 1; i++) {
-    if (polylineOverlap(segments[i], segments[i+1])) return { bad: true, reason: `第${i+1}→${i+2}段折返重叠` }
+    if (polylineOverlap(segments[i], segments[i+1], 200)) return { bad: true, reason: `第${i+1}→${i+2}段折返重叠` }
   }
   return { bad: false, reason: '' }
 }
@@ -76,8 +77,9 @@ function findDeadEndWaypoints(segments) {
   for (let i = 0; i < segments.length - 1; i++) {
     const segIn = segments[i], segOut = segments[i+1]
     const ratioIn = detourRatio(segIn), ratioOut = detourRatio(segOut)
-    const overlap = polylineOverlap(segIn, segOut)
-    if (ratioIn > 2.0 || ratioOut > 2.0 || overlap) dead.push({ waypointIndex: i })
+    const overlap = polylineOverlap(segIn, segOut, 200)
+    // 降低死胡同判定阈值：绕路比>1.6 或折返重叠即判定
+    if (ratioIn > 1.6 || ratioOut > 1.6 || overlap) dead.push({ waypointIndex: i })
   }
   dead.sort((a, b) => b.waypointIndex - a.waypointIndex)
   return dead

@@ -13,30 +13,47 @@ const W = 960, H = 640, P = 44
 const supplyPositions = ref([])
 let flashTimer = null, flashCount = 0
 
-// zoom & pan state
+// zoom & pan state — 用安全范围防止浮点精度问题
 const zoom = ref(1), panX = ref(0), panY = ref(0)
+const ZOOM_MIN = 1, ZOOM_MAX = 20
 let dragging = false, lastX = 0, lastY = 0
 
+function clampZoom(v) {
+  const n = Number(v)
+  if (!isFinite(n) || isNaN(n)) return 1
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(n * 1000) / 1000))
+}
+function clampPan(v) {
+  const n = Number(v)
+  if (!isFinite(n) || isNaN(n)) return 0
+  return Math.min(2000, Math.max(-2000, n))
+}
+
 function zoomIn() {
-  const r = Math.min(20, zoom.value * 2) / zoom.value
-  panX.value *= r; panY.value *= r; zoom.value *= r
+  const newZ = clampZoom(zoom.value * 2)
+  const ratio = newZ / zoom.value
+  panX.value = clampPan(panX.value * ratio)
+  panY.value = clampPan(panY.value * ratio)
+  zoom.value = newZ
 }
 function zoomOut() {
-  const r = Math.max(1, zoom.value / 2) / zoom.value
-  panX.value *= r; panY.value *= r; zoom.value *= r
-  if (zoom.value <= 1) { panX.value = 0; panY.value = 0 }
+  const newZ = clampZoom(zoom.value / 2)
+  const ratio = newZ / zoom.value
+  panX.value = clampPan(panX.value * ratio)
+  panY.value = clampPan(panY.value * ratio)
+  zoom.value = newZ
+  if (zoom.value <= ZOOM_MIN) { panX.value = 0; panY.value = 0 }
 }
-function resetView() { zoom.value = 1; panX.value = 0; panY.value = 0 }
+function resetView() { zoom.value = ZOOM_MIN; panX.value = 0; panY.value = 0 }
 
 // flash states: -1=hidden, 0=normal, 1=big, 2=bigger
 function flashMarker(index) {
   if (flashTimer) { clearInterval(flashTimer); flashCount = 0 }
   if (index < 0) { draw(); return }
-  // auto-reset zoom and scroll into view
   resetView()
   nextTick(() => { cvs.value?.scrollIntoView?.({ behavior: 'smooth', block: 'center' }) })
   flashCount = 0
-  const steps = [1, 2, 1, 2, 1, 2, 0] // big→bigger→big→bigger→big→bigger→normal
+  const steps = [1, 2, 1, 2, 1, 2, 0]
   flashTimer = setInterval(() => {
     draw(flashCount < steps.length ? { index, flash: steps[flashCount] } : { index: -1, flash: 0 })
     flashCount++
@@ -44,12 +61,15 @@ function flashMarker(index) {
   }, 200)
 }
 
-watch(() => props.highlightIndex, (idx) => flashMarker(idx))
+watch(() => props.highlightIndex, (idx) => {
+  // 跳过由 resetView 触发的重复调用
+  if (flashTimer) return
+  flashMarker(idx)
+})
 
 function draw(flashInfo = { index: -1, flash: 0 }) {
   const cv = cvs.value; if (!cv) return
   const dpr = window.devicePixelRatio || 1
-  // 用 parent 宽度，不用 clientWidth（避免回流循环）
   const w = 360, h = 320
   cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px'
   const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr)
@@ -70,15 +90,16 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
   const ox = (w - rL * sc) / 2, oy = (h - rA * sc) / 2
   const tx = l => ox + (l - mnLo) * sc, ty = a => oy + (mxLa - a) * sc
 
-  // fixed background (always full size)
+  // fixed background
   ctx.fillStyle = '#faf7fc'; ctx.fillRect(0, 0, w, h)
 
-  // apply zoom/pan as canvas transform (only affects route content)
+  // apply zoom/pan as canvas transform — zoom centered on canvas, then pan
   ctx.save()
-  const z = zoom.value
-  ctx.translate(w/2 + panX.value, h/2 + panY.value)
+  const z = clampZoom(zoom.value)
+  // 缩放中心在 canvas 正中，然后偏移 pan
+  ctx.translate(w/2, h/2)
   ctx.scale(z, z)
-  ctx.translate(-w/2, -h/2)
+  ctx.translate(-w/2 + clampPan(panX.value), -h/2 + clampPan(panY.value))
 
   // route polylines
   if (props.segments) props.segments.forEach(s => {
@@ -138,7 +159,7 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
   })
   supplyPositions.value = pos
 
-  // restore transform (back to fixed coordinates)
+  // restore transform
   ctx.restore()
 
   // north arrow (fixed position, outside zoom/pan)
@@ -146,7 +167,7 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
   ctx.fillText('↑ 北', w - P + 4, P - 4)
 }
 
-// click on supply markers (account for zoom/pan transform)
+// click on supply markers
 function onCanvasClick(e) {
   const cv = cvs.value; if (!cv) return
   const rect = cv.getBoundingClientRect()
@@ -154,10 +175,11 @@ function onCanvasClick(e) {
   const cx = (e.clientX - rect.left) * dpr
   const cy = (e.clientY - rect.top) * dpr
   const w = 360, h = 320
-  const z = zoom.value
-  // inverse transform: screen → drawing coords
-  const dx = (cx - w/2 - panX.value) / z + w/2
-  const dy = (cy - h/2 - panY.value) / z + h/2
+  const z = clampZoom(zoom.value)
+  // inverse transform: 先撤销 pan 再撤销 scale
+  const px = clampPan(panX.value), py = clampPan(panY.value)
+  const dx = (cx - w/2) / z + w/2 - px
+  const dy = (cy - h/2) / z + h/2 - py
   for (let i = 0; i < supplyPositions.value.length; i++) {
     const { x, y } = supplyPositions.value[i]
     if (Math.sqrt((dx - x) ** 2 + (dy - y) ** 2) < 14) {
@@ -169,43 +191,43 @@ function onCanvasClick(e) {
 
 // drag to pan
 function onMouseDown(e) {
-  if (zoom.value <= 1) return
+  if (zoom.value <= ZOOM_MIN) return
   dragging = true; lastX = e.clientX; lastY = e.clientY
 }
 function onMouseMove(e) {
   if (!dragging) return
-  panX.value += e.clientX - lastX
-  panY.value += e.clientY - lastY
+  panX.value = clampPan(panX.value + e.clientX - lastX)
+  panY.value = clampPan(panY.value + e.clientY - lastY)
   lastX = e.clientX; lastY = e.clientY
 }
 function onMouseUp() { dragging = false }
 function onTouchStart(e) {
-  if (zoom.value <= 1) return
+  if (zoom.value <= ZOOM_MIN) return
   if (e.touches.length !== 1) { dragging = false; return }
   dragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY
 }
 function onTouchMove(e) {
   if (!dragging) return
-  panX.value += e.touches[0].clientX - lastX
-  panY.value += e.touches[0].clientY - lastY
+  panX.value = clampPan(panX.value + e.touches[0].clientX - lastX)
+  panY.value = clampPan(panY.value + e.touches[0].clientY - lastY)
   lastX = e.touches[0].clientX; lastY = e.touches[0].clientY
 }
 function onTouchEnd() { dragging = false }
 
 onMounted(draw)
-watch(() => [props.segments, props.waypoints, props.supplyPoints, props.highlightIndex, zoom.value, panX.value, panY.value],
+watch(() => [props.segments, props.waypoints, props.supplyPoints, zoom.value, panX.value, panY.value],
   () => nextTick(draw), { deep: true })
 </script>
 <template>
   <div class="thumb-wrap">
-    <canvas ref="cvs" class="route-thumb" :class="{zoomable: zoom>1}"
+    <canvas ref="cvs" class="route-thumb" :class="{zoomable: zoom>ZOOM_MIN}"
       @click="onCanvasClick"
       @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseUp"
       @touchstart.prevent="onTouchStart" @touchmove.prevent="onTouchMove" @touchend="onTouchEnd" />
     <div class="zoom-btns">
-      <button class="zbtn" @click="zoomIn" :disabled="zoom>=20" title="放大">＋</button>
-      <button class="zbtn" @click="zoomOut" :disabled="zoom<=1" title="缩小">－</button>
-      <button v-if="zoom>1" class="zbtn reset" @click="resetView" title="重置">↺</button>
+      <button class="zbtn" @click="zoomIn" :disabled="zoom>=ZOOM_MAX" title="放大">＋</button>
+      <button class="zbtn" @click="zoomOut" :disabled="zoom<=ZOOM_MIN" title="缩小">－</button>
+      <button v-if="zoom>ZOOM_MIN" class="zbtn reset" @click="resetView" title="重置">↺</button>
     </div>
   </div>
 </template>
@@ -213,7 +235,6 @@ watch(() => [props.segments, props.waypoints, props.supplyPoints, props.highligh
 .thumb-wrap { position: relative; }
 .route-thumb { width: 360px; max-width: 100%; border-radius: 12px; background: #faf7fc; border: 1.5px solid #f2eaf4; display: block; }
 .route-thumb.zoomable { cursor: grab; }
-.thumb-wrap { }
 .zoom-btns { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; z-index: 5; }
 .zbtn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid #ddd6fe; background: rgba(255,255,255,0.9); color: #7c3aed; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1; }
 .zbtn:disabled { opacity: 0.3; cursor: default; }
