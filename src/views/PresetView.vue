@@ -227,16 +227,17 @@ async function generate() {
   supplyPoints.value = []; supplyCoords = []; supplySearched = 0
   try {
     let td = 0, tt = 0; const segs = []
-    for (let i = 0; i < pts.length - 1; i++) {
-      const seg = await fetchBicyclingRoute(pts[i], pts[i + 1])
+    // 并行请求所有路段
+    const segResults = await Promise.all(pts.slice(0, -1).map((pt, i) => fetchBicyclingRoute(pt, pts[i + 1])))
+    for (let i = 0; i < segResults.length; i++) {
+      const seg = segResults[i]
       td += seg.distance; tt += seg.duration
       segs.push({ ...seg, from: pts[i], to: pts[i + 1], idx: i })
       progress.value = 30 + (i / (pts.length - 1)) * 40
       tryInfo.value = `正在获取第${i+1}段路线…`
-      if (i < pts.length - 2) await new Promise(r => setTimeout(r, 800))
     }
     const wps = pts.slice(1, -1)
-    if (wps.length > 0) { tryInfo.value = '正在获取途经点地名…'; for (let i = 0; i < wps.length; i++) { const wp = wps[i]; wp.poiName = await nameWaypoint(wp.lng, wp.lat); if (i < wps.length - 1) await new Promise(r => setTimeout(r, 800)) } }
+    if (wps.length > 0) { tryInfo.value = '正在获取途经点地名…'; await Promise.all(wps.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) }
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = { waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null }
     resultShow.value = true

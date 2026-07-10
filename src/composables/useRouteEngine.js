@@ -2,7 +2,7 @@ import { haversine, getBearing, destinationPoint, sleep, sortWaypointsAlongCorri
 import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths } from './useAMap.js'
 import { getRecentSectors } from './useStorage.js'
 
-export const MAX_WAYPOINTS = 10, MAX_RETRIES = 30, EARLY_ACCEPT_AFTER = 8
+export const MAX_WAYPOINTS = 10, MAX_RETRIES = 12, EARLY_ACCEPT_AFTER = 5
 
 function pickSector(mode, recent) {
   if (mode === 'mixed') { const s = Math.random() > 0.5 ? 1 : -1; return { sector: -1, dirSign: () => s } }
@@ -101,23 +101,27 @@ function snapWaypointToMainRoad(segIn, segOut) {
 function validateCoord(lng, lat) { return lng !== '' && lng != null && !isNaN(parseFloat(lng)) && lat !== '' && lat != null && !isNaN(parseFloat(lat)) && Math.abs(parseFloat(lat)) <= 90 && Math.abs(parseFloat(lng)) <= 180 }
 
 async function tryFixDeadEnds(segments, waypoints, td, tt, home, work, maxDist, onTry, attempt, sector) {
-  const MAX_FIX = 3; let fs = segments, fw = [...waypoints], fd = td, ft = tt, fa = false
+  const MAX_FIX = 3; let fs = [...segments], fw = [...waypoints], fd = td, ft = tt, fa = false
   for (let pass = 0; pass <= MAX_FIX; pass++) {
     const dead = findDeadEndWaypoints(fs)
     if (dead.length === 0) { onTry?.(attempt + 1, fd, fa ? '已修复折返' : null); return { accepted: true, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } } }
     if (pass === MAX_FIX) break
     let fixed = 0
+    const affectedSegIndices = new Set()
     for (const d of dead) {
       const wi = d.waypointIndex; if (wi >= fw.length) continue
       const snapped = snapWaypointToMainRoad(fs[wi], fs[wi+1])
-      if (snapped && validateCoord(snapped.lng, snapped.lat)) { fw[wi] = snapped; fixed++ }
+      if (snapped && validateCoord(snapped.lng, snapped.lat)) { fw[wi] = snapped; fixed++; affectedSegIndices.add(wi); affectedSegIndices.add(wi + 1) }
     }
     if (fixed === 0) break
     fa = true; onTry?.(attempt + 1, fd, `修正${fixed}个死胡同途经点…`)
     const np = [home, ...fw, work]
     try {
-      const sp = []; for (let i = 0; i < np.length - 1; i++) sp.push(fetchBicyclingRoute(np[i], np[i+1]))
-      const sr = await Promise.all(sp); fs = sr.map((s, i) => ({ ...s, from: np[i], to: np[i+1], idx: i }))
+      // 只重查受影响的段，其他段保持不变
+      const sp = []; const indices = []
+      for (const i of affectedSegIndices) { sp.push(fetchBicyclingRoute(np[i], np[i+1])); indices.push(i) }
+      const sr = await Promise.all(sp)
+      for (let j = 0; j < indices.length; j++) { const i = indices[j]; fs[i] = { ...sr[j], from: np[i], to: np[i+1], idx: i } }
       fd = fs.reduce((s, seg) => s + seg.distance, 0); ft = fs.reduce((s, seg) => s + seg.duration, 0)
     } catch(e) { onTry?.(attempt + 1, null, `修复重查失败: ${e.message}`); return null }
     if (fd > maxDist) { onTry?.(attempt+1, fd, '修复后超范围'); return { accepted: false, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } } }
@@ -174,8 +178,8 @@ export async function tryGenerateRoute(home, work, opts = {}) {
         if (diff < bestDiff) { bestDiff = diff; best = { waypoints, segments: segs, totalDistance: td, totalDuration: tt, sector } }
         onTry?.(a + 1, td, `超出${((td-maxDist)/1000).toFixed(1)}km`)
       }
-    } catch(e) { onTry?.(a + 1, null, e.message); await sleep(500) }
-    await sleep(200)
+    } catch(e) { onTry?.(a + 1, null, e.message); await sleep(100) }
+    await sleep(50)
   }
 
   if (best) {

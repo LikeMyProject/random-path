@@ -71,7 +71,7 @@ async function doGenerate(isRetry = false) {
       }
     })
     if (!route) { toast('生成失败，请重试', 'err'); loading.value = false; return }
-    if (route.waypoints.length > 0) { tryInfo.value = '正在获取途经点地名…'; for (const wp of route.waypoints) { wp.poiName = await nameWaypoint(wp.lng, wp.lat); await new Promise(r => setTimeout(r, 200)) } }
+    if (route.waypoints.length > 0) { tryInfo.value = '正在获取途经点地名…'; await Promise.all(route.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) }
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = route; resultShow.value = true; loading.value = false
     saveHistory({ type: 'commute', home: h.name, work: w.name, distance: route.totalDistance, sector: route.sector, waypoints: route.waypoints.map(w => ({ lng: w.lng, lat: w.lat, name: w.poiName })) })
