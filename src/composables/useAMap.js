@@ -35,6 +35,11 @@ export async function searchPOIsByText(keywords, city = '', limit = 5) {
 
 export async function geocode(address, city = '') {
   const k = `${address}||${city}`; if (gcCache.has(k)) return gcCache.get(k)
+  const tryPOI = async () => {
+    const pois = await searchPOIsByText(address, city || '', 1)
+    if (pois.length > 0) return { lng: pois[0].lng, lat: pois[0].lat, name: pois[0].name }
+    return null
+  }
   try {
     let url = `https://restapi.amap.com/v3/geocode/geo?key=${AMAP_KEY}&address=${encodeURIComponent(address)}`
     if (city) url += `&city=${encodeURIComponent(city)}`
@@ -42,16 +47,17 @@ export async function geocode(address, city = '') {
     if (d.status === '1' && d.geocodes?.length > 0) {
       const g = d.geocodes[0]; const [lng, lat] = g.location.split(',').map(parseFloat)
       const apiName = g.formatted_address || ''
-      const name = apiName || address
       // 地理编码结果太笼统（丢失了用户输入的具体地标名），用 POI 文本搜索找精确坐标
       if (address.length > apiName.length + 2) {
-        const pois = await searchPOIsByText(address, city || '', 1)
-        if (pois.length > 0) { const r = { lng: pois[0].lng, lat: pois[0].lat, name: pois[0].name }; if (gcCache.size < 100) gcCache.set(k, r); return r }
-        // POI 也搜不到就用用户输入做名字
+        const poi = await tryPOI()
+        if (poi) { const r = { ...poi }; if (gcCache.size < 100) gcCache.set(k, r); return r }
         const r = { lng, lat, name: address }; if (gcCache.size < 100) gcCache.set(k, r); return r
       }
-      const r = { lng, lat, name }; if (gcCache.size < 100) gcCache.set(k, r); return r
+      const r = { lng, lat, name: apiName || address }; if (gcCache.size < 100) gcCache.set(k, r); return r
     }
+    // geocode 没找到，直接用 POI 文本搜索
+    const poi = await tryPOI()
+    if (poi) { if (gcCache.size < 100) gcCache.set(k, poi); return poi }
   } catch (e) {}
   return null
 }
