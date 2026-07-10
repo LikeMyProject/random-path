@@ -23,6 +23,16 @@ async function fetchJSON(url, retries = 2) {
   }
 }
 const gcCache = new Map()
+export async function searchPOIsByText(keywords, city = '', limit = 5) {
+  try {
+    let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}&keywords=${encodeURIComponent(keywords)}&offset=${limit}`
+    if (city) url += `&region=${encodeURIComponent(city)}`
+    const d = await fetchJSON(url)
+    if (d.status === '1' && d.pois?.length > 0) return d.pois.map(p => { const [pl, pt] = p.location.split(',').map(parseFloat); return { lng: pl, lat: pt, name: p.name, type: p.type } })
+  } catch (e) {}
+  return []
+}
+
 export async function geocode(address, city = '') {
   const k = `${address}||${city}`; if (gcCache.has(k)) return gcCache.get(k)
   try {
@@ -31,8 +41,16 @@ export async function geocode(address, city = '') {
     const d = await fetchJSON(url)
     if (d.status === '1' && d.geocodes?.length > 0) {
       const g = d.geocodes[0]; const [lng, lat] = g.location.split(',').map(parseFloat)
-      const r = { lng, lat, name: g.formatted_address || address }
-      if (gcCache.size < 100) gcCache.set(k, r); return r
+      const apiName = g.formatted_address || ''
+      const name = apiName || address
+      // 地理编码结果太笼统（丢失了用户输入的具体地标名），用 POI 文本搜索找精确坐标
+      if (address.length > apiName.length + 2) {
+        const pois = await searchPOIsByText(address, city || '', 1)
+        if (pois.length > 0) { const r = { lng: pois[0].lng, lat: pois[0].lat, name: pois[0].name }; if (gcCache.size < 100) gcCache.set(k, r); return r }
+        // POI 也搜不到就用用户输入做名字
+        const r = { lng, lat, name: address }; if (gcCache.size < 100) gcCache.set(k, r); return r
+      }
+      const r = { lng, lat, name }; if (gcCache.size < 100) gcCache.set(k, r); return r
     }
   } catch (e) {}
   return null
