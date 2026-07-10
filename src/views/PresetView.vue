@@ -14,8 +14,8 @@ const { suggestions, showSuggest, searchAddress, pickSuggestion, closeSuggest } 
 
 // ====== ALL 90+ PRESET ROUTES ======
 const PRESET_ROUTES = [
-  { name:'西安·三河一山绿道',start:{name:'西安北站',lng:108.958,lat:34.379},end:{name:'西安北站',lng:108.958,lat:34.379},waypoints:[{name:'三河一山起点',lng:109.063,lat:34.314},{name:'灞渭驿',lng:109.010,lat:34.431},{name:'漕渭驿',lng:108.946,lat:34.403},{name:'沣河绿道',lng:108.747,lat:34.323},{name:'仪祉湖',lng:108.764,lat:34.106},{name:'沣峪口转盘',lng:108.822,lat:34.051},{name:'太乙驿',lng:109.015,lat:34.032},{name:'库峪河大桥',lng:109.172,lat:34.028},{name:'半坡驿',lng:109.044,lat:34.267}]},
-  { name:'西安·骊山环山路（最美72拐）',start:{name:'西安北站',lng:108.958,lat:34.379},end:{name:'西安北站',lng:108.958,lat:34.379},waypoints:[{name:'骊山索道大门',lng:109.210,lat:34.360},{name:'骊山牡丹门',lng:109.220,lat:34.350},{name:'骊山天文台',lng:109.230,lat:34.340},{name:'藤原豆腐店',lng:109.240,lat:34.330},{name:'人祖庙',lng:109.250,lat:34.320},{name:'洪庆山',lng:109.180,lat:34.280}]},
+  { name:'西安·三河一山绿道',start:{name:'三河一山起点',lng:109.063,lat:34.314},end:{name:'三河一山起点',lng:109.063,lat:34.314},waypoints:[{name:'灞渭驿',lng:109.010,lat:34.431},{name:'漕渭驿',lng:108.946,lat:34.403},{name:'沣河绿道',lng:108.747,lat:34.323},{name:'仪祉湖',lng:108.764,lat:34.106},{name:'沣峪口转盘',lng:108.822,lat:34.051},{name:'太乙驿',lng:109.015,lat:34.032},{name:'库峪河大桥',lng:109.172,lat:34.028},{name:'半坡驿',lng:109.044,lat:34.267}]},
+  { name:'西安·骊山环山路（最美72拐）',start:{name:'骊山索道大门',lng:109.210,lat:34.360},end:{name:'骊山索道大门',lng:109.210,lat:34.360},waypoints:[{name:'骊山牡丹门',lng:109.220,lat:34.350},{name:'骊山天文台',lng:109.230,lat:34.340},{name:'藤原豆腐店',lng:109.240,lat:34.330},{name:'人祖庙',lng:109.250,lat:34.320},{name:'洪庆山',lng:109.180,lat:34.280}]},
   { name:'西安·秦岭分水岭（G210爬坡线）',start:{name:'沣峪口',lng:108.830,lat:34.050},end:{name:'分水岭',lng:108.950,lat:33.880},waypoints:[{name:'净业寺',lng:108.850,lat:34.020},{name:'九龙潭',lng:108.870,lat:33.980},{name:'黎元坪',lng:108.890,lat:33.950},{name:'鸡窝子',lng:108.920,lat:33.920},{name:'广货街',lng:108.800,lat:33.830}]},
   { name:'西安·城墙环线',start:{name:'永宁门',lng:108.948,lat:34.254},end:{name:'永宁门',lng:108.948,lat:34.254},waypoints:[{name:'长乐门',lng:108.970,lat:34.263},{name:'安远门',lng:108.948,lat:34.274},{name:'安定门',lng:108.926,lat:34.263}]},
   { name:'西安·曲江池盛唐文化线',start:{name:'大雁塔',lng:108.963,lat:34.217},end:{name:'寒窑',lng:108.993,lat:34.199},waypoints:[{name:'大唐芙蓉园',lng:108.977,lat:34.213},{name:'曲江池遗址公园',lng:108.985,lat:34.206}]},
@@ -142,60 +142,63 @@ function removeWP(i) { waypoints.value.splice(i, 1) }
 
 const activeRoute = computed(() => PRESET_ROUTES.find(r => r.name === selectedKey.value))
 
+const hasCustomStart = computed(() => !!(customStart.value.name && customStart.value.lng && customStart.value.lat))
+
 const fullPoints = computed(() => {
   const pts = []
   const route = activeRoute.value
   if (!route) return pts
-  if (customStart.value.name && customStart.value.lng && customStart.value.lat) pts.push({ name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) })
-  else pts.push({ ...route.start })
-  pts.push(...waypoints.value.filter(w => w.name && w.lng && w.lat && !isNaN(parseFloat(w.lng)) && !isNaN(parseFloat(w.lat))).map(w => ({ name: w.name, lng: parseFloat(w.lng), lat: parseFloat(w.lat) })))
-  pts.push({ ...route.end })
+  if (hasCustomStart.value) {
+    // 自定义起点 → 环线：起点出发兜一圈回到起点
+    const s = { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) }
+    pts.push(s)
+    pts.push(...waypoints.value.filter(w => w.name && w.lng && w.lat && !isNaN(parseFloat(w.lng)) && !isNaN(parseFloat(w.lat))).map(w => ({ name: w.name, lng: parseFloat(w.lng), lat: parseFloat(w.lat) })))
+    pts.push(s) // 环线终点=起点
+  } else {
+    pts.push({ ...route.start })
+    pts.push(...waypoints.value.filter(w => w.name && w.lng && w.lat && !isNaN(parseFloat(w.lng)) && !isNaN(parseFloat(w.lat))).map(w => ({ name: w.name, lng: parseFloat(w.lng), lat: parseFloat(w.lat) })))
+    pts.push({ ...route.end })
+  }
   return pts
 })
 
 const presetObj = computed(() => {
   const r = activeRoute.value
   if (!r) return null
-  return {
-    start: customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : r.start,
-    end: r.end,
-    waypoints: r.waypoints
+  if (hasCustomStart.value) {
+    const s = { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) }
+    return { start: s, end: s, waypoints: r.waypoints }
   }
+  return { start: r.start, end: r.end, waypoints: r.waypoints }
 })
 
 const diffObj = computed(() => result.value ? rateDifficulty(result.value.totalDistance, result.value.totalClimb) : null)
 const navUrl = computed(() => {
-  if (!result.value) return ''
-  const route = activeRoute.value
-  if (!route) return ''
-  const start = customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : route.start
-  return buildNavUrl(start, route.end, result.value.waypoints)
+  if (!result.value || !presetObj.value) return ''
+  return buildNavUrl(presetObj.value.start, presetObj.value.end, result.value.waypoints)
 })
 function openNav() {
-  if (!result.value || !activeRoute.value) return
-  const route = activeRoute.value
-  const start = customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : route.start
-  openNavigation(start, route.end, result.value.waypoints)
+  if (!result.value || !presetObj.value) return
+  openNavigation(presetObj.value.start, presetObj.value.end, result.value.waypoints)
 }
 function copyNav() { if (navUrl.value) { navigator.clipboard?.writeText(navUrl.value); toast('已复制') } }
 function downloadGpx() {
-  if (!result.value || !activeRoute.value) return
-  const route = activeRoute.value
-  const start = customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : route.start
-  const gpx = buildGPX(result.value, start, route.end)
+  if (!result.value || !presetObj.value) return
+  const { start, end } = presetObj.value
+  const gpx = buildGPX(result.value, start, end)
   const blob = new Blob([gpx], { type: 'application/gpx+xml' }); const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob); a.download = `RandomPath_Preset_${start.name}_${route.end.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`
+  a.href = URL.createObjectURL(blob); a.download = `RandomPath_Preset_${start.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`
   a.click(); URL.revokeObjectURL(a.href)
 }
 async function doShare() {
-  if (!result.value || !activeRoute.value) return
+  if (!result.value || !presetObj.value) return
+  const { start, end } = presetObj.value
   const route = activeRoute.value
-  const start = customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : route.start
   const canvas = generateShareImage({
     title: route.name,
-    subtitle: start.name + ' → ' + route.end.name,
+    subtitle: start.name + (hasCustomStart.value ? ' ↻ 环线' : ' → ' + end.name),
     totalDistance: result.value.totalDistance, totalDuration: result.value.totalDuration,
-    segments: result.value.segments, waypoints: result.value.waypoints, home: start, work: route.end,
+    segments: result.value.segments, waypoints: result.value.waypoints, home: start, work: end,
     stats: [
       { label: '总距离', value: (result.value.totalDistance / 1000).toFixed(1) + ' km' },
       { label: '预计', value: Math.round(result.value.totalDuration / 60) + ' 分钟' },
@@ -252,9 +255,8 @@ async function generate() {
     result.value = { waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null }
     resultShow.value = true
     // 保存最后路线到本地
-    const route = activeRoute.value
-    const start = customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : route.start
-    saveLastRoute({ type: 'preset', presetKey: selectedKey.value, home: start, work: route.end, waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null })
+    const po = presetObj.value
+    saveLastRoute({ type: 'preset', presetKey: selectedKey.value, home: po.start, work: po.end, waypoints: wps, segments: segs, totalDistance: td, totalDuration: tt, sector: -1, totalClimb: null })
   } catch (e) { toast('错误: ' + e.message, 'err') }
   loading.value = false
 }
