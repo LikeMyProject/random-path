@@ -30,18 +30,10 @@ function clampPan(v) {
 }
 
 function zoomIn() {
-  const newZ = clampZoom(zoom.value * 2)
-  const ratio = newZ / zoom.value
-  panX.value = clampPan(panX.value * ratio)
-  panY.value = clampPan(panY.value * ratio)
-  zoom.value = newZ
+  zoom.value = clampZoom(zoom.value * 2)
 }
 function zoomOut() {
-  const newZ = clampZoom(zoom.value / 2)
-  const ratio = newZ / zoom.value
-  panX.value = clampPan(panX.value * ratio)
-  panY.value = clampPan(panY.value * ratio)
-  zoom.value = newZ
+  zoom.value = clampZoom(zoom.value / 2)
   if (zoom.value <= ZOOM_MIN) { panX.value = 0; panY.value = 0 }
 }
 function resetView() { zoom.value = ZOOM_MIN; panX.value = 0; panY.value = 0 }

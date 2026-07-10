@@ -6,6 +6,7 @@ import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute
 import { useSuggest } from '../composables/useAutoComplete.js'
 import { tryGenerateRoute, MAX_RETRIES, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
 import { rateDifficulty } from '../composables/useScoring.js'
+import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
@@ -95,6 +96,25 @@ const navUrl = computed(() => result.value && homeObj.value && workObj.value ? b
 function openNav() { if (result.value && homeObj.value && workObj.value) openNavigation(homeObj.value, workObj.value, result.value.waypoints) }
 function copyNav() { if (navUrl.value) { navigator.clipboard?.writeText(navUrl.value); toast('已复制') } }
 function downloadGpx() { if (result.value && homeObj.value && workObj.value) { const gpx = buildGPX(result.value, homeObj.value, workObj.value); const blob = new Blob([gpx], { type: 'application/gpx+xml' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `RandomPath_${homeObj.value.name}_${workObj.value.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`; a.click(); URL.revokeObjectURL(a.href) } }
+async function doShare() {
+  if (!result.value) return
+  const route = result.value
+  const h = homeObj.value, w = workObj.value
+  const canvas = generateShareImage({
+    title: (h?.name || '?') + ' → ' + (w?.name || '?'),
+    subtitle: (route.totalDistance / 1000).toFixed(1) + ' km · ' + Math.round(route.totalDuration / 60) + ' min',
+    totalDistance: route.totalDistance, totalDuration: route.totalDuration,
+    segments: route.segments, waypoints: route.waypoints, home: h, work: w,
+    stats: [
+      { label: '总距离', value: (route.totalDistance / 1000).toFixed(1) + ' km' },
+      { label: '预计', value: Math.round(route.totalDuration / 60) + ' 分钟' },
+      { label: '途经点', value: route.waypoints.length + ' 个' },
+    ]
+  })
+  const result = await shareImage(canvas, `RandomPath_${(h?.name||'route')}_${(route.totalDistance/1000).toFixed(1)}km.png`)
+  if (result === 'shared') toast('已分享 🎉')
+  else toast('已下载 📥')
+}
 
 const showAddrModal = ref(false), newAddr = ref({ alias: '', name: '', lng: '', lat: '' })
 function saveNewAddr() { const a = newAddr.value; if (!a.alias || !a.name || !a.lng || !a.lat) { toast('请填写完整', 'warn'); return }; addresses[a.alias] = { name: a.name, lng: parseFloat(a.lng), lat: parseFloat(a.lat) }; saveAddresses(addresses); newAddr.value = { alias: '', name: '', lng: '', lat: '' }; showAddrModal.value = false; toast('地址已保存') }
@@ -172,7 +192,7 @@ async function geocodeNewAddr() {
     </div>
     <button class="btn btn-nav" @click="openNav">开始导航</button>
     <div class="nav-link-box"><div class="label">高德导航链接（可复制）：</div><div class="url">{{ navUrl }}</div></div>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button><button class="btn btn-sm btn-secondary" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff" @click="doShare">📤 分享</button></div>
     <button class="btn btn-secondary" style="margin-top:8px" @click="doGenerate(true)">换一条</button>
   </div>
 

@@ -5,6 +5,7 @@ import { fetchBicyclingRoute } from '../composables/useAMap.js'
 import { rateDifficulty } from '../composables/useScoring.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
 import { nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
+import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
@@ -111,8 +112,6 @@ const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
 const supplyPoints = ref([]), supplyLoading = ref(false), highlightSupply = ref(-1)
 function onSupplyChipClick(i) { highlightSupply.value = -1; nextTick(() => { highlightSupply.value = i }) }
 function onSupplyMarkerClick(i) { highlightSupply.value = i; const sp = supplyPoints.value[i]; if (sp) toast(sp.name) }
-let supplyCoords = [], supplySearched = 0
-
 let st = null
 function onStartInput() { clearTimeout(st); st = setTimeout(() => searchAddress(customStart.value.name), 200) }
 function selectSugg(i) { const p = pickSuggestion(i); if (p) { customStart.value = { name: p.name, lng: p.lng, lat: p.lat }; toast(p.name) } }
@@ -188,33 +187,44 @@ function downloadGpx() {
   a.href = URL.createObjectURL(blob); a.download = `RandomPath_Preset_${start.name}_${route.end.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`
   a.click(); URL.revokeObjectURL(a.href)
 }
+async function doShare() {
+  if (!result.value || !activeRoute.value) return
+  const route = activeRoute.value
+  const start = customStart.value.name && customStart.value.lng ? { name: customStart.value.name, lng: parseFloat(customStart.value.lng), lat: parseFloat(customStart.value.lat) } : route.start
+  const canvas = generateShareImage({
+    title: route.name,
+    subtitle: start.name + ' → ' + route.end.name,
+    totalDistance: result.value.totalDistance, totalDuration: result.value.totalDuration,
+    segments: result.value.segments, waypoints: result.value.waypoints, home: start, work: route.end,
+    stats: [
+      { label: '总距离', value: (result.value.totalDistance / 1000).toFixed(1) + ' km' },
+      { label: '预计', value: Math.round(result.value.totalDuration / 60) + ' 分钟' },
+      { label: '途经点', value: result.value.waypoints.length + ' 个' },
+    ]
+  })
+  const r = await shareImage(canvas, `RandomPath_${route.name}_${(result.value.totalDistance/1000).toFixed(1)}km.png`)
+  if (r === 'shared') toast('已分享 🎉')
+  else toast('已下载 📥')
+}
 
 async function searchSupply() {
   if (supplyLoading.value) return
-  // first click: sample the route polyline
-  if (supplyCoords.length === 0) {
-    const segs = result.value?.segments
-    if (!segs) return
-    const all = []; const { parsePolyline, samplePoints } = await import('../utils/math.js')
-    for (const seg of segs) { if (seg.polyline) all.push(...parsePolyline(seg.polyline)) }
-    if (all.length >= 2) supplyCoords = samplePoints(all, Math.min(9, Math.ceil(all.length / 15)))
-  }
-  if (supplySearched >= supplyCoords.length) { toast('已搜索全部区域', 'warn'); return }
-  supplyLoading.value = true
-  const batch = supplyCoords.slice(supplySearched, supplySearched + 3)
+  const segs = result.value?.segments
+  if (!segs || segs.length === 0) { toast('没有路线数据', 'warn'); return }
+  supplyLoading.value = true; supplyPoints.value = []
   try {
-    const { searchPOIs } = await import('../composables/useAMap.js')
-    const seen = new Set(supplyPoints.value.map(p => `${p.name}|${p.lng.toFixed(4)}|${p.lat.toFixed(4)}`))
-    for (const pt of batch) {
-      const pois = await searchPOIs(pt.lng, pt.lat, '080100|010100|060000|050000', 800, 15)
-      for (const poi of pois) {
-        const key = `${poi.name}|${poi.lng.toFixed(4)}|${poi.lat.toFixed(4)}`
-        if (!seen.has(key)) { seen.add(key); supplyPoints.value.push(poi) }
+    const { searchAlongRoute } = await import('../composables/useAMap.js')
+    const results = await searchAlongRoute(segs, {
+      concurrency: 6,
+      onProgress: ({ done, total }) => {
+        tryInfo.value = `沿途搜索中… ${Math.round(done/total*100)}%`
       }
-      await new Promise(r => setTimeout(r, 1000))
-    }
-    supplySearched += batch.length
-    toast(`找到 ${supplyPoints.value.length} 个补给点`)
+    })
+    supplyPoints.value = results
+    const catCounts = {}
+    for (const r of results) { catCounts[r.catLabel] = (catCounts[r.catLabel] || 0) + 1 }
+    const summary = Object.entries(catCounts).map(([k,v]) => `${k}×${v}`).join(' ')
+    toast(`找到 ${results.length} 个补给点 ${summary ? '| ' + summary : ''}`)
   } catch(e) { toast('搜索失败，请稍后重试', 'warn') }
   supplyLoading.value = false
 }
@@ -224,7 +234,7 @@ async function generate() {
   if (pts.length < 2) { toast('至少需要起终点', 'warn'); return }
   loading.value = true; resultShow.value = false; progress.value = 0; tryInfo.value = '正在拉取路线数据…'
   // reset supply state
-  supplyPoints.value = []; supplyCoords = []; supplySearched = 0
+  supplyPoints.value = []
   try {
     let td = 0, tt = 0; const segs = []
     // 并行请求所有路段
@@ -349,15 +359,15 @@ onMounted(() => {
       <div class="segments"><div class="seg" v-for="(seg,i) in result.segments" :key="i"><span class="seg-detail">第{{ i+1 }}段: {{ fullPoints[i]?.name }} → {{ fullPoints[i+1]?.name }}</span><span class="seg-nums">{{ (seg.distance/1000).toFixed(1) }}km · {{ Math.round(seg.duration/60) }}min</span></div></div>
       <div v-if="supplyPoints.length" style="margin-top:12px;border-top:1px dashed #ece0ec;padding-top:10px">
         <div style="font-size:12px;font-weight:700;color:#5e5468;margin-bottom:6px">💧 沿途补给点 ({{ supplyPoints.length }})</div>
-        <div class="supply-chips"><span v-for="(sp, i) in supplyPoints" :key="i" class="supply-chip" :class="{active: highlightSupply===i}" :title="sp.type" @click="onSupplyChipClick(i)">{{ i+1 }}. {{ sp.name }}</span></div>
+        <div class="supply-chips"><span v-for="(sp, i) in supplyPoints" :key="i" class="supply-chip" :class="{active: highlightSupply===i}" :title="sp.type" @click="onSupplyChipClick(i)">{{ sp.catLabel?.slice(0,2) || '📍' }} {{ sp.name }}</span></div>
       </div>
     </div>
     <button class="btn btn-supply" @click="searchSupply" :disabled="supplyLoading">
-      {{ supplyLoading ? '搜索中…' : supplyPoints.length ? '🔄 加载更多补给点' : '🔍 搜索沿途补给点' }}
+      {{ supplyLoading ? '搜索中…' : '🔍 搜索沿途补给点' }}
     </button>
     <button class="btn btn-nav" @click="openNav">开始导航</button>
     <div class="nav-link-box"><div class="label">高德导航链接（可复制）：</div><div class="url">{{ navUrl }}</div></div>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button><button class="btn btn-sm btn-secondary" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff" @click="doShare">📤 分享</button></div>
   </div>
 </div>
 </template>

@@ -79,3 +79,67 @@ export async function fetchBicyclingPaths(origin, destination) {
   return result
 }
 export async function fetchBicyclingRoute(o, d) { return (await fetchBicyclingPaths(o, d))[0] }
+
+// === 沿途搜索：沿路线 polyline 密集采样批量搜索 POI ===
+export async function searchAlongRoute(segments, opts = {}) {
+  const { onProgress = null, concurrency = 5 } = opts
+  const { parsePolyline, samplePoints } = await import('../utils/math.js')
+
+  // 1. 合并所有 polyline 坐标点
+  const allPts = []
+  for (const seg of segments) {
+    if (seg.polyline) allPts.push(...parsePolyline(seg.polyline))
+  }
+  if (allPts.length < 2) return []
+
+  // 2. 每 500m 采一个点（最少5个，最多30个）
+  const totalDist = segments.reduce((s, seg) => s + (seg.distance || 0), 0)
+  const sampleCount = Math.max(5, Math.min(30, Math.ceil(totalDist / 500)))
+  const samples = samplePoints(allPts, sampleCount)
+
+  // 3. POI 分类配置
+  const CATEGORIES = [
+    { key: 'shop', label: '🛒 便利店', types: '010100|060000', radius: 500, limit: 3 },
+    { key: 'food', label: '🍜 餐饮', types: '050000', radius: 500, limit: 3 },
+    { key: 'wc', label: '🚻 公厕', types: '200300|200000', radius: 800, limit: 2 },
+    { key: 'med', label: '💊 药店', types: '090000', radius: 800, limit: 2 },
+  ]
+
+  // 4. 并行批量搜索
+  const allResults = []
+  let done = 0
+  const tasks = []
+  for (const pt of samples) {
+    for (const cat of CATEGORIES) {
+      tasks.push({ pt, cat })
+    }
+  }
+
+  // 分批并行执行
+  const seen = new Set()
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    const batch = tasks.slice(i, i + concurrency)
+    const batchResults = await Promise.all(
+      batch.map(async ({ pt, cat }) => {
+        try {
+          const pois = await searchPOIs(pt.lng, pt.lat, cat.types, cat.radius, cat.limit)
+          return pois.map(p => ({ ...p, category: cat.key, catLabel: cat.label }))
+        } catch(e) { return [] }
+      })
+    )
+    for (const results of batchResults) {
+      for (const poi of results) {
+        const key = `${poi.name}|${poi.lng.toFixed(4)}|${poi.lat.toFixed(4)}`
+        if (!seen.has(key)) { seen.add(key); allResults.push(poi) }
+      }
+    }
+    done += batch.length
+    onProgress?.({ done, total: tasks.length })
+  }
+
+  // 5. 按分类分组排序
+  const order = { shop: 0, food: 1, wc: 2, med: 3 }
+  allResults.sort((a, b) => (order[a.category] ?? 9) - (order[b.category] ?? 9))
+
+  return allResults
+}
