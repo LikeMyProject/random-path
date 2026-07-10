@@ -134,12 +134,23 @@ async function doShare() {
 }
 
 const showAddrModal = ref(false), newAddr = ref({ alias: '', name: '', lng: '', lat: '' })
-const devUnlocked = ref(localStorage.getItem('radompath_dev') === '1')
-const showPwdInput = ref(false), pwdValue = ref('')
-
 const _K = '30e32c7bfa7d24588696277a60efc034c396283d8584c01ccd99c184e1dd68e4'
 const _D = 'eyLlrrYiOnsibmFtZSI6Iumahua6kOWbvemZheWfjkTljLoiLCJsbmciOjEwOC45NTg0MzIsImxhdCI6MzQuMzc4NTQ2fSwi5YWs5Y+4Ijp7Im5hbWUiOiLms7DljY7Ct+mHkei0uOWbvemZhSIsImxuZyI6MTA4Ljg4NjY0NCwibGF0IjozNC4yMjQ2MTV9fQ=='
 function _decode() { try { const b=atob(_D);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return JSON.parse(new TextDecoder().decode(u)) } catch(e) { return {} } }
+
+const devUnlocked = ref(localStorage.getItem('radompath_dev') === '1')
+// 已解锁但地址可能是旧乱码 → 自动修复
+if (devUnlocked.value) {
+  const presets = _decode()
+  let needSave = false
+  for (const [k, v] of Object.entries(presets)) {
+    if (!addresses[k] || (addresses[k].name && addresses[k].name.includes('Ã'))) {
+      addresses[k] = { name: v.name, lng: v.lng, lat: v.lat }; needSave = true
+    }
+  }
+  if (needSave) saveAddresses(addresses)
+}
+const showPwdInput = ref(false), pwdValue = ref('')
 async function checkPassword() {
   const enc = new TextEncoder()
   const hashBuf = await crypto.subtle.digest('SHA-256', enc.encode(pwdValue.value))
