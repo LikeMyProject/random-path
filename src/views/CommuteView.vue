@@ -149,7 +149,7 @@ async function checkPassword() {
     showPwdInput.value = false; pwdValue.value = ''
     const presets = _decode()
     for (const [k, v] of Object.entries(presets)) {
-      if (!addresses[k]) addresses[k] = { name: v.name, lng: v.lng, lat: v.lat }
+      addresses[k] = { name: v.name, lng: v.lng, lat: v.lat }
     }
     saveAddresses(addresses)
     toast('已解锁 ✅')
