@@ -1,4 +1,4 @@
-import { haversine, getBearing, destinationPoint, sleep, sortWaypointsAlongCorridor, parsePolyline, samplePoints } from '../utils/math.js'
+import { haversine, getBearing, destinationPoint, sortWaypointsAlongCorridor, parsePolyline, samplePoints } from '../utils/math.js'
 import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths } from './useAMap.js'
 import { getRecentSectors } from './useStorage.js'
 
@@ -178,8 +178,7 @@ export async function tryGenerateRoute(home, work, opts = {}) {
         if (diff < bestDiff) { bestDiff = diff; best = { waypoints, segments: segs, totalDistance: td, totalDuration: tt, sector } }
         onTry?.(a + 1, td, `超出${((td-maxDist)/1000).toFixed(1)}km`)
       }
-    } catch(e) { onTry?.(a + 1, null, e.message); await sleep(100) }
-    await sleep(50)
+    } catch(e) { onTry?.(a + 1, null, e.message) }
   }
 
   if (best) {
@@ -224,18 +223,23 @@ export function isBadLocationName(name) {
 }
 
 export async function nameWaypoint(lng, lat) {
-  let name = await reverseGeocode(lng, lat)
-  if (name && name.length >= 2 && !isBadLocationName(name)) return name
-  await new Promise(r => setTimeout(r, 600))
-  try {
-    const pois = await searchPOIs(lng, lat, '道路交叉口|公园广场|风景名胜|地标|购物中心|商场|酒店|交通枢纽|桥梁|政府机构', 2000, 5)
-    if (pois.length > 0) return pois.filter(p => !isBadLocationName(p.name))[0]?.name || pois[0].name
-  } catch(e) {}
-  await new Promise(r => setTimeout(r, 600))
-  const fallback = await reverseGeocode(lng, lat)
-  if (fallback && fallback.length >= 2) {
-    const parts = fallback.split(/[（）()]/)
-    return parts.length > 1 ? parts[0].trim() : fallback.replace(/小区|家属院|花园|学校|学院|校区.*$/g, '').trim() || fallback
+  // 并行请求：reverseGeocode + searchPOIs 同时发出，消除600ms串行等待
+  const [geoName, pois] = await Promise.all([
+    reverseGeocode(lng, lat),
+    searchPOIs(lng, lat, '道路交叉口|公园广场|风景名胜|地标|购物中心|商场|酒店|交通枢纽|桥梁|政府机构', 2000, 5).catch(() => [])
+  ])
+  // 优先用逆地理编码的好名字
+  if (geoName && geoName.length >= 2 && !isBadLocationName(geoName)) return geoName
+  // 其次用 POI 结果
+  if (pois.length > 0) {
+    const good = pois.filter(p => !isBadLocationName(p.name))[0]
+    if (good) return good.name
+    return pois[0].name
+  }
+  // 逆地理编码结果即使"不好"也比坐标强
+  if (geoName && geoName.length >= 2) {
+    const parts = geoName.split(/[（）()]/)
+    return parts.length > 1 ? parts[0].trim() : geoName.replace(/小区|家属院|花园|学校|学院|校区.*$/g, '').trim() || geoName
   }
   return `${lng.toFixed(4)}, ${lat.toFixed(4)}`
 }

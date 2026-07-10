@@ -53,16 +53,29 @@ export async function searchPOIs(lng, lat, types, radius = 3000, limit = 10) {
   } catch (e) {}
   return []
 }
+
+// 路线缓存：避免重试时对相似坐标重复请求
+const routeCache = new Map()
+const ROUTE_CACHE_MAX = 300
+function routeCacheKey(o, d) {
+  const r = 2000 // ~50m 精度，让相近坐标命中缓存
+  return `${Math.round(o.lng * r) / r},${Math.round(o.lat * r) / r}|${Math.round(d.lng * r) / r},${Math.round(d.lat * r) / r}`
+}
 export async function fetchBicyclingPaths(origin, destination) {
+  const key = routeCacheKey(origin, destination)
+  if (routeCache.has(key)) return routeCache.get(key)
   const url = `https://restapi.amap.com/v5/direction/bicycling?origin=${origin.lng},${origin.lat}&destination=${destination.lng},${destination.lat}&key=${AMAP_KEY}&show_fields=polyline`
   const d = await fetchJSON(url)
   if (d.status !== '1') throw Error(d.info || 'API error')
   const paths = d.route?.paths || []
   if (paths.length === 0) throw Error('no route')
-  return paths.map(p => ({
+  const result = paths.map(p => ({
     distance: parseInt(p.distance), duration: parseInt(p.duration),
     polyline: p.steps?.map(s => s.polyline).filter(Boolean).join(';') || '',
     steps: (p.steps || []).map(s => ({ instruction: s.instruction, distance: parseInt(s.distance) })),
   }))
+  if (routeCache.size >= ROUTE_CACHE_MAX) { const first = routeCache.keys().next().value; routeCache.delete(first) }
+  routeCache.set(key, result)
+  return result
 }
 export async function fetchBicyclingRoute(o, d) { return (await fetchBicyclingPaths(o, d))[0] }
