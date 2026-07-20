@@ -106,15 +106,15 @@ const PRESET_ROUTES = [
   { name:'商洛→金丝峡（陕南峡谷）',start:{name:'商洛',lng:109.918,lat:33.870},end:{name:'金丝峡',lng:110.560,lat:33.380},waypoints:[{name:'丹凤',lng:110.332,lat:33.696},{name:'商南',lng:110.882,lat:33.531}]},
   { name:'商洛→镇安→柞水（秦岭南麓环线）',start:{name:'商洛',lng:109.918,lat:33.870},end:{name:'商洛',lng:109.918,lat:33.870},waypoints:[{name:'山阳',lng:109.882,lat:33.532},{name:'镇安',lng:109.154,lat:33.423},{name:'柞水',lng:109.114,lat:33.686},{name:'牛背梁',lng:108.990,lat:33.760}]},
 
-  // === 全国热门骑行 (8条) ===
-  { name:'青海湖·环湖东线（西海镇→黑马河）',start:{name:'西海镇',lng:100.901,lat:36.959},end:{name:'黑马河',lng:99.780,lat:36.730},waypoints:[{name:'湖东种羊场',lng:100.570,lat:36.760},{name:'二郎剑',lng:100.450,lat:36.650},{name:'江西沟',lng:100.220,lat:36.620}]},
-  { name:'大理·环洱海',start:{name:'大理古城',lng:100.163,lat:25.688},end:{name:'大理古城',lng:100.163,lat:25.688},waypoints:[{name:'喜洲',lng:100.108,lat:25.857},{name:'双廊',lng:100.201,lat:25.944},{name:'挖色',lng:100.267,lat:25.843},{name:'海东',lng:100.303,lat:25.717},{name:'下关',lng:100.228,lat:25.605}]},
-  { name:'海南·东线（海口→三亚）',start:{name:'海口',lng:110.331,lat:20.031},end:{name:'三亚',lng:109.512,lat:18.253},waypoints:[{name:'文昌',lng:110.754,lat:19.550},{name:'博鳌',lng:110.588,lat:19.162},{name:'万宁',lng:110.392,lat:18.795},{name:'陵水',lng:110.036,lat:18.506},{name:'海棠湾',lng:109.737,lat:18.306}]},
-  { name:'成都→都江堰→青城山',start:{name:'成都',lng:104.066,lat:30.573},end:{name:'青城山',lng:103.606,lat:30.900},waypoints:[{name:'郫都区',lng:103.888,lat:30.810},{name:'都江堰',lng:103.647,lat:30.988},{name:'青城前山',lng:103.590,lat:30.900}]},
-  { name:'G318川藏线·成都→康定段',start:{name:'成都',lng:104.066,lat:30.573},end:{name:'康定',lng:101.963,lat:30.055},waypoints:[{name:'雅安',lng:103.013,lat:29.981},{name:'天全',lng:102.764,lat:30.059},{name:'泸定',lng:102.235,lat:29.915},{name:'折多塘',lng:101.920,lat:30.040}]},
-  { name:'北京·妙峰山→潭柘寺',start:{name:'妙峰山',lng:116.020,lat:40.070},end:{name:'潭柘寺',lng:116.025,lat:39.870},waypoints:[{name:'门头沟',lng:116.103,lat:39.940},{name:'戒台寺',lng:116.080,lat:39.890}]},
-  { name:'杭州→千岛湖（杭千绿道）',start:{name:'杭州',lng:120.155,lat:30.274},end:{name:'千岛湖',lng:119.042,lat:29.609},waypoints:[{name:'富阳',lng:119.960,lat:30.049},{name:'桐庐',lng:119.691,lat:29.793},{name:'建德',lng:119.281,lat:29.475}]},
-  { name:'桂林→阳朔（漓江画廊）',start:{name:'桂林',lng:110.290,lat:25.274},end:{name:'阳朔',lng:110.495,lat:24.779},waypoints:[{name:'大圩古镇',lng:110.380,lat:25.170},{name:'兴坪',lng:110.540,lat:24.920},{name:'遇龙河',lng:110.460,lat:24.790}]},
+  // === 陕西经典追加 (8条) ===
+  { name:'西安·浐灞→世博园→洪庆（灞河绿道）',start:{name:'浐灞',lng:109.060,lat:34.320},end:{name:'洪庆山',lng:109.180,lat:34.280},waypoints:[{name:'世博园',lng:109.060,lat:34.320},{name:'广运潭',lng:109.035,lat:34.310},{name:'灞桥',lng:109.059,lat:34.309},{name:'洪庆街道',lng:109.130,lat:34.310}]},
+  { name:'西安·长安大道→环山路→汤峪',start:{name:'韦曲',lng:108.940,lat:34.160},end:{name:'汤峪',lng:109.220,lat:34.020},waypoints:[{name:'环山路',lng:108.970,lat:34.050},{name:'太乙宫',lng:108.980,lat:34.000},{name:'南五台',lng:108.960,lat:33.960}]},
+  { name:'西安·翠华→太乙→库峪（三峪串骑）',start:{name:'太乙宫',lng:108.980,lat:34.000},end:{name:'库峪',lng:109.070,lat:33.920},waypoints:[{name:'翠华山',lng:109.000,lat:33.970},{name:'南五台',lng:108.960,lat:33.960},{name:'石砭峪',lng:108.940,lat:33.970},{name:'大峪',lng:109.040,lat:33.940}]},
+  { name:'铜川→照金→旬邑（红色照金线）',start:{name:'铜川',lng:109.075,lat:35.069},end:{name:'旬邑',lng:108.334,lat:35.112},waypoints:[{name:'照金',lng:108.640,lat:34.960},{name:'石门山',lng:108.520,lat:35.020},{name:'马栏',lng:108.440,lat:35.080}]},
+  { name:'渭南→合阳→韩城（黄河湿地）',start:{name:'渭南',lng:109.502,lat:34.499},end:{name:'韩城',lng:110.443,lat:35.479},waypoints:[{name:'大荔',lng:109.942,lat:34.795},{name:'合阳',lng:110.149,lat:35.238},{name:'洽川湿地',lng:110.290,lat:35.300}]},
+  { name:'宝鸡→太白→黄柏塬（太洋公路）',start:{name:'宝鸡',lng:107.238,lat:34.363},end:{name:'黄柏塬',lng:107.510,lat:33.820},waypoints:[{name:'太白县',lng:107.319,lat:34.058},{name:'鳌山登山口',lng:107.420,lat:33.950},{name:'核桃坪',lng:107.420,lat:33.880}]},
+  { name:'汉中→宁强→广坪（汉江源头）',start:{name:'汉中',lng:107.023,lat:33.068},end:{name:'广坪',lng:105.990,lat:32.780},waypoints:[{name:'宁强',lng:106.257,lat:32.830},{name:'汉江源',lng:106.150,lat:32.810},{name:'燕子砭',lng:106.030,lat:32.850}]},
+  { name:'商洛→洛南→巡检（洛河峡谷）',start:{name:'商洛',lng:109.918,lat:33.870},end:{name:'巡检',lng:110.220,lat:34.280},waypoints:[{name:'洛南',lng:110.148,lat:34.091},{name:'石门',lng:110.080,lat:34.120},{name:'洛河峡谷',lng:110.160,lat:34.200}]},
 
   // === 咸阳及周边 (3条) ===
   { name:'咸阳·五陵塬骑行',start:{name:'咸阳钟楼',lng:108.710,lat:34.336},end:{name:'咸阳钟楼',lng:108.710,lat:34.336},waypoints:[{name:'汉阳陵',lng:108.780,lat:34.370},{name:'长陵',lng:108.820,lat:34.390},{name:'安陵',lng:108.850,lat:34.400},{name:'渭河横桥',lng:108.790,lat:34.380}]},
@@ -140,11 +140,11 @@ const PRESET_ROUTES = [
   { name:'安康→白河（汉江顺流）',start:{name:'安康',lng:109.029,lat:32.685},end:{name:'白河',lng:110.113,lat:32.809},waypoints:[{name:'旬阳',lng:109.365,lat:32.834},{name:'蜀河古镇',lng:109.710,lat:32.870}]},
   { name:'汉中→略阳（嘉陵江峡谷）',start:{name:'汉中',lng:107.023,lat:33.068},end:{name:'略阳',lng:106.157,lat:33.327},waypoints:[{name:'勉县',lng:106.673,lat:33.155},{name:'茶店',lng:106.480,lat:33.220},{name:'何家岩',lng:106.280,lat:33.290}]},
 
-  // === 全国热门追加 (4条) ===
-  { name:'G109青藏线·西宁→青海湖',start:{name:'西宁',lng:101.778,lat:36.617},end:{name:'青海湖',lng:100.620,lat:36.800},waypoints:[{name:'湟源',lng:101.256,lat:36.682},{name:'日月山',lng:101.090,lat:36.540},{name:'倒淌河',lng:100.960,lat:36.600}]},
-  { name:'G214滇藏线·丽江→香格里拉',start:{name:'丽江',lng:100.225,lat:26.872},end:{name:'香格里拉',lng:99.707,lat:27.826},waypoints:[{name:'虎跳峡',lng:100.130,lat:27.190},{name:'小中甸',lng:99.820,lat:27.520}]},
-  { name:'浙江·千岛湖环湖',start:{name:'千岛湖镇',lng:119.042,lat:29.609},end:{name:'千岛湖镇',lng:119.042,lat:29.609},waypoints:[{name:'汾口',lng:118.700,lat:29.520},{name:'姜家',lng:118.800,lat:29.560},{name:'威坪',lng:118.880,lat:29.720}]},
-  { name:'上海·滴水湖→芦潮港→奉贤海湾',start:{name:'滴水湖',lng:121.938,lat:30.898},end:{name:'奉贤海湾',lng:121.571,lat:30.830},waypoints:[{name:'芦潮港',lng:121.840,lat:30.870},{name:'海湾森林公园',lng:121.680,lat:30.850}]},
+  // === 陕西追加 (4条) ===
+  { name:'西安·太白山穿越（汤峪→拔仙台→厚畛子）',start:{name:'汤峪',lng:107.920,lat:34.110},end:{name:'厚畛子',lng:107.950,lat:33.850},waypoints:[{name:'下板寺',lng:107.820,lat:34.020},{name:'上板寺',lng:107.800,lat:34.000},{name:'拔仙台',lng:107.760,lat:33.960},{name:'南天门',lng:107.800,lat:33.900}]},
+  { name:'安康→平利→镇坪（化龙山脉）',start:{name:'安康',lng:109.029,lat:32.685},end:{name:'镇坪',lng:109.527,lat:31.884},waypoints:[{name:'平利',lng:109.362,lat:32.389},{name:'八仙',lng:109.380,lat:32.200},{name:'化龙山',lng:109.450,lat:32.050}]},
+  { name:'榆林·红碱淖环湖',start:{name:'榆林',lng:109.734,lat:38.286},end:{name:'榆林',lng:109.734,lat:38.286},waypoints:[{name:'神木',lng:110.499,lat:38.842},{name:'红碱淖',lng:110.040,lat:38.980},{name:'尔林兔',lng:109.920,lat:38.920},{name:'大保当',lng:109.850,lat:38.600}]},
+  { name:'延安·南泥湾→云岩→壶口（延壶公路）',start:{name:'南泥湾',lng:109.780,lat:36.320},end:{name:'壶口瀑布',lng:110.444,lat:36.148},waypoints:[{name:'麻洞川',lng:109.880,lat:36.230},{name:'云岩',lng:110.050,lat:36.140},{name:'高柏',lng:110.250,lat:36.110}]},
 ]
 
 const selectedKey = ref(''), customFilter = ref('')
