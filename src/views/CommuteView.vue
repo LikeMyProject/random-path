@@ -4,7 +4,7 @@ import { haversine } from '../utils/math.js'
 import { geocode, setDetectedCity, detectCityFromGPS } from '../composables/useAMap.js'
 import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
-import { tryGenerateRoute, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
+import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
 import { rateDifficulty } from '../composables/useScoring.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
@@ -89,8 +89,9 @@ async function doGenerate(isRetry = false) {
         tryInfo.value = loadingHint.value
       }
     }
-    const route = h === w
-      ? await tryGenerateRoute(h, h, { ...opts, waypointGenerator: (ld, mn, mx) => ({ waypoints: [], sector: -1 }) }) // 无终点=环线
+    const isLoop = h.lng === w.lng && h.lat === w.lat
+    const route = isLoop
+      ? await tryGenerateRoute(h, h, { ...opts, minDist: Math.round(td * 0.55), maxDist: Math.round(td * 1.5), waypointGenerator: (ld, mn, mx) => generateCompassLoop(h, td, dirDeg), onTry: opts.onTry })
       : await tryGenerateRoute(h, w, opts)
     if (!route) { toast('生成失败，请重试', 'err'); loading.value = false; return }
     if (route.waypoints.length > 0) { tryInfo.value = '正在获取途经点地名…'; await Promise.all(route.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) }
