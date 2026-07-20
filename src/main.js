@@ -1,14 +1,14 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import App from './App.vue'
-import CommuteView from './views/CommuteView.vue'
-import LoopView from './views/LoopView.vue'
+import ExploreView from './views/ExploreView.vue'
 import PresetView from './views/PresetView.vue'
 
 const routes = [
-  { path: '/', redirect: '/commute' },
-  { path: '/commute', component: CommuteView, meta: { tab: 'commute' } },
-  { path: '/loop', component: LoopView, meta: { tab: 'loop' } },
+  { path: '/', redirect: '/explore' },
+  { path: '/explore', component: ExploreView, meta: { tab: 'explore' } },
+  { path: '/commute', redirect: '/explore' },
+  { path: '/loop', redirect: '/explore' },
   { path: '/preset', component: PresetView, meta: { tab: 'preset' } },
 ]
 const router = createRouter({ history: createWebHashHistory(), routes })
