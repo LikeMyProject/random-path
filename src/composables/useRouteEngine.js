@@ -1,5 +1,5 @@
 import { haversine, getBearing, destinationPoint, sortWaypointsAlongCorridor, parsePolyline, samplePoints } from '../utils/math.js'
-import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths } from './useAMap.js'
+import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths, AMAP_KEY } from './useAMap.js'
 import { getRecentSectors, saveWaypointTracker, loadWaypointTracker } from './useStorage.js'
 
 export const MAX_WAYPOINTS = 10, MAX_RETRIES = 12, EARLY_ACCEPT_AFTER = 5
@@ -179,12 +179,21 @@ async function tryFixDeadEnds(segments, waypoints, td, tt, home, work, maxDist, 
 
 export async function queryElevations(points) {
   if (points.length === 0) return []
+  const BATCH = 80 // 高德单次最多支持的点数
+  const results = []
   try {
-    const lats = points.map(p => p.lat).join(','), lngs = points.map(p => p.lng).join(',')
-    const url = `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lngs}`
-    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 10000)
-    const res = await fetch(url, { signal: ctrl.signal }); clearTimeout(t)
-    if (!res.ok) return []; const d = await res.json(); return d.elevation || []
+    for (let i = 0; i < points.length; i += BATCH) {
+      const batch = points.slice(i, i + BATCH)
+      const locs = batch.map(p => `${p.lng},${p.lat}`).join('|')
+      const url = `https://restapi.amap.com/v3/assistant/elevation?key=${AMAP_KEY}&locations=${locs}`
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 10000)
+      const res = await fetch(url, { signal: ctrl.signal }); clearTimeout(t)
+      if (!res.ok) return []
+      const d = await res.json()
+      if (d.status !== '1' || !d.results) return []
+      for (const r of d.results) results.push(parseFloat(r.elevation) || 0)
+    }
+    return results
   } catch(e) { return [] }
 }
 
