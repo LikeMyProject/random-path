@@ -455,7 +455,7 @@ export async function tryGenerateRoute(home, work, opts = {}) {
     } else if (window.$toast) {
       window.$toast('坡度分析未成功，请重试', 'warn')
     }
-    return { ...best, totalClimb: slopeProfile?.totalClimb ?? null, uphillSections: slopeProfile?.uphillSections ?? [], downhillSections: slopeProfile?.downhillSections ?? [], hasBacktrack: bt.bad }
+    return { ...best, totalClimb: slopeProfile?.totalClimb ?? null, uphillSections: slopeProfile?.uphillSections ?? [], downhillSections: slopeProfile?.downhillSections ?? [], elevationProfile: slopeProfile?.elevationProfile ?? null, hasBacktrack: bt.bad }
   }
   return null
 }
@@ -516,3 +516,22 @@ export async function nameWaypoint(lng, lat) {
 
 export function getUserWeight() { try { const w = parseFloat(localStorage.getItem('radompath_weight')); return w > 0 ? w : 70 } catch(e) { return 70 } }
 export function calcCalories(distMeters, durationSeconds) { return Math.round(8 * getUserWeight() * (durationSeconds / 3600)) }
+
+// === 路线质量评分（基于途经点地名） ===
+export function scoreRouteQuality(waypoints) {
+  let water = 0, green = 0, urban = 0, count = 0
+  for (const wp of waypoints) {
+    const n = wp.poiName || wp.name || ''
+    if (!n || n.length < 2) continue
+    count++
+    if (/[河湖江水滨湾滩溪渠湿地水库海]/.test(n)) water++
+    if (/[公园植物园湿地林场山林风景区生态绿道]/.test(n)) green++
+    if (/[工业园物流园高速快速路大道主干路立交桥]/.test(n)) urban++
+  }
+  const tags = []
+  if (water >= count * 0.3) tags.push('🌊滨水')
+  if (green >= count * 0.3) tags.push('🌲绿荫')
+  if (urban <= count * 0.2 && count > 0) tags.push('🛤清净')
+  if (count >= 3 && water + green >= count * 0.5) tags.push('✨优质')
+  return { water, green, urban, count, tags }
+}

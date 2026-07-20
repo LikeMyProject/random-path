@@ -3,10 +3,11 @@ import { ref, computed, onMounted } from 'vue'
 import { geocode, setDetectedCity, detectCityFromGPS } from '../composables/useAMap.js'
 import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
-import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories } from '../composables/useRouteEngine.js'
+import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories, scoreRouteQuality } from '../composables/useRouteEngine.js'
 import { rateDifficulty } from '../composables/useScoring.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
+import ElevationProfile from '../components/ElevationProfile.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
 const addresses = loadAddresses()
@@ -156,7 +157,7 @@ function downloadGpx() { if (result.value && homeObj.value && workObj.value) { c
 async function doShare() {
   if (!result.value) return
   const route = result.value; const h = homeObj.value, w = workObj.value
-  const canvas = generateShareImage({ title: (h?.name||'?') + (hasDest.value ? ' → '+(w?.name||'?') : ' ↻'), subtitle: (route.totalDistance/1000).toFixed(1)+' km · '+Math.round(route.totalDuration/60)+' min', totalDistance: route.totalDistance, totalDuration: route.totalDuration, segments: route.segments, waypoints: route.waypoints, home: h, work: w||h, stats: [{ label:'总距离', value:(route.totalDistance/1000).toFixed(1)+' km' },{ label:'预计', value:Math.round(route.totalDuration/60)+' 分钟' },{ label:'途经点', value:route.waypoints.length+' 个' }] })
+  const canvas = generateShareImage({ title: (h?.name||'?') + (hasDest.value ? ' → '+(w?.name||'?') : ' ↻ 环线'), subtitle: (route.totalDistance/1000).toFixed(1)+' km · '+Math.round(route.totalDuration/60)+' min', totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, segments: route.segments, waypoints: route.waypoints, home: h, work: w||h, uphillSections: route.uphillSections, downhillSections: route.downhillSections })
   const r = await shareImage(canvas, `RandomPath_${(h?.name||'route')}_${(route.totalDistance/1000).toFixed(1)}km.png`)
   if (r === 'shared') toast('已分享 🎉'); else toast('已下载 📥')
 }
@@ -259,6 +260,10 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :home="homeObj" :work="workObj" :uphillSections="result.uphillSections" :downhillSections="result.downhillSections" />
     <div class="route-thumb-legend"><span>🟢 起点</span><span>🟠 终点</span><span>🔵 途经点</span><span>🔴 上坡</span><span>🟢 下坡</span><span>⬆ 北</span></div>
     <div class="route-summary" v-html="'<strong>'+(homeObj?.name||'')+'</strong> → '+result.waypoints.map((w,i)=>w.poiName||'途经点'+(i+1)).join(' → ')+' → <strong>'+(workObj?.name||'')+'</strong>'"></div>
+    <div v-if="scoreRouteQuality(result.waypoints).tags.length" class="quality-tags">
+      <span v-for="t in scoreRouteQuality(result.waypoints).tags" :key="t" class="qtag">{{ t }}</span>
+    </div>
+    <ElevationProfile v-if="result.elevationProfile" :elevationProfile="result.elevationProfile" :uphillSections="result.uphillSections" :downhillSections="result.downhillSections" />
     <div class="collapse-toggle" :class="{open:collapseOpen}" @click="collapseOpen=!collapseOpen"><span class="arrow">▶</span> 详细数据</div>
     <div class="collapse-body" :class="{open:collapseOpen}">
       <div class="stats" style="margin-top:8px">

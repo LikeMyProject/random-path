@@ -112,4 +112,7 @@ footer{text-align:center;padding:16px;color:#8cb8a8;font-size:10px;font-weight:5
 .multi-card{flex:0 0 85%;scroll-snap-align:start;background:#fff;border-radius:14px;padding:10px;border:2px solid #f2eaf4;cursor:pointer;transition:all .2s}
 .multi-card.active{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
 .multi-card .route-thumb{width:100%}
+/* 路线质量标签 */
+.quality-tags{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.qtag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
 </style>
