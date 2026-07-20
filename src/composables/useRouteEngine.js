@@ -186,18 +186,21 @@ export async function queryElevations(points) {
     await loadAMapSDK()
     await new Promise((resolve, reject) => {
       if (!window.AMap) return reject(new Error('AMap SDK not loaded'))
-      AMap.plugin('AMap.Elevation', () => resolve(), { retry: 3 })
+      if (window.AMap.Elevation) return resolve() // 插件已存在
+      AMap.plugin('AMap.Elevation', resolve, reject)
     })
     for (let i = 0; i < points.length; i += BATCH) {
       const batch = points.slice(i, i + BATCH).map(p => new AMap.LngLat(p.lng, p.lat))
       const result = await new Promise((resolve, reject) => {
         const el = new AMap.Elevation()
         el.getElevation(batch, (status, res) => {
+          // res 可能是数组 {data:[...], info:"OK"} 或直接是数组 [...]
           if (status === 'complete') resolve(res)
           else reject(new Error(status))
         })
       })
-      for (const r of result) {
+      const items = Array.isArray(result) ? result : (result?.data || [])
+      for (const r of items) {
         allResults.push(typeof r.elevation === 'number' ? r.elevation : (parseFloat(r.z) || 0))
       }
     }
