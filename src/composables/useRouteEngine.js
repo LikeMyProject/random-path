@@ -1,5 +1,5 @@
 import { haversine, getBearing, destinationPoint, sortWaypointsAlongCorridor, parsePolyline, samplePoints } from '../utils/math.js'
-import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths, AMAP_KEY } from './useAMap.js'
+import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths, loadAMapSDK } from './useAMap.js'
 import { getRecentSectors, saveWaypointTracker, loadWaypointTracker } from './useStorage.js'
 
 export const MAX_WAYPOINTS = 10, MAX_RETRIES = 12, EARLY_ACCEPT_AFTER = 5
@@ -179,22 +179,23 @@ async function tryFixDeadEnds(segments, waypoints, td, tt, home, work, maxDist, 
 
 export async function queryElevations(points) {
   if (points.length === 0) return []
-  const BATCH = 80 // 高德单次最多支持的点数
-  const results = []
   try {
+    await loadAMapSDK()
+    const BATCH = 50
+    const allResults = []
     for (let i = 0; i < points.length; i += BATCH) {
-      const batch = points.slice(i, i + BATCH)
-      const locs = batch.map(p => `${p.lng},${p.lat}`).join('|')
-      const url = `https://restapi.amap.com/v3/assistant/elevation?key=${AMAP_KEY}&locations=${locs}`
-      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 10000)
-      const res = await fetch(url, { signal: ctrl.signal }); clearTimeout(t)
-      if (!res.ok) return []
-      const d = await res.json()
-      if (d.status !== '1' || !d.results) return []
-      for (const r of d.results) results.push(parseFloat(r.elevation) || 0)
+      const batch = points.slice(i, i + BATCH).map(p => [p.lng, p.lat])
+      const result = await new Promise((resolve, reject) => {
+        const el = new AMap.Elevation()
+        el.getElevation(batch, (status, res) => {
+          if (status === 'complete') resolve(res)
+          else reject(new Error('Elevation SDK failed: ' + status))
+        })
+      })
+      for (const r of result) allResults.push((r.elevation != null ? r.elevation : r.z) || 0)
     }
-    return results
-  } catch(e) { return [] }
+    return allResults
+  } catch(e) { console.error('[queryElevations]', e); return [] }
 }
 
 export async function calcClimb(polyline) {
@@ -272,55 +273,72 @@ export async function calcSlopeProfile(segments) {
     profile.push(pt)
   }
 
-  // 5. 识别上坡路段（连续 grade >= UPHILL_MIN_GRADE 的点合并为一个路段）
-  const uphillSections = []
-  let cur = null
+  // 5. 识别上下坡路段（连续 |grade| >= UPHILL_MIN_GRADE 的点合并）
+  const uphillSections = [], downhillSections = []
+  let cur = null, curType = '' // 'up' | 'down'
 
   function flushSection() {
     if (!cur) return
-    const climb = cur.eleGains.filter(g => g > 0).reduce((a, b) => a + b, 0)
+    const change = cur.eleGains.filter(g => (curType === 'up' ? g > 0 : g < 0))
+    const totalChange = change.reduce((a, b) => a + Math.abs(b), 0)
     const lengthKm = (cur.endDist - cur.startDist) / 1000
     if (lengthKm >= UPHILL_MIN_LENGTH) {
-      uphillSections.push({
-        startDist: Math.round(cur.startDist / 100) / 10,   // km，保留1位小数
+      const section = {
+        startDist: Math.round(cur.startDist / 100) / 10,
         endDist: Math.round(cur.endDist / 100) / 10,
         length: Math.round(lengthKm * 10) / 10,
-        climb: Math.round(climb),
-        avgGrade: Math.round(cur.grades.reduce((a, b) => a + b, 0) / cur.grades.length * 10) / 10,
-        maxGrade: Math.round(Math.max(...cur.grades) * 10) / 10,
+        change: Math.round(totalChange),
+        avgGrade: Math.round(cur.grades.reduce((a, b) => a + Math.abs(b), 0) / cur.grades.length * 10) / 10,
+        maxGrade: Math.round(Math.max(...cur.grades.map(g => Math.abs(g))) * 10) / 10,
         startCoord: cur.startCoord,
         endCoord: cur.endCoord,
-      })
+        type: curType,
+      }
+      if (curType === 'up') uphillSections.push(section)
+      else downhillSections.push(section)
     }
-    cur = null
+    cur = null; curType = ''
   }
 
   for (let i = 1; i < profile.length; i++) {
     if (profile[i].grade >= UPHILL_MIN_GRADE) {
-      if (!cur) {
-        cur = {
-          startDist: profile[i - 1].dist,
-          startCoord: { lng: profile[i - 1].lng, lat: profile[i - 1].lat },
-          grades: [],
-          eleGains: [],
-          endDist: 0,
-          endCoord: null,
-        }
-      }
-      cur.grades.push(profile[i].grade)
-      cur.eleGains.push(profile[i].eleDiff)
-      cur.endDist = profile[i].dist
-      cur.endCoord = { lng: profile[i].lng, lat: profile[i].lat }
+      if (!cur || curType !== 'up') { flushSection(); cur = { startDist: profile[i - 1].dist, startCoord: { lng: profile[i - 1].lng, lat: profile[i - 1].lat }, grades: [], eleGains: [], endDist: 0, endCoord: null }; curType = 'up' }
+      cur.grades.push(profile[i].grade); cur.eleGains.push(profile[i].eleDiff)
+      cur.endDist = profile[i].dist; cur.endCoord = { lng: profile[i].lng, lat: profile[i].lat }
+    } else if (profile[i].grade <= -UPHILL_MIN_GRADE) {
+      if (!cur || curType !== 'down') { flushSection(); cur = { startDist: profile[i - 1].dist, startCoord: { lng: profile[i - 1].lng, lat: profile[i - 1].lat }, grades: [], eleGains: [], endDist: 0, endCoord: null }; curType = 'down' }
+      cur.grades.push(profile[i].grade); cur.eleGains.push(profile[i].eleDiff)
+      cur.endDist = profile[i].dist; cur.endCoord = { lng: profile[i].lng, lat: profile[i].lat }
     } else {
       flushSection()
     }
   }
   flushSection()
 
-  // 6. 计算总爬升
+  // 6. 计算总爬升和总下降
   const totalClimb = Math.round(profile.reduce((s, p) => s + (p.eleDiff > 0 ? p.eleDiff : 0), 0))
 
-  return { uphillSections, totalClimb, elevationProfile: profile }
+  // 7. 为每个坡段提取实际道路坐标路径
+  function extractPaths(sections) {
+    for (const sec of sections) {
+      const sMeter = sec.startDist * 1000, eMeter = sec.endDist * 1000
+      const buf = 200
+      const sBuf = Math.max(0, sMeter - buf), eBuf = Math.min(totalDist, eMeter + buf)
+      const path = []
+      for (let j = 0; j < allCoords.length; j++) {
+        if (cumDist[j] >= sBuf && cumDist[j] <= eBuf) path.push({ lng: allCoords[j].lng, lat: allCoords[j].lat })
+      }
+      sec.path = path.length > 0 ? path : [sec.startCoord, sec.endCoord]
+    }
+  }
+  extractPaths(uphillSections)
+  extractPaths(downhillSections)
+
+  // uphillSections 用 climb 字段，downhillSections 用 descent 字段，方便模板区分
+  for (const s of uphillSections) { s.climb = s.change; delete s.change }
+  for (const s of downhillSections) { s.descent = s.change; delete s.change }
+
+  return { uphillSections, downhillSections, totalClimb, elevationProfile: profile }
 }
 
 export async function tryGenerateRoute(home, work, opts = {}) {
@@ -361,7 +379,7 @@ export async function tryGenerateRoute(home, work, opts = {}) {
     const bt = checkBacktrack(best.segments)
     let slopeProfile = null
     try { slopeProfile = await calcSlopeProfile(best.segments) } catch(e) {}
-    return { ...best, totalClimb: slopeProfile?.totalClimb ?? null, uphillSections: slopeProfile?.uphillSections ?? [], hasBacktrack: bt.bad }
+    return { ...best, totalClimb: slopeProfile?.totalClimb ?? null, uphillSections: slopeProfile?.uphillSections ?? [], downhillSections: slopeProfile?.downhillSections ?? [], hasBacktrack: bt.bad }
   }
   return null
 }

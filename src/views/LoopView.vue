@@ -135,8 +135,8 @@ onMounted(async () => {
       <div class="stat"><div class="val">{{ Math.round(result.totalDuration/60) }}</div><div class="lbl">预计 分钟</div></div>
       <div class="stat"><div class="val small" :style="{color: diffObj?.color}">{{ diffObj?.label }}</div><div class="lbl">难度</div></div>
     </div>
-    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :home="centerObj" :work="centerObj" :uphillSections="result.uphillSections" />
-    <div class="route-thumb-legend"><span>🟢 起点</span><span>🟠 终点</span><span>🔵 途经点</span><span>🟠🔴 上坡</span><span>⬆ 北</span></div>
+    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :home="centerObj" :work="centerObj" :uphillSections="result.uphillSections" :downhillSections="result.downhillSections" />
+    <div class="route-thumb-legend"><span>🟢 起点</span><span>🟠 终点</span><span>🔵 途经点</span><span>🔴 上坡</span><span>🟢 下坡</span><span>⬆ 北</span></div>
     <div class="route-summary" v-html="'<strong>'+ (centerObj?.name||'') +'</strong> → '+ result.waypoints.map((w,i)=>w.poiName||'途经点'+(i+1)).join(' → ') +' → <strong>'+ (centerObj?.name||'') +'</strong>'"></div>
     <div class="collapse-toggle" :class="{open:collapseOpen}" @click="collapseOpen=!collapseOpen"><span class="arrow">▶</span> 详细数据</div>
     <div class="collapse-body" :class="{open:collapseOpen}">
@@ -147,12 +147,20 @@ onMounted(async () => {
       </div>
       <div class="segments"><div class="seg" v-for="(seg,i) in result.segments" :key="i"><span class="seg-detail">第{{ i+1 }}段: {{ i===0 ? centerObj?.name : (result.waypoints[i-1]?.poiName||'途经点'+i) }} → {{ i===result.segments.length-1 ? centerObj?.name : (result.waypoints[i]?.poiName||'途经点'+(i+1)) }}</span><span class="seg-nums">{{ (seg.distance/1000).toFixed(1) }}km · {{ Math.round(seg.duration/60) }}min</span></div></div>
       <div class="waypoints-info"><span v-for="(wp,i) in result.waypoints" :key="i">途经点{{ i+1 }}: {{ wp.lng.toFixed(5) }}, {{ wp.lat.toFixed(5) }} {{ wp.poiName||'' }}</span></div>
-      <div v-if="result.uphillSections?.length" class="uphill-box">
-        <div class="uphill-title">📈 上坡路段 (坡度≥5%)</div>
-        <div class="uphill-item" v-for="(sec, i) in result.uphillSections" :key="i">
-          <span class="uphill-badge" :class="sec.avgGrade >= 8 ? 'steep' : 'moderate'">{{ sec.avgGrade >= 8 ? '🔴' : '🟠' }} 第{{ i+1 }}段</span>
-          <span class="uphill-data">{{ sec.length }} km ↗ {{ sec.climb }}m</span>
-          <span class="uphill-grade">均{{ sec.avgGrade }}% / 最{{ sec.maxGrade }}%</span>
+      <div v-if="result.uphillSections?.length" class="slope-box uphill">
+        <div class="slope-title">🔴 上坡路段 (坡度≥5%)</div>
+        <div class="slope-item" v-for="(sec, i) in result.uphillSections" :key="'u'+i">
+          <span class="slope-badge" :class="sec.avgGrade >= 8 ? 'steep' : 'moderate'">{{ sec.avgGrade >= 8 ? '🔴' : '🟠' }} 第{{ i+1 }}段</span>
+          <span class="slope-data">{{ sec.length }} km ↗ {{ sec.climb }}m</span>
+          <span class="slope-grade">均{{ sec.avgGrade }}% / 最{{ sec.maxGrade }}%</span>
+        </div>
+      </div>
+      <div v-if="result.downhillSections?.length" class="slope-box downhill">
+        <div class="slope-title">🟢 下坡路段 (坡度≥5%)</div>
+        <div class="slope-item" v-for="(sec, i) in result.downhillSections" :key="'d'+i">
+          <span class="slope-badge">{{ sec.avgGrade >= 8 ? '🟢' : '🟢' }} 第{{ i+1 }}段</span>
+          <span class="slope-data">{{ sec.length }} km ↘ {{ sec.descent }}m</span>
+          <span class="slope-grade">均{{ sec.avgGrade }}% / 最{{ sec.maxGrade }}%</span>
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { parsePolyline } from '../utils/math.js'
 const props = defineProps({
   segments: Array, waypoints: Array, home: Object, work: Object,
   supplyPoints: Array, highlightIndex: { type: Number, default: -1 },
-  uphillSections: Array, // { startCoord, endCoord, avgGrade, maxGrade }[]
+  uphillSections: Array, downhillSections: Array,
 })
 const emit = defineEmits(['supply-click'])
 
@@ -103,24 +103,38 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
     ctx.beginPath(); ctx.moveTo(tx(pts[0].lng), ty(pts[0].lat)); for (let i = 1; i < pts.length; i++) ctx.lineTo(tx(pts[i].lng), ty(pts[i].lat)); ctx.stroke()
   })
 
-  // uphill overlays — 坡度≥8%红色，5-8%橙色
-  if (props.uphillSections && props.uphillSections.length > 0) {
-    for (const sec of props.uphillSections) {
-      if (!sec.startCoord || !sec.endCoord) continue
+  // 上下坡着色：上坡🔴红色，下坡🟢绿色，沿实际路线路径绘制
+  function drawSlopeSections(sections, colorFn) {
+    if (!sections || sections.length === 0) return
+    for (const sec of sections) {
+      const path = sec.path && sec.path.length >= 2 ? sec.path : [sec.startCoord, sec.endCoord]
+      if (!path || path.length < 2) continue
       const grade = sec.avgGrade || sec.maxGrade || 5
-      const color = grade >= 8 ? 'rgba(239,68,68,0.7)' : 'rgba(249,115,22,0.6)'
-      const lw = grade >= 8 ? 7 : 5
-      ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'
-      ctx.beginPath()
-      ctx.moveTo(tx(sec.startCoord.lng), ty(sec.startCoord.lat))
-      ctx.lineTo(tx(sec.endCoord.lng), ty(sec.endCoord.lat))
+      const [r, g, b, alpha] = colorFn(grade)
+      // 发光底色
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.35})`
+      ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+      ctx.beginPath(); ctx.moveTo(tx(path[0].lng), ty(path[0].lat))
+      for (let k = 1; k < path.length; k++) ctx.lineTo(tx(path[k].lng), ty(path[k].lat))
       ctx.stroke()
-      const mx = tx((sec.startCoord.lng + sec.endCoord.lng) / 2)
-      const my = ty((sec.startCoord.lat + sec.endCoord.lat) / 2)
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
-      ctx.fillText('↗' + Math.round(grade) + '%', mx, my - 2)
+      // 主线
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`
+      ctx.lineWidth = 6
+      ctx.beginPath(); ctx.moveTo(tx(path[0].lng), ty(path[0].lat))
+      for (let k = 1; k < path.length; k++) ctx.lineTo(tx(path[k].lng), ty(path[k].lat))
+      ctx.stroke()
+      // 标签
+      const mi = Math.floor(path.length / 2)
+      const mx = tx(path[mi].lng), my = ty(path[mi].lat)
+      ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+      const arrow = colorFn === uphillColor ? '↗' : '↘'
+      ctx.fillText(arrow + Math.round(grade) + '%', mx, my - 4)
     }
   }
+  const uphillColor = g => g >= 8 ? [220, 38, 38, 0.85] : [234, 88, 12, 0.75]
+  const downhillColor = g => g >= 8 ? [22, 163, 74, 0.85] : [5, 150, 105, 0.75]
+  drawSlopeSections(props.uphillSections, uphillColor)
+  drawSlopeSections(props.downhillSections, downhillColor)
 
   // waypoints
   if (props.waypoints) props.waypoints.forEach((w, i) => {
