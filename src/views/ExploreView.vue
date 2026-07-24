@@ -16,13 +16,7 @@ const addresses = loadAddresses()
 const { suggestions, showSuggest, searchAddress, pickSuggestion, closeSuggest } = useSuggest()
 
 // === 场景模式 ===
-const SCENES = [
-  { key:'casual', icon:'🌅', label:'休闲骑', desc:'1h · 平路 · 沿河公园', time:60, flat:true },
-  { key:'training', icon:'🏋', label:'训练骑', desc:'2h · 多坡 · 进山', time:120, hilly:true },
-  { key:'random', icon:'🔀', label:'随便骑', desc:'随机时长 · 随机方向', time:-1, random:true },
-]
 const scene = ref('random')
-const showCustom = ref(false)
 const showAdvanced = ref(false)
 
 // === 地址 ===
@@ -33,14 +27,6 @@ const hasDest = computed(() => !!(to.value.name && to.value.lng && to.value.lat)
 // === 自定义参数 ===
 const direction = ref('random')
 const timeMin = ref(90) // 默认值，会被场景覆盖
-
-function applyScene(s) {
-  scene.value = s.key
-  showCustom.value = s.key === 'custom'
-  if (s.key === 'random') { direction.value = 'random'; timeMin.value = 60 + Math.floor(Math.random() * 3) * 60 }
-  else if (s.key === 'casual') { direction.value = 'random'; timeMin.value = 60 }
-  else if (s.key === 'training') { direction.value = 'S'; timeMin.value = 120 }
-}
 
 // 监听 scene 变更 → 自动同步 timeMin + direction
 watch(scene, (s) => {
@@ -190,7 +176,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 <template>
 <div>
   <!-- GPS 定位条 -->
-  <div class="gps-bar">
+  <div class="gps-bar" @click="locateMe('from')">
     <span class="gps-icon">📍</span>
     <span class="gps-text">{{ from.name || '点击设置起点' }}</span>
     <span class="gps-hint">自动定位 · 点击切换</span>
@@ -209,7 +195,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     :disabled="loading"
     @click="doGenerate(false)"
   >
-    {{ loading ? '生成中…' : '🎲 出发！' }}
+    {{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : '🏋 开始训练！' }}
   </button>
   <button
     class="btn-multi"
@@ -231,6 +217,10 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       <div class="addr-quick-row">
         <button v-for="(v,k) in addresses" :key="k" class="chip-sm" @click="pickAddr(k,'from')">{{ k }}</button>
         <button class="chip-sm add" @click="showAddrModal = true">+管理</button>
+      </div>
+      <div v-if="devUnlocked" style="display:flex;gap:3px;margin-top:4px">
+        <button class="chip-sm" style="background:#f08ca4;color:#fff" @click="quickFill('from','家')">家</button>
+        <button class="chip-sm" style="background:#f08ca4;color:#fff" @click="quickFill('from','公司')">公司</button>
       </div>
       <div class="input-row" style="position:relative">
         <input v-model="from.name" placeholder="输入地名搜索" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
@@ -366,6 +356,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   color: #fff;
   font-size: 20px;
   font-weight: 700;
+  font-family: inherit;
   cursor: pointer;
   transition: transform .15s, box-shadow .15s;
   margin-top: 16px;

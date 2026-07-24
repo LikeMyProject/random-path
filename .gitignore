@@ -4,3 +4,4 @@ gitee-pages/
 *.cmd
 .env
 .env.local
+.superpowers/

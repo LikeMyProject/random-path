@@ -62,8 +62,6 @@ input:focus,select:focus{outline:none;border-color:#f08ca4;box-shadow:0 0 0 3px 
 .suggest-item .s-name{color:#5a4e5c;flex:1}
 .suggest-item .s-dist{color:#a898b8;font-size:10px;margin-left:8px}
 .empty-state{text-align:center;padding:24px;color:#a898b8}
-.addr-quick{margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
-.addr-quick span{font-size:10px;color:#a898b8;font-weight:600}
 footer{text-align:center;padding:16px;color:#8cb8a8;font-size:10px;font-weight:500}
 .supply-chips{display:flex;flex-wrap:wrap;gap:4px}
 .supply-chip{display:inline-block;background:linear-gradient(135deg,#f5f3ff,#ede9fe);color:#7c3aed;border:1px solid #ddd6fe;border-radius:6px;padding:3px 8px;font-size:10px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:all .2s}
@@ -90,23 +88,12 @@ footer{text-align:center;padding:16px;color:#8cb8a8;font-size:10px;font-weight:5
 .chip{border:2px solid #e5dcec;border-radius:10px;padding:6px 10px;font-size:11px;font-weight:600;background:#fff;color:#8a7a98;cursor:pointer;transition:all .2s;white-space:nowrap}
 .chip.active{background:linear-gradient(135deg,#f08ca4,#e27790);color:#fff;border-color:#f08ca4;box-shadow:0 2px 8px rgba(240,140,164,0.25)}
 .chip:active{transform:scale(.94)}
-.time-chips{display:flex;gap:4px;flex-wrap:wrap}
 /* 罗盘网格 */
 .compass-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:240px;margin:0 auto}
 .compass-btn{border:2px solid #e5dcec;border-radius:12px;padding:10px 4px;font-size:13px;font-weight:600;background:#fff;color:#8a7a98;cursor:pointer;transition:all .2s;text-align:center}
 .compass-btn.center{font-size:16px;padding:12px 4px}
 .compass-btn.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-color:#6366f1;box-shadow:0 2px 10px rgba(99,102,241,0.3);transform:scale(1.05)}
 .compass-btn:active{transform:scale(.92)}
-/* 场景模式卡片 */
-.scene-cards{display:flex;gap:8px}
-.scene-card{flex:1;background:#fff;border:2px solid #f2eaf4;border-radius:14px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .2s}
-.scene-card.active{background:linear-gradient(135deg,#fef6f8,#faf1f5);border-color:#f08ca4;box-shadow:0 3px 12px rgba(240,140,164,0.2);transform:translateY(-2px)}
-.scene-card:active{transform:scale(.95)}
-.scene-icon{font-size:28px;margin-bottom:4px}
-.scene-label{font-size:13px;font-weight:700;color:#5e5468}
-.scene-desc{font-size:10px;color:#a898b8;margin-top:2px;line-height:1.3}
-/* 自定义面板 */
-.custom-panel{margin-top:8px;padding-top:8px;border-top:1px dashed #ece0ec}
 /* 多路线卡片 */
 .multi-cards{display:flex;gap:8px;overflow-x:auto;padding:4px 0;margin-bottom:12px;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
 .multi-card{flex:0 0 85%;scroll-snap-align:start;background:#fff;border-radius:14px;padding:10px;border:2px solid #f2eaf4;cursor:pointer;transition:all .2s}
