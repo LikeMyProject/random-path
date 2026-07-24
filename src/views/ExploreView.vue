@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { geocode, setDetectedCity, detectCityFromGPS } from '../composables/useAMap.js'
 import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
@@ -8,6 +8,8 @@ import { rateDifficulty } from '../composables/useScoring.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 import ElevationProfile from '../components/ElevationProfile.vue'
+import SceneCards from '../components/SceneCards.vue'
+import TimeSlider from '../components/TimeSlider.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
 const addresses = loadAddresses()
@@ -21,6 +23,7 @@ const SCENES = [
 ]
 const scene = ref('random')
 const showCustom = ref(false)
+const showAdvanced = ref(false)
 
 // === 地址 ===
 const from = ref({ name: '', lng: '', lat: '' }), to = ref({ name: '', lng: '', lat: '' })
@@ -38,6 +41,13 @@ function applyScene(s) {
   else if (s.key === 'casual') { direction.value = 'random'; timeMin.value = 60 }
   else if (s.key === 'training') { direction.value = 'S'; timeMin.value = 120 }
 }
+
+// 监听 scene 变更 → 自动同步 timeMin + direction
+watch(scene, (s) => {
+  if (s === 'random') { direction.value = 'random'; timeMin.value = 60 + Math.floor(Math.random() * 3) * 60 }
+  else if (s === 'casual') { direction.value = 'random'; timeMin.value = 60 }
+  else if (s === 'training') { direction.value = 'S'; timeMin.value = 120 }
+})
 
 const targetDist = computed(() => timeMin.value * 60 * BIKE_SPEED / 3.6)
 const homeObj = computed(() => { const l = parseFloat(from.value.lng), a = parseFloat(from.value.lat); return (l && a && from.value.name) ? { lng: l, lat: a, name: from.value.name } : null })
@@ -179,56 +189,77 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
 <template>
 <div>
-  <!-- 场景模式选择 -->
-  <div class="scene-cards">
-    <div v-for="s in SCENES" :key="s.key" :class="['scene-card', { active: scene === s.key }]" @click="applyScene(s)">
-      <div class="scene-icon">{{ s.icon }}</div>
-      <div class="scene-label">{{ s.label }}</div>
-      <div class="scene-desc">{{ s.desc }}</div>
-    </div>
+  <!-- GPS 定位条 -->
+  <div class="gps-bar">
+    <span class="gps-icon">📍</span>
+    <span class="gps-text">{{ from.name || '点击设置起点' }}</span>
+    <span class="gps-hint">自动定位 · 点击切换</span>
   </div>
 
-  <!-- 起点 -->
-  <div class="card" style="margin-top:10px">
-    <div class="addr-quick"><span>地址簿：</span><button v-for="(v,k) in addresses" :key="k" class="btn btn-sm" style="background:#334155;color:#e2e8f0;font-size:10px;margin:1px" @click="pickAddr(k,'from')">{{ k }}</button><button class="btn btn-sm" style="background:#f08ca4;color:#fff;font-size:10px" @click="showAddrModal=true">+管理</button></div>
-    <div style="display:flex;align-items:center;gap:8px"><label style="font-size:12px;color:#8a8098;font-weight:600">📍 起点</label><span v-if="devUnlocked" style="display:flex;gap:3px"><button class="btn btn-sm" style="background:#f08ca4;color:#fff;font-size:9px;padding:2px 8px" @click="quickFill('from','家')">家</button><button class="btn btn-sm" style="background:#f08ca4;color:#fff;font-size:9px;padding:2px 8px" @click="quickFill('from','公司')">公司</button></span></div>
-    <div class="row" style="position:relative">
-      <input v-model="from.name" placeholder="输入地名搜索（GPS自动定位）" style="flex:1" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
-      <button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="doGeocode('from')">🔍</button>
-      <button class="btn btn-sm" style="background:#42a5f5;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="locateMe('from')">📍</button>
-      <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop"><div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)"><span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span></div></div>
-    </div>
+  <!-- 模式卡片 -->
+  <p class="section-title">今天想怎么骑？</p>
+  <SceneCards v-model="scene" />
 
-    <!-- 终点（可选，折叠） -->
-    <div v-if="showCustom" style="margin-top:8px">
-      <div style="display:flex;align-items:center;gap:8px"><label style="font-size:12px;color:#8a8098;font-weight:600">📍 终点 <span style="font-size:10px;color:#a898b8">(不填=环线)</span></label></div>
-      <div class="row" style="position:relative">
-        <input v-model="to.name" placeholder="可选目的地" style="flex:1" @input="onNameInput('to')" @focus="onNameInput('to')" @blur="setTimeout(closeSuggest,200)">
-        <button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="doGeocode('to')">🔍</button>
-        <button class="btn btn-sm" style="background:#42a5f5;color:#fff;flex-shrink:0;padding:6px 10px;font-size:11px" @click="locateMe('to')">📍</button>
-      </div>
-    </div>
+  <!-- 时长滑块 -->
+  <TimeSlider v-model="timeMin" />
 
-    <!-- 自定义展开 -->
-    <button class="btn btn-sm" style="background:transparent;color:#a898b8;font-size:10px;margin-top:6px;width:auto;display:block" @click="showCustom=!showCustom">
-      {{ showCustom ? '▲ 收起自定义' : '▼ 自定义（方向/时长/终点）' }}
-    </button>
-    <div v-if="showCustom" class="custom-panel">
-      <label style="font-size:11px;color:#8a8098;font-weight:600;margin:6px 0 4px;display:block">🧭 方向</label>
-      <div class="compass-row">
-        <button v-for="d in COMPASS" :key="d.key" :class="['chip', { active: direction === d.key }]" @click="direction = d.key">{{ d.label }}</button>
-      </div>
-      <label style="font-size:11px;color:#8a8098;font-weight:600;margin:8px 0 4px;display:block">⏱ 时长</label>
-      <div class="time-chips">
-        <button v-for="t in [{m:30,l:'30m'},{m:60,l:'1h'},{m:120,l:'2h'},{m:180,l:'3h'},{m:300,l:'半天'}]" :key="t.m" :class="['chip', { active: timeMin === t.m }]" @click="timeMin = t.m">{{ t.l }}</button>
-      </div>
-      <p style="font-size:10px;color:#a898b8;margin-top:4px">≈ {{ (timeMin * BIKE_SPEED / 60).toFixed(0) }}km ({{ BIKE_SPEED }}km/h)</p>
-    </div>
+  <!-- 大按钮 -->
+  <button
+    class="btn-go"
+    :disabled="loading"
+    @click="doGenerate(false)"
+  >
+    {{ loading ? '生成中…' : '🎲 出发！' }}
+  </button>
+  <button
+    class="btn-multi"
+    :disabled="loading"
+    @click="doGenerateMultiple"
+  >
+    📋 多生成几条对比
+  </button>
+
+  <!-- 高级选项折叠 -->
+  <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
+    <span>⚙️ 方向 · 起终点 · 偏好</span>
+    <span class="arrow" :class="{ open: showAdvanced }">▾</span>
   </div>
+  <div v-if="showAdvanced" class="advanced-panel">
+    <!-- 起点 -->
+    <div class="addr-row">
+      <label>📍 起点</label>
+      <div class="addr-quick-row">
+        <button v-for="(v,k) in addresses" :key="k" class="chip-sm" @click="pickAddr(k,'from')">{{ k }}</button>
+        <button class="chip-sm add" @click="showAddrModal = true">+管理</button>
+      </div>
+      <div class="input-row" style="position:relative">
+        <input v-model="from.name" placeholder="输入地名搜索" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
+        <button class="btn-icon" @click="doGeocode('from')">🔍</button>
+        <button class="btn-icon" @click="locateMe('from')">📍</button>
+        <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop"><div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)"><span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span></div></div>
+      </div>
+    </div>
 
-  <!-- 操作按钮 -->
-  <button class="btn btn-primary" :disabled="loading" @click="doGenerate(false)" style="font-size:18px;padding:16px">{{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : '🏋 开始训练！' }}</button>
-  <button class="btn btn-secondary" :disabled="loading" @click="doGenerateMultiple" style="margin-top:6px;font-size:12px">📋 多生成几条对比</button>
+    <!-- 终点（可选） -->
+    <div class="addr-row">
+      <label>📍 终点 <span class="hint">(不填=环线)</span></label>
+      <div class="input-row" style="position:relative">
+        <input v-model="to.name" placeholder="可选目的地" @input="onNameInput('to')" @focus="onNameInput('to')" @blur="setTimeout(closeSuggest,200)">
+        <button class="btn-icon" @click="doGeocode('to')">🔍</button>
+        <button class="btn-icon" @click="locateMe('to')">📍</button>
+      </div>
+    </div>
+
+    <!-- 方向 -->
+    <label class="adv-label">🧭 方向</label>
+    <div class="compass-row">
+      <button v-for="d in COMPASS" :key="d.key" :class="['chip', { active: direction === d.key }]" @click="direction = d.key">{{ d.label }}</button>
+    </div>
+
+    <!-- 距离偏好 -->
+    <label class="adv-label">🎯 距离偏好</label>
+    <p class="dist-est">≈ {{ (timeMin * BIKE_SPEED / 60).toFixed(0) }}km ({{ BIKE_SPEED }}km/h)</p>
+  </div>
 
   <!-- Loading -->
   <div v-if="loading" class="loading-overlay card">
@@ -299,3 +330,163 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   </div>
 </div>
 </template>
+
+<style scoped>
+/* === Phase 1 新首页样式 === */
+.gps-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f8f4fb, #fdf2f8);
+  border-radius: 16px;
+  margin-top: 4px;
+  cursor: pointer;
+  transition: box-shadow .2s;
+}
+.gps-bar:hover { box-shadow: 0 2px 12px rgba(240,140,164,.15); }
+.gps-icon { font-size: 20px; }
+.gps-text { flex: 1; font-weight: 700; font-size: 15px; color: #5e5468; }
+.gps-hint { font-size: 10px; color: #a898b8; }
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #4a3f55;
+  margin: 16px 0 0;
+}
+
+.btn-go {
+  display: block;
+  width: 100%;
+  padding: 18px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f08ca4, #f97316);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  margin-top: 16px;
+}
+.btn-go:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(240,140,164,.4);
+}
+.btn-go:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.btn-multi {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: #a898b8;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.advanced-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  margin-top: 14px;
+  background: #faf7fc;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #8a8098;
+  cursor: pointer;
+  transition: background .15s;
+}
+.advanced-toggle:hover { background: #f0e8f5; }
+.advanced-toggle .arrow { transition: transform .2s; }
+.advanced-toggle .arrow.open { transform: rotate(180deg); }
+
+.advanced-panel {
+  padding: 12px 14px;
+  background: #fdfbff;
+  border: 1px solid #ece0ec;
+  border-radius: 0 0 14px 14px;
+  border-top: none;
+}
+
+.addr-row {
+  margin-bottom: 10px;
+}
+.addr-row label {
+  font-size: 11px;
+  color: #8a8098;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+.addr-row .hint {
+  font-weight: 400;
+  color: #a898b8;
+}
+
+.addr-quick-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-sm {
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid #d4c4dc;
+  background: #fff;
+  color: #5e5468;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.chip-sm:hover { background: #f8f4fb; }
+.chip-sm.add { border-color: #f08ca4; color: #f08ca4; }
+
+.input-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.input-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e8e0ec;
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #5e5468;
+  background: #fff;
+}
+.btn-icon {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: #fdfbff;
+  cursor: pointer;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.adv-label {
+  font-size: 11px;
+  color: #8a8098;
+  font-weight: 600;
+  display: block;
+  margin: 10px 0 6px;
+}
+
+.dist-est {
+  font-size: 11px;
+  color: #a898b8;
+  margin-top: 4px;
+}
+</style>
