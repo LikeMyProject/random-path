@@ -14,6 +14,7 @@ const props = defineProps({
   loading: Boolean,
   villages: Array,
   supplyPoints: Array,
+  routeTags: Array,
 })
 
 const emit = defineEmits([
@@ -113,9 +114,10 @@ const routeContext = computed(() => {
     <!-- 路线文字描述 -->
     <div class="route-summary" v-html="summaryHTML" />
 
-    <!-- 质量标签 -->
-    <div v-if="scoreRouteQuality(result.waypoints || []).tags.length" class="quality-tags">
-      <span v-for="t in scoreRouteQuality(result.waypoints || []).tags" :key="t" class="qtag">{{ t }}</span>
+    <!-- 路线属性标签 -->
+    <div v-if="routeTags?.length || scoreRouteQuality(result.waypoints || []).tags.length" class="quality-tags">
+      <span v-for="t in (routeTags || [])" :key="t.text" :class="['qtag', 'qtag-' + (t.category || 'nature')]">{{ t.text }}</span>
+      <span v-for="t in scoreRouteQuality(result.waypoints || []).tags" :key="t" class="qtag qtag-quality">{{ t }}</span>
     </div>
 
     <!-- 高程图 -->
@@ -287,6 +289,9 @@ const routeContext = computed(() => {
   color: #166534;
   border: 1px solid #bbf7d0;
 }
+.qtag-nature { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.qtag-cycling { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
+.qtag-quality { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 
 .nav-link-box {
   margin-top: 8px;

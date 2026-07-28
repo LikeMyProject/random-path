@@ -21,6 +21,7 @@ function cacheKey(lng, lat) {
 export function useRouteContext() {
   const villages = ref([])
   const supplyPoints = ref([])
+  const routeTags = ref([])
   const loading = ref(false)
   const progress = ref('')
 
@@ -119,16 +120,65 @@ export function useRouteContext() {
   }
 
   /**
+   * 离线分析路线属性标签：自然类/骑行类（不需要 API）
+   */
+  function analyzeRouteTags(segments, result = {}) {
+    const tags = []
+
+    const totalDist = (segments || []).reduce((s, seg) => s + (seg.distance || 0), 0) / 1000
+    const totalClimb = result.totalClimb || 0
+    const uphill = result.uphillSections || []
+    const downhill = result.downhillSections || []
+
+    // === 自然类 ===
+    if (totalClimb >= 200 || uphill.some(s => s.avgGrade >= 8)) {
+      tags.push({ text: '⛰ 爬坡王', category: 'nature' })
+    }
+    if (totalClimb < 50 && totalDist > 10) {
+      tags.push({ text: '🛣 平路巡航', category: 'nature' })
+    }
+    const totalDescent = downhill.reduce((s, d) => s + (d.descent || 0), 0)
+    if (downhill.length >= 2 && totalDescent > 100) {
+      tags.push({ text: '🎢 下坡爽', category: 'nature' })
+    }
+    if (totalClimb >= 50 && totalClimb < 200) {
+      tags.push({ text: '⛰ 起伏路', category: 'nature' })
+    }
+
+    // === 骑行类 ===
+    const wpCount = (result.waypoints || []).length
+    if (wpCount >= 5) {
+      tags.push({ text: '🔄 弯道多', category: 'cycling' })
+    }
+    if (wpCount <= 2 && totalDist > 15) {
+      tags.push({ text: '➡ 直路多', category: 'cycling' })
+    }
+
+    if (totalDist >= 50) {
+      tags.push({ text: '🏆 长途', category: 'cycling' })
+    } else if (totalDist >= 30) {
+      tags.push({ text: '🔥 中长途', category: 'cycling' })
+    } else if (totalDist <= 10) {
+      tags.push({ text: '☕ 短途', category: 'cycling' })
+    }
+
+    routeTags.value = tags
+    return tags
+  }
+
+  /**
    * 一键获取全部沿途上下文
    */
-  async function loadContext(segments, waypoints) {
+  async function loadContext(segments, waypoints, result) {
     loading.value = true
     try {
       const [v, s] = await Promise.all([
         identifyVillages(segments, waypoints),
         findSupplyPoints(segments),
       ])
-      return { villages: v, supplyPoints: s }
+      // 离线标签分析（不依赖 API）
+      analyzeRouteTags(segments, result)
+      return { villages: v, supplyPoints: s, tags: routeTags.value }
     } finally {
       loading.value = false
     }
@@ -137,10 +187,12 @@ export function useRouteContext() {
   return {
     villages,
     supplyPoints,
+    routeTags,
     loading,
     progress,
     identifyVillages,
     findSupplyPoints,
+    analyzeRouteTags,
     loadContext,
   }
 }

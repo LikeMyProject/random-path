@@ -61,7 +61,7 @@ const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
 const multiResults = ref([]), activeResultIdx = ref(0)
 
 // === 沿途上下文 ===
-const { villages, supplyPoints, loadContext } = useRouteContext()
+const { villages, supplyPoints, routeTags, loadContext } = useRouteContext()
 
 // === 初始化 ===
 onMounted(async () => {
@@ -172,7 +172,7 @@ async function doGenerate(isRetry = false) {
     saveHistory({ type: 'explore', home: h.name, work: w.name, distance: route.totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
     saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, timeMin: timeMin.value, scene: scene.value })
     // 后台获取沿途上下文，不阻塞结果展示
-    loadContext(route.segments, route.waypoints).catch(() => {})
+    loadContext(route.segments, route.waypoints, { totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, waypoints: route.waypoints, totalDistance: route.totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
 
@@ -338,6 +338,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     :hasDest="hasDest"
     v-model:collapseOpen="collapseOpen"
     :loading="loading"
+    :routeTags="routeTags"
     :villages="villages"
     :supplyPoints="supplyPoints"
     @openNav="openNav"
