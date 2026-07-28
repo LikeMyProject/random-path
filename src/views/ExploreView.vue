@@ -314,9 +314,13 @@ async function doGenerateRoundTrip() {
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
 
-function selectMulti(i) { activeResultIdx.value = i; const r = multiResults.value[i]; if (!r) return; result.value = r; resultShow.value = true }
+function selectMulti(i) { activeResultIdx.value = i; const r = multiResults.value[i]; if (!r) return; result.value = r; resultShow.value = true; loadContext(r.segments, r.waypoints, { totalClimb: r.totalClimb, uphillSections: r.uphillSections, downhillSections: r.downhillSections, waypoints: r.waypoints, totalDistance: r.totalDistance }).catch(() => {}) }
 
 // === 结果操作 ===
+function doRegenerate() {
+  if (result.value?.isRoundTrip) doGenerateRoundTrip()
+  else doGenerate(true)
+}
 const navUrl = computed(() => result.value && homeObj.value && workObj.value ? buildNavUrl(homeObj.value, workObj.value, result.value.waypoints) : '')
 function openNav() { if (result.value && homeObj.value && workObj.value) openNavigation(homeObj.value, workObj.value, result.value.waypoints) }
 function copyNav() { if (navUrl.value) { navigator.clipboard?.writeText(navUrl.value); toast('已复制') } }
@@ -359,8 +363,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <p class="section-title">今天想怎么骑？</p>
   <SceneCards v-model="scene" />
 
-  <!-- 时长滑块 -->
-  <TimeSlider v-model="timeMin" />
+  <!-- 时长滑块（目的地模式不需要） -->
+  <TimeSlider v-if="scene !== 'destination'" v-model="timeMin" />
 
   <!-- 骑到某处：目的地搜索（仅 destination 模式） -->
   <div v-if="scene === 'destination'" class="dest-search card">
@@ -396,6 +400,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     {{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : scene === 'training' ? '🏋 开始训练！' : '🎯 骑过去！' }}
   </button>
   <button
+    v-if="scene !== 'destination'"
     class="btn-multi"
     :disabled="loading"
     @click="doGenerateMultiple"
@@ -485,7 +490,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     @copyNav="copyNav"
     @downloadGpx="downloadGpx"
     @doShare="doShare"
-    @regenerate="doGenerate(true)"
+    @regenerate="doRegenerate"
   />
 
   <!-- 地址管理弹窗 -->

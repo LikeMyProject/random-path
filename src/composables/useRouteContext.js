@@ -126,7 +126,7 @@ export function useRouteContext() {
     const tags = []
 
     const totalDist = (segments || []).reduce((s, seg) => s + (seg.distance || 0), 0) / 1000
-    const totalClimb = result.totalClimb || 0
+    const totalClimb = Number(result.totalClimb ?? 0)
     const uphill = result.uphillSections || []
     const downhill = result.downhillSections || []
 
