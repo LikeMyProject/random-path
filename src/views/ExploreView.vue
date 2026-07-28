@@ -359,12 +359,25 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 <template>
 <div>
   <!-- GPS 定位条 -->
-  <div class="gps-bar" @click="locateMe('from')">
+  <div class="gps-bar">
     <span class="gps-icon">📍</span>
-    <span class="gps-text">{{ from.name || '点击设置起点' }}</span>
-    <span class="gps-hint" v-if="!nearbyMode">自动定位 · 点击切换</span>
-    <span class="gps-hint" v-else>离家 {{ homeDist }}km · 附近模式</span>
+    <input
+      v-model="from.name"
+      placeholder="输入起点或点击右侧按钮定位"
+      class="gps-input"
+      @focus="onNameInput('from')"
+      @input="onNameInput('from')"
+      @blur="setTimeout(closeSuggest,200)"
+    />
+    <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop gps-suggest">
+      <div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)">
+        <span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span>
+      </div>
+    </div>
+    <span v-if="nearbyMode" class="gps-hint">离家{{ homeDist }}km</span>
+    <button class="gps-locate-btn" @click="locateMe('from')" title="获取当前位置的经纬度">📍</button>
     <button v-if="nearbyMode" class="gps-home-btn" @click.stop="toggleNearby" title="切回家">🏠</button>
+    <button class="gps-locate-btn" @click="doGeocode('from')" title="搜索地名获取坐标">🔍</button>
   </div>
 
   <!-- 模式卡片 -->
@@ -521,18 +534,47 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 .gps-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 14px 16px;
+  gap: 6px;
+  padding: 10px 12px;
   background: linear-gradient(135deg, #f8f4fb, #fdf2f8);
   border-radius: 16px;
   margin-top: 4px;
-  cursor: pointer;
-  transition: box-shadow .2s;
+  position: relative;
 }
-.gps-bar:hover { box-shadow: 0 2px 12px rgba(240,140,164,.15); }
-.gps-icon { font-size: 20px; }
-.gps-text { flex: 1; font-weight: 700; font-size: 15px; color: #5e5468; }
-.gps-hint { font-size: 10px; color: #a898b8; }
+.gps-icon { font-size: 18px; flex-shrink: 0; }
+.gps-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #e8e0ec;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #5e5468;
+  background: #fff;
+  min-width: 0;
+}
+.gps-input::placeholder { color: #c4b5d0; }
+.gps-hint { font-size: 10px; color: #a898b8; white-space: nowrap; flex-shrink: 0; }
+
+.gps-locate-btn {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #d4c4dc;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.gps-locate-btn:hover { background: #f8f4fb; }
+
+.gps-suggest {
+  position: absolute;
+  top: 100%;
+  left: 30px;
+  right: 0;
+  z-index: 10;
+}
 
 .gps-home-btn {
   padding: 4px 8px;
