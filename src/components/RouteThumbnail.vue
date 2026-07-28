@@ -6,6 +6,7 @@ const props = defineProps({
   segments: Array, waypoints: Array, home: Object, work: Object,
   supplyPoints: Array, highlightIndex: { type: Number, default: -1 },
   uphillSections: Array, downhillSections: Array,
+  villages: Array,
 })
 const emit = defineEmits(['supply-click'])
 
@@ -28,6 +29,22 @@ function clampPan(v) {
   const n = Number(v)
   if (!isFinite(n) || isNaN(n)) return 0
   return Math.min(2000, Math.max(-2000, n))
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.arcTo(x + w, y, x + w, y + r, r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+  ctx.lineTo(x + r, y + h)
+  ctx.arcTo(x, y + h, x, y + h - r, r)
+  ctx.lineTo(x, y + r)
+  ctx.arcTo(x, y, x + r, y, r)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
 }
 
 function zoomIn() {
@@ -185,6 +202,35 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
   })
   supplyPositions.value = pos
 
+  // villages — 黄色圆角矩形 + 名称
+  if (props.villages && props.villages.length > 0) {
+    const drawnLabels = new Set()
+    for (const v of props.villages) {
+      if (!v || !v.name) continue
+      // 去重：同名字只画一次
+      const labelKey = v.name.slice(0, 6)
+      if (drawnLabels.has(labelKey)) continue
+      drawnLabels.add(labelKey)
+
+      const vx = tx(v.lng), vy = ty(v.lat)
+      const shortName = v.name.length > 6 ? v.name.slice(0, 5) + '…' : v.name
+      ctx.font = 'bold 9px sans-serif'
+      const tw = ctx.measureText(shortName).width
+      const pw = tw + 12, ph = 18
+
+      // 背景
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.85)'
+      ctx.strokeStyle = 'rgba(202, 138, 4, 0.6)'
+      ctx.lineWidth = 1
+      roundRect(ctx, vx - pw / 2, vy - ph - 8, pw, ph, 6)
+
+      // 文字
+      ctx.fillStyle = '#713f12'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText(shortName, vx, vy - ph / 2 - 8)
+    }
+  }
+
   // restore transform
   ctx.restore()
 
@@ -241,7 +287,7 @@ function onTouchMove(e) {
 function onTouchEnd() { dragging = false }
 
 onMounted(draw)
-watch(() => [props.segments, props.waypoints, props.supplyPoints, zoom.value, panX.value, panY.value],
+watch(() => [props.segments, props.waypoints, props.supplyPoints, props.villages, zoom.value, panX.value, panY.value],
   () => nextTick(draw), { deep: true })
 </script>
 <template>

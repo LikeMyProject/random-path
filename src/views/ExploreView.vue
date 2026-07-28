@@ -3,11 +3,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { geocode, setDetectedCity, detectCityFromGPS } from '../composables/useAMap.js'
 import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
-import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories, scoreRouteQuality } from '../composables/useRouteEngine.js'
-import { rateDifficulty } from '../composables/useScoring.js'
+import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX } from '../composables/useRouteEngine.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
+import { useRouteContext } from '../composables/useRouteContext.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
-import ElevationProfile from '../components/ElevationProfile.vue'
+import ResultView from './ResultView.vue'
 import SceneCards from '../components/SceneCards.vue'
 import TimeSlider from '../components/TimeSlider.vue'
 
@@ -44,6 +44,9 @@ const loading = ref(false), loadingHint = ref(''), tryInfo = ref(''), progress =
 const retryDots = ref(Array(10).fill(''))
 const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
 const multiResults = ref([]), activeResultIdx = ref(0)
+
+// === 沿途上下文 ===
+const { villages, supplyPoints, loadContext } = useRouteContext()
 
 // === 初始化 ===
 onMounted(async () => {
@@ -116,6 +119,8 @@ async function doGenerate(isRetry = false) {
     result.value = route; resultShow.value = true; loading.value = false
     saveHistory({ type: 'explore', home: h.name, work: w.name, distance: route.totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
     saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, timeMin: timeMin.value, scene: scene.value })
+    // 后台获取沿途上下文，不阻塞结果展示
+    loadContext(route.segments, route.waypoints).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
 
@@ -145,7 +150,6 @@ async function doGenerateMultiple() {
 function selectMulti(i) { activeResultIdx.value = i; const r = multiResults.value[i]; if (!r) return; result.value = r; resultShow.value = true }
 
 // === 结果操作 ===
-const diffObj = computed(() => result.value ? rateDifficulty(result.value.totalDistance, result.value.totalClimb) : null)
 const navUrl = computed(() => result.value && homeObj.value && workObj.value ? buildNavUrl(homeObj.value, workObj.value, result.value.waypoints) : '')
 function openNav() { if (result.value && homeObj.value && workObj.value) openNavigation(homeObj.value, workObj.value, result.value.waypoints) }
 function copyNav() { if (navUrl.value) { navigator.clipboard?.writeText(navUrl.value); toast('已复制') } }
@@ -272,36 +276,22 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   </div>
 
   <!-- 结果 -->
-  <div v-if="resultShow && result" class="card" style="animation:cardIn .4s cubic-bezier(.34,1.56,.64,1)">
-    <div class="stats">
-      <div class="stat"><div class="val">{{ (result.totalDistance/1000).toFixed(1) }}</div><div class="lbl">总距离 km</div></div>
-      <div class="stat"><div class="val">{{ Math.round(result.totalDuration/60) }}</div><div class="lbl">预计 分钟</div></div>
-      <div class="stat"><div class="val small" :style="{color: diffObj?.color}">{{ diffObj?.label }}</div><div class="lbl">难度</div></div>
-    </div>
-    <RouteThumbnail :segments="result.segments" :waypoints="result.waypoints" :home="homeObj" :work="workObj" :uphillSections="result.uphillSections" :downhillSections="result.downhillSections" />
-    <div class="route-thumb-legend"><span>🟢 起点</span><span>🟠 终点</span><span>🔵 途经点</span><span>🔴 上坡</span><span>🟢 下坡</span><span>⬆ 北</span></div>
-    <div class="route-summary" v-html="'<strong>'+(homeObj?.name||'')+'</strong> → '+result.waypoints.map((w,i)=>w.poiName||'途经点'+(i+1)).join(' → ')+' → <strong>'+(workObj?.name||'')+'</strong>'"></div>
-    <div v-if="scoreRouteQuality(result.waypoints).tags.length" class="quality-tags">
-      <span v-for="t in scoreRouteQuality(result.waypoints).tags" :key="t" class="qtag">{{ t }}</span>
-    </div>
-    <ElevationProfile v-if="result.elevationProfile" :elevationProfile="result.elevationProfile" :uphillSections="result.uphillSections" :downhillSections="result.downhillSections" />
-    <div class="collapse-toggle" :class="{open:collapseOpen}" @click="collapseOpen=!collapseOpen"><span class="arrow">▶</span> 详细数据</div>
-    <div class="collapse-body" :class="{open:collapseOpen}">
-      <div class="stats" style="margin-top:8px">
-        <div class="stat"><div class="val small">{{ result.totalClimb != null ? result.totalClimb+'m' : '--' }}</div><div class="lbl">爬升 m</div></div>
-        <div class="stat"><div class="val small">{{ calcCalories(result.totalDistance, result.totalDuration) }}kcal</div><div class="lbl">消耗</div></div>
-        <div class="stat"><div class="val small">{{ result.waypoints.length }}</div><div class="lbl">途经点</div></div>
-      </div>
-      <div class="segments"><div class="seg" v-for="(seg,i) in result.segments" :key="i"><span class="seg-detail">第{{ i+1 }}段: {{ i===0 ? homeObj?.name : (result.waypoints[i-1]?.poiName||'途经点'+i) }} → {{ i===result.segments.length-1 ? workObj?.name : (result.waypoints[i]?.poiName||'途经点'+(i+1)) }}</span><span class="seg-nums">{{ (seg.distance/1000).toFixed(1) }}km · {{ Math.round(seg.duration/60) }}min</span></div></div>
-      <div class="waypoints-info"><span v-for="(wp,i) in result.waypoints" :key="i">途经点{{ i+1 }}: {{ wp.lng.toFixed(5) }}, {{ wp.lat.toFixed(5) }} {{ wp.poiName||'' }}</span></div>
-      <div v-if="result.uphillSections?.length" class="slope-box uphill"><div class="slope-title">🔴 上坡路段 (坡度≥5%)</div><div class="slope-item" v-for="(sec,i) in result.uphillSections" :key="'u'+i"><span class="slope-badge" :class="sec.avgGrade>=8?'steep':'moderate'">{{ sec.avgGrade>=8?'🔴':'🟠' }} 第{{ i+1 }}段</span><span class="slope-data">{{ sec.length }}km ↗{{ sec.climb }}m</span><span class="slope-grade">均{{ sec.avgGrade }}% / 最{{ sec.maxGrade }}%</span></div></div>
-      <div v-if="result.downhillSections?.length" class="slope-box downhill"><div class="slope-title">🟢 下坡路段 (坡度≥5%)</div><div class="slope-item" v-for="(sec,i) in result.downhillSections" :key="'d'+i"><span class="slope-badge">{{ sec.avgGrade>=8?'🟢':'🟢' }} 第{{ i+1 }}段</span><span class="slope-data">{{ sec.length }}km ↘{{ sec.descent }}m</span><span class="slope-grade">均{{ sec.avgGrade }}% / 最{{ sec.maxGrade }}%</span></div></div>
-    </div>
-    <button class="btn btn-nav" @click="openNav">开始导航</button>
-    <div class="nav-link-box"><div class="label">高德导航链接（可复制）：</div><div class="url">{{ navUrl }}</div></div>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button><button class="btn btn-sm btn-secondary" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff" @click="doShare">📤 分享</button></div>
-    <button class="btn btn-secondary" style="margin-top:8px" @click="doGenerate(true)">换一条</button>
-  </div>
+  <ResultView
+    v-if="resultShow && result"
+    :result="result"
+    :homeObj="homeObj"
+    :workObj="workObj"
+    :hasDest="hasDest"
+    v-model:collapseOpen="collapseOpen"
+    :loading="loading"
+    :villages="villages"
+    :supplyPoints="supplyPoints"
+    @openNav="openNav"
+    @copyNav="copyNav"
+    @downloadGpx="downloadGpx"
+    @doShare="doShare"
+    @regenerate="doGenerate(true)"
+  />
 
   <!-- 地址管理弹窗 -->
   <div class="modal" v-if="showAddrModal" @click.self="showAddrModal=false">
