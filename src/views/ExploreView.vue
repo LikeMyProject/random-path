@@ -19,6 +19,21 @@ const { suggestions, showSuggest, searchAddress, pickSuggestion, closeSuggest } 
 const scene = ref('random')
 const showAdvanced = ref(false)
 
+// === 附近起点模式 ===
+const nearbyMode = ref(false)
+const homeDist = ref(0)
+const homeAddr = ref(null)
+
+function calcDistKm(a, b) {
+  const R = 6371
+  const dLat = (b.lat - a.lat) * Math.PI / 180
+  const dLng = (b.lng - a.lng) * Math.PI / 180
+  const lat1 = a.lat * Math.PI / 180
+  const lat2 = b.lat * Math.PI / 180
+  const sa = Math.sin(dLat / 2), sb = Math.sin(dLng / 2)
+  return R * 2 * Math.asin(Math.sqrt(sa * sa + Math.cos(lat1) * Math.cos(lat2) * sb * sb))
+}
+
 // === 地址 ===
 const from = ref({ name: '', lng: '', lat: '' }), to = ref({ name: '', lng: '', lat: '' })
 const activeSuggest = ref('')
@@ -50,8 +65,13 @@ const { villages, supplyPoints, loadContext } = useRouteContext()
 
 // === 初始化 ===
 onMounted(async () => {
-  if (addresses['家']) from.value = { name: addresses['家'].name, lng: addresses['家'].lng, lat: addresses['家'].lat }
+  // 先加载家/公司地址
+  if (addresses['家']) {
+    from.value = { name: addresses['家'].name, lng: addresses['家'].lng, lat: addresses['家'].lat }
+    homeAddr.value = { name: addresses['家'].name, lng: parseFloat(addresses['家'].lng), lat: parseFloat(addresses['家'].lat) }
+  }
   if (addresses['公司']) to.value = { name: addresses['公司'].name, lng: addresses['公司'].lng, lat: addresses['公司'].lat }
+
   const last = loadLastRoute()
   if (last && (last.type === 'commute' || last.type === 'loop') && last.home) {
     from.value = { name: last.home.name, lng: String(last.home.lng), lat: String(last.home.lat) }
@@ -62,12 +82,30 @@ onMounted(async () => {
     result.value = { waypoints: last.waypoints || [], segments: last.segments || [], totalDistance: last.totalDistance, totalDuration: last.totalDuration, totalClimb: last.totalClimb, uphillSections: last.uphillSections || [], downhillSections: last.downhillSections || [] }
     resultShow.value = true; return
   }
-  if (!addresses['家'] && navigator.geolocation) {
+
+  // GPS 定位 + 附近模式检测
+  if (navigator.geolocation) {
     try {
       const pos = await new Promise((res, rej) => { navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }) })
       const { longitude: lng, latitude: lat } = pos.coords
-      from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
-      try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
+
+      if (!addresses['家'] || !homeAddr.value) {
+        // 没有家地址，直接用 GPS
+        from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+        try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
+      } else {
+        const dist = calcDistKm({ lat, lng }, homeAddr.value)
+        homeDist.value = Math.round(dist * 10) / 10
+        if (dist > 2) {
+          // 离家 > 2km → 自动附近模式
+          nearbyMode.value = true
+          from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+          try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
+        } else {
+          // 在家附近，保持家地址
+          nearbyMode.value = false
+        }
+      }
     } catch(e) {}
   }
 })
@@ -87,6 +125,20 @@ function locateMe(target) {
     toast('已获取当前位置')
     try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) { if (target === 'from') from.value.name = name; else to.value.name = name }; if (city) setDetectedCity(city) } catch(e) {}
   }, () => { toast('定位失败', 'warn') }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 })
+}
+
+function toggleNearby() {
+  if (nearbyMode.value) {
+    // 切回家
+    if (homeAddr.value) {
+      from.value = { name: homeAddr.value.name, lng: String(homeAddr.value.lng), lat: String(homeAddr.value.lat) }
+    }
+    nearbyMode.value = false
+  } else {
+    // 切到附近——重新 GPS 定位
+    locateMe('from')
+    nearbyMode.value = true
+  }
 }
 
 // === 生成路线 ===
@@ -183,7 +235,9 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <div class="gps-bar" @click="locateMe('from')">
     <span class="gps-icon">📍</span>
     <span class="gps-text">{{ from.name || '点击设置起点' }}</span>
-    <span class="gps-hint">自动定位 · 点击切换</span>
+    <span class="gps-hint" v-if="!nearbyMode">自动定位 · 点击切换</span>
+    <span class="gps-hint" v-else>离家 {{ homeDist }}km · 附近模式</span>
+    <button v-if="nearbyMode" class="gps-home-btn" @click.stop="toggleNearby" title="切回家">🏠</button>
   </div>
 
   <!-- 模式卡片 -->
@@ -328,6 +382,18 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 .gps-icon { font-size: 20px; }
 .gps-text { flex: 1; font-weight: 700; font-size: 15px; color: #5e5468; }
 .gps-hint { font-size: 10px; color: #a898b8; }
+
+.gps-home-btn {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid #d4c4dc;
+  background: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.gps-home-btn:hover { background: #f8f4fb; }
 
 .section-title {
   font-size: 16px;
