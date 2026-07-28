@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { loadAddresses, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
-import { fetchBicyclingRoute } from '../composables/useAMap.js'
+import { fetchBicyclingRoute, searchAlongRoute } from '../composables/useAMap.js'
 import { rateDifficulty } from '../composables/useScoring.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
 import { nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories, calcSlopeProfile } from '../composables/useRouteEngine.js'
@@ -259,7 +259,6 @@ async function searchSupply() {
   if (!segs || segs.length === 0) { toast('没有路线数据', 'warn'); return }
   supplyLoading.value = true; supplyPoints.value = []
   try {
-    const { searchAlongRoute } = await import('../composables/useAMap.js')
     const results = await searchAlongRoute(segs, {
       concurrency: 6,
       onProgress: ({ done, total }) => {

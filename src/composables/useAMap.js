@@ -1,3 +1,5 @@
+import { parsePolyline, samplePoints } from '../utils/math.js'
+
 export const AMAP_KEY = import.meta.env.VITE_AMAP_KEY || ''
 const TIMEOUT = 10000
 let sdkLoaded = false, sdkLoading = null
@@ -144,8 +146,6 @@ export async function fetchBicyclingRoute(o, d) { return (await fetchBicyclingPa
 // === 沿途搜索：沿路线 polyline 密集采样批量搜索 POI ===
 export async function searchAlongRoute(segments, opts = {}) {
   const { onProgress = null, concurrency = 5 } = opts
-  const { parsePolyline, samplePoints } = await import('../utils/math.js')
-
   // 1. 合并所有 polyline 坐标点
   const allPts = []
   for (const seg of segments) {

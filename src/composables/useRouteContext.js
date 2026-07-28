@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { reverseGeocode, searchAlongRoute, searchPOIs } from './useAMap.js'
+import { parsePolyline, samplePoints } from '../utils/math.js'
 
 // 逆地理编码缓存
 const geoCache = new Map()
@@ -27,8 +28,6 @@ export function useRouteContext() {
    * 沿路线采样并逆地理编码，识别沿途地名
    */
   async function identifyVillages(segments, waypoints = []) {
-    const { parsePolyline, samplePoints } = await import('../utils/math.js')
-
     // 合并所有 polyline 坐标
     const allPts = []
     for (const seg of (segments || [])) {
