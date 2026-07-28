@@ -10,7 +10,6 @@ import { useRouteContext } from '../composables/useRouteContext.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 import ResultView from './ResultView.vue'
 import SceneCards from '../components/SceneCards.vue'
-import TimeSlider from '../components/TimeSlider.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
 const addresses = loadAddresses()
@@ -47,13 +46,14 @@ const hasDest = computed(() => !!(to.value.name && to.value.lng && to.value.lat)
 
 // === 自定义参数 ===
 const direction = ref('random')
-const timeMin = ref(90) // 默认值，会被场景覆盖
 
-// 监听 scene 变更 → 自动同步 timeMin + direction
+// 场景 → 固定目标距离(m)
+const SCENE_DIST = { casual: 12000, training: 30000, random: null }
+
 watch(scene, (s) => {
-  if (s === 'random') { direction.value = 'random'; timeMin.value = 60 + Math.floor(Math.random() * 3) * 60 }
-  else if (s === 'casual') { direction.value = 'random'; timeMin.value = 60 }
-  else if (s === 'training') { direction.value = 'S'; timeMin.value = 120 }
+  if (s === 'random') { direction.value = 'random' }
+  else if (s === 'casual') { direction.value = 'random' }
+  else if (s === 'training') { direction.value = 'S' }
   else if (s === 'destination') {
     destName.value = ''
     destCoord.value = null
@@ -61,7 +61,12 @@ watch(scene, (s) => {
   }
 })
 
-const targetDist = computed(() => timeMin.value * 60 * BIKE_SPEED / 3.6)
+// 目标距离：场景固定；random 模式 15~45km 随机
+const targetDist = computed(() => {
+  if (scene.value === 'destination') return 20000
+  if (scene.value === 'random') return 15000 + Math.floor(Math.random() * 6) * 5000
+  return SCENE_DIST[scene.value] || 20000
+})
 const homeObj = computed(() => { const l = parseFloat(from.value.lng), a = parseFloat(from.value.lat); return (l && a && from.value.name) ? { lng: l, lat: a, name: from.value.name } : null })
 const workObj = computed(() => hasDest.value ? { name: to.value.name, lng: parseFloat(to.value.lng), lat: parseFloat(to.value.lat) } : homeObj.value)
 
@@ -88,7 +93,6 @@ onMounted(async () => {
     from.value = { name: last.home.name, lng: String(last.home.lng), lat: String(last.home.lat) }
     if (last.work && last.work.name !== last.home.name) to.value = { name: last.work.name, lng: String(last.work.lng), lat: String(last.work.lat) }
     if (last.direction) direction.value = last.direction
-    if (last.timeMin) timeMin.value = last.timeMin
     if (last.scene) scene.value = last.scene
     result.value = { waypoints: last.waypoints || [], segments: last.segments || [], totalDistance: last.totalDistance, totalDuration: last.totalDuration, totalClimb: last.totalClimb, uphillSections: last.uphillSections || [], downhillSections: last.downhillSections || [] }
     resultShow.value = true; return
@@ -166,8 +170,12 @@ async function searchDestination() {
     // 预估单程距离
     const h = homeObj.value || { lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
     if (h.lng && h.lat && r.lng && r.lat) {
-      const oneWayDist = calcDistKm({ lng: h.lng, lat: h.lat }, { lng: r.lng, lat: r.lat }) * 1.5 // 道路系数(km)
-      const oneWayKm = Math.round(oneWayDist * 10) / 10
+      const straightKm = calcDistKm({ lng: h.lng, lat: h.lat }, { lng: r.lng, lat: r.lat })
+      if (straightKm < 0.5) {
+        toast('起点坐标可能未设置，请先在地图中定位起点', 'warn')
+        destLoading.value = false; return
+      }
+      const oneWayKm = Math.round(straightKm * 1.5 * 10) / 10 // 道路系数 ~1.5
       const oneWayMin = Math.round(oneWayKm / BIKE_SPEED * 60)
       destEstimate.value = {
         oneWayKm,
@@ -210,7 +218,7 @@ async function doGenerate(isRetry = false) {
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = route; resultShow.value = true; loading.value = false
     saveHistory({ type: 'explore', home: h.name, work: w.name, distance: route.totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
-    saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, timeMin: timeMin.value, scene: scene.value })
+    saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, scene: scene.value })
     // 后台获取沿途上下文，不阻塞结果展示
     loadContext(route.segments, route.waypoints, { totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, waypoints: route.waypoints, totalDistance: route.totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
@@ -308,7 +316,7 @@ async function doGenerateRoundTrip() {
     result.value = mergedRoute; resultShow.value = true; loading.value = false
 
     saveHistory({ type: 'roundtrip', home: h.name, work: d.name, distance: mergedRoute.totalDistance, waypoints: mergedRoute.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
-    saveLastRoute({ type: 'roundtrip', home: h, work: d, waypoints: mergedRoute.waypoints, segments: mergedRoute.segments, totalDistance: mergedRoute.totalDistance, totalDuration: mergedRoute.totalDuration, totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, direction: direction.value, timeMin: timeMin.value, scene: 'destination' })
+    saveLastRoute({ type: 'roundtrip', home: h, work: d, waypoints: mergedRoute.waypoints, segments: mergedRoute.segments, totalDistance: mergedRoute.totalDistance, totalDuration: mergedRoute.totalDuration, totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, direction: direction.value, scene: 'destination' })
     // 后台获取沿途上下文
     loadContext(mergedRoute.segments, mergedRoute.waypoints, { totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, waypoints: mergedRoute.waypoints, totalDistance: mergedRoute.totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
@@ -362,9 +370,6 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <!-- 模式卡片 -->
   <p class="section-title">今天想怎么骑？</p>
   <SceneCards v-model="scene" />
-
-  <!-- 时长滑块（目的地模式不需要） -->
-  <TimeSlider v-if="scene !== 'destination'" v-model="timeMin" />
 
   <!-- 骑到某处：目的地搜索（仅 destination 模式） -->
   <div v-if="scene === 'destination'" class="dest-search card">
@@ -451,7 +456,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
     <!-- 距离偏好 -->
     <label class="adv-label">🎯 距离偏好</label>
-    <p class="dist-est">≈ {{ (timeMin * BIKE_SPEED / 60).toFixed(0) }}km ({{ BIKE_SPEED }}km/h)</p>
+    <p class="dist-est">≈ {{ (targetDist / 1000).toFixed(0) }}km ({{ BIKE_SPEED }}km/h)</p>
   </div>
 
   <!-- Loading -->
