@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { geocode, setDetectedCity, detectCityFromGPS } from '../composables/useAMap.js'
+import { geocode, setDetectedCity, detectCityFromGPS, getDetectedCity } from '../composables/useAMap.js'
 import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
 import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX } from '../composables/useRouteEngine.js'
+import { getBearing } from '../utils/math.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import { useRouteContext } from '../composables/useRouteContext.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
@@ -18,6 +19,11 @@ const { suggestions, showSuggest, searchAddress, pickSuggestion, closeSuggest } 
 // === 场景模式 ===
 const scene = ref('random')
 const showAdvanced = ref(false)
+
+// === 骑到某处模式 ===
+const destName = ref('')
+const destCoord = ref(null)
+const destEstimate = ref(null)
 
 // === 附近起点模式 ===
 const nearbyMode = ref(false)
@@ -48,6 +54,11 @@ watch(scene, (s) => {
   if (s === 'random') { direction.value = 'random'; timeMin.value = 60 + Math.floor(Math.random() * 3) * 60 }
   else if (s === 'casual') { direction.value = 'random'; timeMin.value = 60 }
   else if (s === 'training') { direction.value = 'S'; timeMin.value = 120 }
+  else if (s === 'destination') {
+    destName.value = ''
+    destCoord.value = null
+    destEstimate.value = null
+  }
 })
 
 const targetDist = computed(() => timeMin.value * 60 * BIKE_SPEED / 3.6)
@@ -141,6 +152,35 @@ function toggleNearby() {
   }
 }
 
+const destLoading = ref(false)
+
+async function searchDestination() {
+  if (!destName.value.trim()) { toast('请输入目的地', 'warn'); return }
+  destLoading.value = true
+  try {
+    const r = await geocode(destName.value, getDetectedCity())
+    if (!r) { toast('未找到该地点', 'warn'); destLoading.value = false; return }
+    destCoord.value = { lng: r.lng, lat: r.lat, name: r.name }
+    destName.value = r.name
+
+    // 预估单程距离
+    const h = homeObj.value || { lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
+    if (h.lng && h.lat && r.lng && r.lat) {
+      const oneWayDist = calcDistKm({ lng: h.lng, lat: h.lat }, { lng: r.lng, lat: r.lat }) * 1.5 // 道路系数
+      const oneWayKm = Math.round(oneWayDist / 100) / 10
+      const oneWayMin = Math.round(oneWayKm / BIKE_SPEED * 60)
+      destEstimate.value = {
+        oneWayKm,
+        oneWayMin,
+        roundKm: Math.round(oneWayKm * 2 * 10) / 10,
+        roundMin: oneWayMin * 2,
+      }
+    }
+    toast(`已定位：${r.name}`)
+  } catch(e) { toast('搜索失败', 'err') }
+  destLoading.value = false
+}
+
 // === 生成路线 ===
 async function doGenerate(isRetry = false) {
   multiResults.value = []
@@ -199,6 +239,81 @@ async function doGenerateMultiple() {
   loading.value = false
 }
 
+async function doGenerateRoundTrip() {
+  if (!destCoord.value) { toast('请先搜索目的地', 'warn'); return }
+  const h = homeObj.value || { name: from.value.name, lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
+  if (!h.lng || !h.lat) { toast('请完善起点', 'warn'); return }
+  const d = destCoord.value
+
+  resultShow.value = false; multiResults.value = []
+  loading.value = true; progress.value = 0; loadingHint.value = '正在规划去程路线…'; tryInfo.value = ''
+
+  const onTryOut = (a, dist, e) => {
+    progress.value = Math.round((a / MAX_RETRIES) * 50)
+    loadingHint.value = e ? `去程第${a}次: ${e}` : `去程第${a}次: ${(dist/1000).toFixed(1)} km`
+    tryInfo.value = loadingHint.value
+  }
+  const onTryBack = (a, dist, e) => {
+    progress.value = 50 + Math.round((a / MAX_RETRIES) * 50)
+    loadingHint.value = e ? `返程第${a}次: ${e}` : `返程第${a}次: ${(dist/1000).toFixed(1)} km`
+    tryInfo.value = loadingHint.value
+  }
+
+  try {
+    // 去程：家 → 目的地
+    const routeOut = await tryGenerateRoute(h, d, {
+      minDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 0.6 || 10000),
+      maxDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 1.4 || 30000),
+      onTry: onTryOut,
+    })
+    if (!routeOut) { toast('去程生成失败，请重试', 'err'); loading.value = false; return }
+
+    // 返程：目的地 → 家（反方向）
+    const returnDir = ((getBearing({ lng: d.lng, lat: d.lat }, { lng: h.lng, lat: h.lat }) + 180) % 360)
+    const routeBack = await tryGenerateRoute(d, h, {
+      minDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 0.6 || 10000),
+      maxDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 1.4 || 30000),
+      directionDeg: returnDir,
+      onTry: onTryBack,
+    })
+    if (!routeBack) { toast('返程生成失败，请重试', 'err'); loading.value = false; return }
+
+    // 拼接路线
+    const mergedSegments = [...routeOut.segments, ...routeBack.segments]
+    const mergedWaypoints = [
+      ...routeOut.waypoints,
+      { lng: d.lng, lat: d.lat, poiName: d.name || '🎯 目的地' },
+      ...routeBack.waypoints,
+    ]
+
+    const mergedRoute = {
+      segments: mergedSegments,
+      waypoints: mergedWaypoints,
+      totalDistance: routeOut.totalDistance + routeBack.totalDistance,
+      totalDuration: routeOut.totalDuration + routeBack.totalDuration,
+      totalClimb: (routeOut.totalClimb || 0) + (routeBack.totalClimb || 0),
+      uphillSections: [...(routeOut.uphillSections || []), ...(routeBack.uphillSections || [])],
+      downhillSections: [...(routeOut.downhillSections || []), ...(routeBack.downhillSections || [])],
+      isRoundTrip: true,
+      destName: d.name,
+    }
+
+    // 获取途经点地名
+    if (mergedRoute.waypoints.length > 0) {
+      tryInfo.value = '正在获取途经点地名…'
+      await Promise.all(mergedRoute.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) }))
+    }
+
+    progress.value = 100; await new Promise(r => setTimeout(r, 200))
+    result.value = mergedRoute; resultShow.value = true; loading.value = false
+
+    saveHistory({ type: 'roundtrip', home: h.name, work: d.name, distance: mergedRoute.totalDistance, waypoints: mergedRoute.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
+    saveLastRoute({ type: 'roundtrip', home: h, work: d, waypoints: mergedRoute.waypoints, segments: mergedRoute.segments, totalDistance: mergedRoute.totalDistance, totalDuration: mergedRoute.totalDuration, totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, direction: direction.value, timeMin: timeMin.value, scene: 'destination' })
+    // 后台获取沿途上下文
+    loadContext(mergedRoute.segments, mergedRoute.waypoints, { totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, waypoints: mergedRoute.waypoints, totalDistance: mergedRoute.totalDistance }).catch(() => {})
+  } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
+}
+
 function selectMulti(i) { activeResultIdx.value = i; const r = multiResults.value[i]; if (!r) return; result.value = r; resultShow.value = true }
 
 // === 结果操作 ===
@@ -247,13 +362,38 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <!-- 时长滑块 -->
   <TimeSlider v-model="timeMin" />
 
+  <!-- 骑到某处：目的地搜索（仅 destination 模式） -->
+  <div v-if="scene === 'destination'" class="dest-search card">
+    <label style="font-size:12px;color:#8a8098;font-weight:600;display:block;margin-bottom:6px">🎯 想去哪儿？</label>
+    <div class="input-row">
+      <input
+        v-model="destName"
+        placeholder="输入目的地，如：秦岭脚下、钟楼"
+        @keyup.enter="searchDestination"
+        style="flex:1"
+      />
+      <button class="btn btn-sm" style="background:#f08ca4;color:#fff;flex-shrink:0" @click="searchDestination" :disabled="destLoading">
+        {{ destLoading ? '搜索中…' : '🔍 搜索' }}
+      </button>
+    </div>
+    <div v-if="destEstimate" class="dest-estimate">
+      <div class="dest-est-row">
+        <span>📍 {{ destCoord?.name }}</span>
+      </div>
+      <div class="dest-est-row">
+        <span>单程 {{ destEstimate.oneWayKm }}km · 约{{ destEstimate.oneWayMin }}分钟</span>
+        <span class="dest-total">来回 {{ destEstimate.roundKm }}km · 约{{ Math.round(destEstimate.roundMin / 60) }}小时</span>
+      </div>
+    </div>
+  </div>
+
   <!-- 大按钮 -->
   <button
     class="btn-go"
     :disabled="loading"
-    @click="doGenerate(false)"
+    @click="scene === 'destination' ? doGenerateRoundTrip() : doGenerate(false)"
   >
-    {{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : '🏋 开始训练！' }}
+    {{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : scene === 'training' ? '🏋 开始训练！' : '🎯 骑过去！' }}
   </button>
   <button
     class="btn-multi"
@@ -536,5 +676,29 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   font-size: 11px;
   color: #a898b8;
   margin-top: 4px;
+}
+
+.dest-search {
+  margin-top: 12px;
+}
+.dest-estimate {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #fef6f8, #faf1f5);
+  border-radius: 10px;
+  border: 1px solid #fce8ee;
+}
+.dest-est-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #5e5468;
+  margin-bottom: 4px;
+}
+.dest-est-row:last-child { margin-bottom: 0; }
+.dest-total {
+  font-weight: 700;
+  color: #f08ca4;
 }
 </style>

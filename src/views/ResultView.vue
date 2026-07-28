@@ -61,11 +61,11 @@ const routeContext = computed(() => {
     <!-- 标题栏 -->
     <div class="result-header">
       <div class="result-title">
-        <span class="result-icon">{{ hasDest ? '📍' : '🔄' }}</span>
-        <span>{{ hasDest ? '骑行路线' : '环线骑行' }}</span>
+        <span class="result-icon">{{ result.isRoundTrip ? '🎯' : hasDest ? '📍' : '🔄' }}</span>
+        <span>{{ result.isRoundTrip ? `去 ${result.destName || '目的地'}` : hasDest ? '骑行路线' : '环线骑行' }}</span>
         <span v-if="diffObj" class="diff-badge" :style="{ background: diffObj.color }">{{ diffObj.label }}</span>
       </div>
-      <div class="result-subtitle">{{ homeObj?.name || '起点' }}{{ hasDest ? ' → ' + (workObj?.name || '终点') : ' 出发兜一圈' }}</div>
+      <div class="result-subtitle">{{ result.isRoundTrip ? `${homeObj?.name || '起点'} ⇄ ${result.destName || '目的地'}` : (homeObj?.name || '起点') + (hasDest ? ' → ' + (workObj?.name || '终点') : ' 出发兜一圈') }}</div>
     </div>
 
     <!-- 三大指标 -->

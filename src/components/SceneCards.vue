@@ -8,6 +8,7 @@ const SCENES = [
   { key: 'casual', icon: '🌅', label: '休闲骑', desc: '~12 km', time: 60, flat: true },
   { key: 'training', icon: '🏋', label: '训练骑', desc: '~30 km', time: 120, hilly: true },
   { key: 'random', icon: '🔀', label: '随便骑', desc: '随机距离 · 随机方向', time: -1, random: true },
+  { key: 'destination', icon: '🎯', label: '骑到某处', desc: '选目的地 · 来回', time: -1, dest: true },
 ]
 </script>
 
