@@ -166,8 +166,8 @@ async function searchDestination() {
     // 预估单程距离
     const h = homeObj.value || { lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
     if (h.lng && h.lat && r.lng && r.lat) {
-      const oneWayDist = calcDistKm({ lng: h.lng, lat: h.lat }, { lng: r.lng, lat: r.lat }) * 1.5 // 道路系数
-      const oneWayKm = Math.round(oneWayDist / 100) / 10
+      const oneWayDist = calcDistKm({ lng: h.lng, lat: h.lat }, { lng: r.lng, lat: r.lat }) * 1.5 // 道路系数(km)
+      const oneWayKm = Math.round(oneWayDist * 10) / 10
       const oneWayMin = Math.round(oneWayKm / BIKE_SPEED * 60)
       destEstimate.value = {
         oneWayKm,
