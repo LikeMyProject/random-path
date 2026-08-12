@@ -9,8 +9,7 @@
 //   6. buildTextGuide      导出文本攻略（markdown）
 // ============================================================
 import { CITIES, getCity, getTransport } from '../data/cities.js'
-import { enrichFoods } from '../data/foodSupplements.js'
-import { searchPOIsByText } from './useAMap.js'
+import { searchPOIsByText, searchRestaurantsForCity } from './useAMap.js'
 
 const PACE_ATTRACTIONS = { relax: 2, standard: 3, compact: 4 }
 export { PACE_ATTRACTIONS }
@@ -133,32 +132,19 @@ export function clusterAttractions(attractions, days, interests = []) {
 // ============================================================
 // 3. 时段分配：每天景点+餐食 → 上午/午餐/下午/晚餐/晚上
 // ============================================================
-const PERIOD_LABELS = { morning: '上午', lunch: '午餐', afternoon: '下午', dinner: '晚餐', evening: '晚上', free: '自由' }
+const PERIOD_LABELS = { breakfast: '早餐', morning: '上午', lunch: '午餐', afternoon: '下午', dinner: '晚餐', evening: '晚上', free: '自由' }
 
-function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0, foodState = null) {
+function assignPeriods(dayAttractions, pace, dayRestaurants = null) {
   const max = PACE_ATTRACTIONS[pace] || 3
   const list = dayAttractions.slice(0, max)
   const slots = []
 
-  // 空景点天：自由活动占位
   if (list.length === 0) {
     slots.push({ period: 'free', attraction: { name: '自由活动 / 机动时间', desc: '可逛城市、探店或休息' } })
   }
 
   const night = list.find(a => a.night) || null
   const dayOnes = night ? list.filter(a => a !== night).slice(0, max - 1) : list
-
-  // 餐食分配：使用 foodState 管理轮换，避免重复
-  // foodState 在 buildFullPlan 中创建，跨天共享
-  let lunch = null, dinner = null
-  if (foods.length > 0 && foodState) {
-    lunch = foodState.next()
-    dinner = foodState.next()
-    // 确保午餐和晚餐不一样
-    if (lunch && dinner && lunch.name === dinner.name && foods.length > 1) {
-      dinner = foodState.next()
-    }
-  }
 
   if (night) {
     dayOnes.forEach((a, i) => slots.push({ period: i === 0 ? 'morning' : 'afternoon', attraction: a }))
@@ -174,59 +160,27 @@ function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0, foodState
     })
   }
 
-  // 统一插入午餐与晚餐（各至多一个），保证全天有餐
+  // 插入早餐、午餐、晚餐
   const withMeals = []
+  if (dayRestaurants?.breakfast) {
+    withMeals.push({ period: 'breakfast', meal: dayRestaurants.breakfast })
+  }
   let hasLunch = false, hasDinner = false
   for (const s of slots) {
-    if (!hasLunch && lunch && s.period !== 'morning') {
-      withMeals.push({ period: 'lunch', meal: lunch })
+    if (!hasLunch && dayRestaurants?.lunch && s.period !== 'morning') {
+      withMeals.push({ period: 'lunch', meal: dayRestaurants.lunch })
       hasLunch = true
     }
     withMeals.push(s)
-    if (!hasDinner && dinner && s.period === 'evening') {
-      withMeals.push({ period: 'dinner', meal: dinner })
+    if (!hasDinner && dayRestaurants?.dinner && s.period === 'evening') {
+      withMeals.push({ period: 'dinner', meal: dayRestaurants.dinner })
       hasDinner = true
     }
   }
-  if (!hasLunch && lunch) withMeals.splice(Math.min(1, withMeals.length), 0, { period: 'lunch', meal: lunch })
-  if (!hasDinner && dinner) withMeals.push({ period: 'dinner', meal: dinner })
+  if (!hasLunch && dayRestaurants?.lunch) withMeals.splice(Math.min(1, withMeals.length), 0, { period: 'lunch', meal: dayRestaurants.lunch })
+  if (!hasDinner && dayRestaurants?.dinner) withMeals.push({ period: 'dinner', meal: dayRestaurants.dinner })
 
   return withMeals.map(s => ({ ...s, periodLabel: PERIOD_LABELS[s.period] }))
-}
-
-/**
- * 美食轮换管理器：确保跨天不重复，用完一轮才 reshuffle
- */
-function createFoodRotation(foods) {
-  let pool = []
-  let cursor = 0
-  let lastServed = null
-
-  function reshuffle() {
-    pool = [...foods]
-    // Fisher-Yates shuffle
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[pool[i], pool[j]] = [pool[j], pool[i]]
-    }
-    // 如果新一轮第一个和上一轮最后一个一样，交换
-    if (lastServed && pool[0] && pool[0].name === lastServed.name && pool.length > 1) {
-      ;[pool[0], pool[1]] = [pool[1], pool[0]]
-    }
-    cursor = 0
-  }
-
-  reshuffle()
-
-  return {
-    next() {
-      if (pool.length === 0) return null
-      if (cursor >= pool.length) reshuffle()
-      const f = pool[cursor++]
-      lastServed = f
-      return f ? { name: f.name, price: f.price, desc: f.desc, shop: f.shop } : null
-    },
-  }
 }
 
 // ============================================================
@@ -359,24 +313,18 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
     transports.push({ from: cities[i], to: cities[i + 1], mode: t.mode, hours: t.hours, estimated: !!t.estimated, date: tDate })
   }
 
-  // 每日行程（使用增强美食数据 + 轮换管理器避免重复）
+  // 每日行程（先用占位，后续 searchAndAssignFoods 替换为真实餐厅）
   cityPlans.forEach(cp => {
     const all = [...cp.data.attractions]
-    // 标记夜景类
     all.forEach(a => {
       if (/夜景|演出|酒吧|夜市|灯光|演艺/.test(a.name + (a.desc || ''))) a.night = true
     })
-    // 合并补充美食数据（推荐门店 + 扩充品种）
-    const enrichedFoods = enrichFoods(cp.name, cp.data.foods || [])
-    cp.data = { ...cp.data, foods: enrichedFoods }
-    // 创建轮换管理器
-    const foodRotation = createFoodRotation(enrichedFoods)
     const clusters = clusterAttractions(all, cp.days, interests)
     cp.daily = clusters.map((cl, di) => ({
       day: di + 1,
       date: cp.dates[di]?.date || cp.dateRange.start,
       dateLabel: cp.dates[di] ? `${cp.dates[di].label} ${fmtShort(cp.dates[di].date)} ${weekday(cp.dates[di].date)}` : '',
-      slots: assignPeriods(cl, pace, enrichedFoods, di, foodRotation),
+      slots: assignPeriods(cl, pace, null),
       count: cl.length,
     }))
   })
@@ -389,6 +337,68 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
     totalDays, transitDays, pace, paceLabel: PACE_LABEL[pace] || '标准',
     interests, startDate: fmtDate(s), endDate: fmtDate(e),
   }
+}
+
+// ============================================================
+// 7.5 异步搜索真实餐厅并分配到每日行程（早中晚不重复）
+// ============================================================
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function distributeRestaurants(restaurants, days) {
+  const byMeal = {
+    breakfast: shuffle(restaurants.filter(r => r.mealType === 'breakfast')),
+    lunch: shuffle(restaurants.filter(r => r.mealType === 'lunch')),
+    dinner: shuffle(restaurants.filter(r => r.mealType === 'dinner')),
+  }
+  const general = shuffle([...restaurants])
+  const used = new Set()
+
+  function pick(pool, fallbackPool) {
+    while (pool.length > 0) {
+      const r = pool.shift()
+      const key = r.name + '|' + r.address
+      if (!used.has(key)) { used.add(key); return r }
+    }
+    while (fallbackPool.length > 0) {
+      const r = fallbackPool.shift()
+      const key = r.name + '|' + r.address
+      if (!used.has(key)) { used.add(key); return r }
+    }
+    return null
+  }
+
+  const daily = []
+  for (let d = 0; d < days; d++) {
+    daily.push({
+      breakfast: pick(byMeal.breakfast, [...general]),
+      lunch: pick(byMeal.lunch, [...general]),
+      dinner: pick(byMeal.dinner, [...general]),
+    })
+  }
+  return daily
+}
+
+export async function searchAndAssignFoods(plan, onProgress = null) {
+  for (let i = 0; i < plan.cityPlans.length; i++) {
+    const cp = plan.cityPlans[i]
+    onProgress?.({ city: cp.name, done: i, total: plan.cityPlans.length })
+    const needed = cp.days * 3 + 5
+    const restaurants = await searchRestaurantsForCity(cp.name, cp.data.coord, needed)
+    const dailyMeals = distributeRestaurants(restaurants, cp.days)
+    cp.restaurants = restaurants
+    cp.daily.forEach((d, di) => {
+      const meals = dailyMeals[di] || {}
+      const attractions = d.slots.filter(s => !s.meal).map(s => s.attraction)
+      d.slots = assignPeriods(attractions, plan.pace, meals)
+    })
+  }
+  onProgress?.({ city: '', done: plan.cityPlans.length, total: plan.cityPlans.length })
 }
 
 // ============================================================
@@ -425,7 +435,13 @@ export function buildTextGuide(plan) {
       if (d.slots.length === 0) { lines.push('- 自由活动 / 机动时间'); return }
       d.slots.forEach(s => {
         if (s.meal) {
-          lines.push(`- **${s.periodLabel}** 🍜 ${s.meal.name}｜${s.meal.price}${s.meal.desc ? ' — ' + s.meal.desc : ''}`)
+          const m = s.meal
+          const parts = [`**${s.periodLabel}** 🍽 ${m.name}`]
+          if (m.price) parts.push(m.price)
+          if (m.rating) parts.push(`${m.rating}分`)
+          if (m.tag) parts.push(m.tag)
+          if (m.address) parts.push(`📍 ${m.address}`)
+          lines.push(`- ${parts.join('｜')}`)
           return
         }
         const a = s.attraction
@@ -443,14 +459,23 @@ export function buildTextGuide(plan) {
   })
   lines.push('')
 
-  // 美食
-  lines.push('## 🍜 必吃美食')
+  // 美食（从每日行程中提取真实餐厅）
+  lines.push('## 🍽 餐厅推荐（实时搜索）')
   plan.cityPlans.forEach(cp => {
     lines.push(`\n### ${cp.name}`)
-    cp.data.foods.forEach(f => {
-      const shop = f.shop ? `｜推荐：${f.shop}` : ''
-      const desc = f.desc ? ` — ${f.desc}` : ''
-      lines.push(`- ${f.name}（${f.price}）${shop}${desc}`)
+    const seen = new Set()
+    cp.daily.forEach(d => {
+      d.slots.forEach(s => {
+        if (s.meal && !seen.has(s.meal.name)) {
+          seen.add(s.meal.name)
+          const m = s.meal
+          const parts = [m.name]
+          if (m.price) parts.push(m.price)
+          if (m.rating) parts.push(`${m.rating}分`)
+          if (m.address) parts.push(`📍 ${m.address}`)
+          lines.push(`- ${parts.join('｜')}`)
+        }
+      })
     })
   })
   lines.push('')

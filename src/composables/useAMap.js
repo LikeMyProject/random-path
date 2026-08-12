@@ -40,6 +40,67 @@ export async function detectCityFromGPS(lng, lat) {
   } catch(e) {}
   return ''
 }
+// ============================================================
+// 城市真实餐厅搜索：多关键词搜索 + 去重 + 餐次分类
+// ============================================================
+const FOOD_SEARCH_QUERIES = [
+  { kw: '早餐',   meal: 'breakfast' },
+  { kw: '包子',   meal: 'breakfast' },
+  { kw: '粥店',   meal: 'breakfast' },
+  { kw: '早茶',   meal: 'breakfast' },
+  { kw: '面馆',   meal: 'lunch' },
+  { kw: '米粉',   meal: 'lunch' },
+  { kw: '快餐',   meal: 'lunch' },
+  { kw: '饺子',   meal: 'lunch' },
+  { kw: '中餐',   meal: 'lunch' },
+  { kw: '美食',   meal: 'lunch' },
+  { kw: '火锅',   meal: 'dinner' },
+  { kw: '烧烤',   meal: 'dinner' },
+  { kw: '烤鱼',   meal: 'dinner' },
+  { kw: '川菜',   meal: 'dinner' },
+  { kw: '西餐',   meal: 'dinner' },
+  { kw: '日料',   meal: 'dinner' },
+  { kw: '小吃',   meal: 'snack' },
+  { kw: '甜品',   meal: 'snack' },
+  { kw: '奶茶',   meal: 'snack' },
+  { kw: '夜宵',   meal: 'snack' },
+]
+
+export async function searchRestaurantsForCity(cityName, cityCoord, needed = 40) {
+  const results = []
+  const seen = new Set()
+  for (const { kw, meal } of FOOD_SEARCH_QUERIES) {
+    if (results.length >= needed) break
+    try {
+      let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
+        `&keywords=${encodeURIComponent(kw)}` +
+        `&city=${encodeURIComponent(cityName)}` +
+        `&types=050000` +
+        `&offset=25` +
+        `&show_fields=rating,price,tag,address`
+      const d = await fetchJSON(url)
+      if (d.status === '1' && d.pois) {
+        for (const p of d.pois) {
+          const loc = (p.location || '').split(',')
+          const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
+          if (!lng || !lat) continue
+          const key = p.name + '|' + (p.address || '')
+          if (seen.has(key)) continue
+          seen.add(key)
+          results.push({
+            name: p.name || '', address: p.address || '', rating: p.rating || '',
+            price: p.price ? `¥${p.price}/人` : '', type: p.type || '', tag: p.tag || '',
+            mealType: meal, coord: { lng, lat },
+          })
+          if (results.length >= needed) break
+        }
+      }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 200))
+  }
+  return results
+}
+
 export async function searchPOIsByText(keywords, city = '', limit = 5) {
   try {
     let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}&keywords=${encodeURIComponent(keywords)}&offset=${limit}`

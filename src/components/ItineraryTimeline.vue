@@ -7,8 +7,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:activeDay'])
 
-const PERIOD_ICON = { morning: '🌅', lunch: '🍜', afternoon: '☀️', dinner: '🍽️', evening: '🌙', free: '🚶' }
-const PERIOD_COLOR = { morning: '#f0a870', lunch: '#d4537e', afternoon: '#f08ca4', dinner: '#e27790', evening: '#8b5cf6', free: '#a898b8' }
+const PERIOD_ICON = { breakfast: '🍳', morning: '🌅', lunch: '🍜', afternoon: '☀️', dinner: '🍽️', evening: '🌙', free: '🚶' }
+const PERIOD_COLOR = { breakfast: '#f59e0b', morning: '#f0a870', lunch: '#d4537e', afternoon: '#f08ca4', dinner: '#e27790', evening: '#8b5cf6', free: '#a898b8' }
 const TYPE_LABEL = { nature: '自然', culture: '人文', food: '美食', family: '亲子', urban: '地标' }
 
 const currentDay = computed(() => props.city?.daily?.[props.activeDay] || null)
@@ -49,17 +49,18 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
           <span class="slot-label" :style="{ color: PERIOD_COLOR[s.period] }">{{ s.periodLabel }}</span>
         </div>
         <div class="slot-body">
-          <!-- 餐食槽位 -->
+          <!-- 餐食槽位（真实餐厅） -->
           <template v-if="s.meal">
             <div class="slot-name meal-name">
               🍽 {{ s.meal.name }}
+              <span v-if="s.meal.rating" class="meal-rating">⭐ {{ s.meal.rating }}</span>
               <span class="meal-tag">当地推荐</span>
             </div>
             <div class="slot-meta">
-              <span class="meta-item meal-price">💴 {{ s.meal.price }}</span>
+              <span v-if="s.meal.price" class="meta-item meal-price">💴 {{ s.meal.price }}</span>
+              <span v-if="s.meal.tag" class="meta-item rest-type-tag">{{ s.meal.tag }}</span>
             </div>
-            <div v-if="s.meal.shop" class="slot-desc">🏪 {{ s.meal.shop }}</div>
-            <div v-else-if="s.meal.desc" class="slot-desc">{{ s.meal.desc }}</div>
+            <div v-if="s.meal.address" class="slot-desc">📍 {{ s.meal.address }}</div>
           </template>
           <!-- 景点槽位 -->
           <template v-else>
@@ -111,6 +112,8 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
 .meal-name { color: #c2415e; }
 .meal-tag { font-size: 9px; background: #fbeaf0; color: #993556; border-radius: 6px; padding: 2px 7px; font-weight: 700; }
 .meal-price { color: #c2415e; font-weight: 700; }
+.meal-rating { font-size: 10px; color: #f59e0b; font-weight: 700; }
+.rest-type-tag { background: #f0edf5; padding: 2px 7px; border-radius: 6px; font-weight: 600; color: #7c6fd8; }
 .slot-must { font-size: 10px; }
 .poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
 .slot-meta { display: flex; gap: 8px; margin-top: 3px; flex-wrap: wrap; }

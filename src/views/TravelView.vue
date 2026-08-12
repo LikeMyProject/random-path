@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import { buildFullPlan, buildTextGuide, supplementAttractions, searchAndAssignFoods, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
@@ -15,6 +15,8 @@ const startDate = ref(''), endDate = ref('')
 const pace = ref('standard')
 const interests = ref([])
 const loading = ref(false)
+const foodLoading = ref(false)
+const foodProgress = ref('')
 
 // 默认日期：下周一开始，4 天
 function defaultDates() {
@@ -172,6 +174,23 @@ async function generate() {
     }
   } catch (e) { /* 补充失败不阻断 */ }
   setTimeout(() => { rebuild(); loading.value = false }, 200)
+
+  // 异步搜索真实餐厅并分配到每日行程
+  if (plan.value) {
+    foodLoading.value = true
+    try {
+      await searchAndAssignFoods(plan.value, ({ city, done, total }) => {
+        if (city) foodProgress.value = `正在搜索 ${city} 的餐厅…（${done + 1}/${total}）`
+        else foodProgress.value = ''
+      })
+      plan.value = { ...plan.value }
+      toast('餐厅搜索完成，已为每日行程分配早中晚餐')
+    } catch (e) {
+      toast('部分餐厅搜索失败，行程仍可使用', 'warn')
+    }
+    foodLoading.value = false
+    foodProgress.value = ''
+  }
 }
 
 // ===== 高德 POI 补充景点 =====
@@ -219,6 +238,24 @@ const cityChain = computed(() => {
   if (!plan.value) return []
   return plan.value.cityPlans.map(cp => ({ name: cp.name, days: cp.days }))
 })
+
+// 从每日行程中提取不重复的餐厅列表
+function cityRestaurants(cp) {
+  const seen = new Set()
+  const list = []
+  cp.daily?.forEach(d => {
+    d.slots?.forEach(s => {
+      if (s.meal && !seen.has(s.meal.name)) {
+        seen.add(s.meal.name)
+        list.push(s.meal)
+      }
+    })
+  })
+  return list
+}
+
+const MEAL_TYPE_LABELS = { breakfast: '🌅 早餐', lunch: '☀️ 午餐', dinner: '🌙 晚餐', snack: '🍮 小吃' }
+function mealTypeLabel(t) { return MEAL_TYPE_LABELS[t] || t }
 
 // 监听输入变化自动重新生成（防抖）
 let rbTimer = null
@@ -388,9 +425,12 @@ async function doShareGuide() {
       </button>
     </div>
 
-    <button class="btn btn-primary btn-gen" :disabled="loading" @click="generate">
-      {{ loading ? '生成中…' : '✨ 一键生成攻略' }}
+    <button class="btn btn-primary btn-gen" :disabled="loading || foodLoading" @click="generate">
+      {{ loading ? '生成中…' : foodLoading ? '搜索餐厅中…' : '✨ 一键生成攻略' }}
     </button>
+    <div v-if="foodLoading" class="food-loading-bar">
+      <span class="spin">⏳</span> {{ foodProgress || '正在搜索目的地真实餐厅…' }}
+    </div>
   </div>
 
   <!-- ===== 结果区 ===== -->
@@ -539,13 +579,23 @@ async function doShareGuide() {
       <!-- 折叠：美食 / 贴士 / 全部景点 -->
       <div v-if="showAdvanced === cp.name" class="city-more">
         <div class="more-sec">
-          <div class="more-title">🍜 必吃美食</div>
-          <div class="food-grid">
-            <div v-for="(f, i) in cp.data.foods" :key="i" class="food-item">
-              <span class="food-name">{{ f.name }}</span>
-              <span class="food-price">{{ f.price }}</span>
-              <span class="food-desc">{{ f.desc }}</span>
+          <div class="more-title">🍽 餐厅推荐 <span class="hint">（实时搜索 · 每日不重复）</span></div>
+          <div v-if="cityRestaurants(cp).length" class="food-grid">
+            <div v-for="(r, i) in cityRestaurants(cp)" :key="i" class="food-item restaurant-item">
+              <div class="rest-header">
+                <span class="food-name">{{ r.name }}</span>
+                <span v-if="r.rating" class="rest-rating">⭐ {{ r.rating }}</span>
+              </div>
+              <div class="rest-meta">
+                <span v-if="r.price" class="food-price">{{ r.price }}</span>
+                <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
+                <span class="rest-meal-type">{{ mealTypeLabel(r.mealType) }}</span>
+              </div>
+              <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
             </div>
+          </div>
+          <div v-else class="food-empty">
+            {{ foodLoading ? '正在搜索真实餐厅…' : '点击「一键生成攻略」搜索目的地餐厅' }}
           </div>
         </div>
         <div class="more-sec">
@@ -692,6 +742,16 @@ async function doShareGuide() {
 .more-title { font-size: 12px; font-weight: 700; color: #4a3f55; margin-bottom: 6px; }
 .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .food-item { background: #f7f5fa; border: none; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; }
+.restaurant-item { padding: 10px 12px; gap: 3px; }
+.rest-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.rest-rating { font-size: 10px; color: #f59e0b; font-weight: 700; flex-shrink: 0; }
+.rest-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rest-tag { font-size: 9px; background: #f0edf5; color: #7c6fd8; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
+.rest-meal-type { font-size: 9px; background: #fff5f8; color: #c2415e; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
+.food-empty { font-size: 12px; color: #b0a3bc; padding: 16px 8px; text-align: center; }
+.food-loading-bar { margin-top: 8px; padding: 8px 14px; background: var(--accent-soft); border-radius: 10px; font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+.food-loading-bar .spin { display: inline-block; animation: hspin 1s linear infinite; }
+@keyframes hspin { to { transform: rotate(360deg) } }
 .food-name { font-size: 12px; font-weight: 700; color: #4a3f55; }
 .food-price { font-size: 10px; color: var(--accent); font-weight: 700; }
 .food-desc { font-size: 10px; color: #a898b8; margin-top: 2px; }
