@@ -338,24 +338,24 @@ onMounted(() => {
     </select>
   </div>
 
-  <div v-if="activeRoute" class="card" style="background:linear-gradient(135deg,#fff9fb,#faf7fc);border:1.5px dashed #ece0ec">
+  <div v-if="activeRoute" class="card" style="background:linear-gradient(135deg,var(--accent-soft),#f7f5fa);border:none">
     <h2>路线详情</h2>
-    <div style="font-size:11px;color:#8a8098;line-height:1.8">
-      <div>起点: <strong>{{ activeRoute.start.name }} ({{ activeRoute.start.lng }}, {{ activeRoute.start.lat }})</strong></div>
-      <div>终点: <strong>{{ activeRoute.end.name }} ({{ activeRoute.end.lng }}, {{ activeRoute.end.lat }})</strong></div>
-      <div>途经点: <strong>{{ activeRoute.waypoints.length }}个</strong></div>
+    <div style="font-size:11px;color:#7a6c8a;line-height:1.8">
+      <div>起点: <strong style="color:#3a3045">{{ activeRoute.start.name }}</strong> <span style="color:#b0a3bc">({{ activeRoute.start.lng }}, {{ activeRoute.start.lat }})</span></div>
+      <div>终点: <strong style="color:#3a3045">{{ activeRoute.end.name }}</strong> <span style="color:#b0a3bc">({{ activeRoute.end.lng }}, {{ activeRoute.end.lat }})</span></div>
+      <div>途经点: <strong style="color:var(--accent)">{{ activeRoute.waypoints.length }}个</strong></div>
     </div>
-    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:10px;color:#8a7a98">
-      <span style="background:var(--accent-2);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">起点</span>{{ activeRoute.start.name }}
-      <span v-for="w in activeRoute.waypoints.slice(0,6)" :key="w.name">→ <span style="background:#8cb8a8;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">途经</span>{{ w.name }}</span>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:#7a6c8a">
+      <span style="background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">起点</span>{{ activeRoute.start.name }}
+      <span v-for="w in activeRoute.waypoints.slice(0,6)" :key="w.name">→ <span style="background:#f0edf5;color:#7a6c8a;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600">途经</span>{{ w.name }}</span>
       <span v-if="activeRoute.waypoints.length>6">... ({{ activeRoute.waypoints.length-6 }}+)</span>
-      → <span style="background:#f0a870;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">终点</span>{{ activeRoute.end.name }}
+      → <span style="background:#f0a870;color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">终点</span>{{ activeRoute.end.name }}
     </div>
   </div>
 
   <div class="card">
     <h2>自定义起点 <span style="font-size:11px;color:#a898b8;font-weight:400">(可选)</span></h2>
-    <div class="addr-quick"><span>地址簿：</span><button v-for="(v,k) in addresses" :key="k" class="btn btn-sm" style="background:#334155;color:#e2e8f0;font-size:9px;margin:1px" @click="pickStart(k)">{{ k }}</button></div>
+    <div class="addr-quick"><span style="font-size:11px;color:#7a6c8a;font-weight:600">地址簿：</span><button v-for="(v,k) in addresses" :key="k" class="chip-sm" style="background:#334155;color:#e2e8f0;font-size:9px;margin:1px" @click="pickStart(k)">{{ k }}</button></div>
     <div class="row" style="position:relative">
       <input v-model="customStart.name" placeholder="起点名称" style="flex:2;font-size:12px" @input="onStartInput" @focus="onStartInput" @blur="setTimeout(closeSuggest,200)">
       <input v-model.number="customStart.lng" type="number" step="0.000001" placeholder="经度" style="flex:1;font-size:12px">
@@ -366,15 +366,15 @@ onMounted(() => {
 
   <div v-if="selectedKey" class="card">
     <h2>途经点 ({{ waypoints.length }})<span style="font-size:11px;color:#a898b8;font-weight:400"> - 可编辑</span></h2>
-    <div v-for="(wp,i) in waypoints" :key="i" style="display:flex;gap:4px;align-items:center;padding:2px 0;border-bottom:1px dashed #ece0ec">
-      <span style="color:#8cb8a8;font-size:10px;min-width:16px;font-weight:700">{{ i+1 }}</span>
-      <input v-model="wp.name" placeholder="地名" style="flex:2;font-size:11px;padding:5px">
-      <input v-model.number="wp.lng" type="number" step="0.000001" placeholder="经度" style="flex:1;font-size:11px;padding:5px">
-      <input v-model.number="wp.lat" type="number" step="0.000001" placeholder="纬度" style="flex:1;font-size:11px;padding:5px">
-      <button class="btn btn-sm" style="background:#ff5252;color:#fff;font-size:9px;padding:3px 5px;flex-shrink:0" @click="removeWP(i)">X</button>
+    <div v-for="(wp,i) in waypoints" :key="i" style="display:flex;gap:4px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.04)">
+      <span style="color:var(--accent);font-size:10px;min-width:20px;font-weight:800;border-radius:6px;background:var(--accent-soft);padding:2px 6px;text-align:center">{{ i+1 }}</span>
+      <input v-model="wp.name" placeholder="地名" style="flex:2;font-size:11px;padding:7px 10px;border:none;background:#f7f5fa;border-radius:8px">
+      <input v-model.number="wp.lng" type="number" step="0.000001" placeholder="经度" style="flex:1;font-size:11px;padding:7px 10px;border:none;background:#f7f5fa;border-radius:8px">
+      <input v-model.number="wp.lat" type="number" step="0.000001" placeholder="纬度" style="flex:1;font-size:11px;padding:7px 10px;border:none;background:#f7f5fa;border-radius:8px">
+      <button class="btn-sm" style="background:rgba(220,38,38,.08);color:#dc2626;font-size:9px;padding:5px 8px;flex-shrink:0;border:none;border-radius:8px;cursor:pointer" @click="removeWP(i)">✕</button>
     </div>
-    <div v-if="waypoints.length===0" style="text-align:center;padding:20px;color:#a898b8;font-size:13px">暂无途经点</div>
-    <button class="btn btn-sm btn-secondary" style="display:block;margin:8px auto;font-size:11px" @click="addWP">+ 添加途经点</button>
+    <div v-if="waypoints.length===0" style="text-align:center;padding:20px;color:#b0a3bc;font-size:13px">暂无途经点</div>
+    <button class="btn-sm" style="display:block;margin:10px auto;font-size:11px;background:var(--accent-soft);color:var(--accent);border:none;border-radius:10px;padding:7px 16px;cursor:pointer" @click="addWP">+ 添加途经点</button>
   </div>
 
   <div v-if="fullPoints.length>=2" class="card">
@@ -432,7 +432,7 @@ onMounted(() => {
     </button>
     <button class="btn btn-nav" @click="openNav">开始导航</button>
     <div class="nav-link-box"><div class="label">高德导航链接（可复制）：</div><div class="url">{{ navUrl }}</div></div>
-    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-sm btn-secondary" style="flex:1" @click="copyNav">复制</button><button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGpx">GPX</button><button class="btn btn-sm btn-secondary" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff" @click="doShare">📤 分享</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn-sm" style="flex:1;background:#f0edf5;color:#7a6c8a;border:none" @click="copyNav">复制</button><button class="btn-sm" style="flex:1;background:#f0edf5;color:#7a6c8a;border:none" @click="downloadGpx">GPX</button><button class="btn-sm" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none" @click="doShare">📤 分享</button></div>
   </div>
 </div>
 </template>

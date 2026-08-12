@@ -30,7 +30,7 @@ const SCENES = [
 <style scoped>
 .scene-cards-v2 {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-top: 14px;
 }
 .scene-card-v2 {
@@ -38,26 +38,40 @@ const SCENES = [
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 14px 8px;
+  gap: 3px;
+  padding: 14px 6px;
   border-radius: 16px;
-  border: 2px solid #e8e0ec;
-  background: #fdfbff;
+  border: none;
+  background: #fff;
   cursor: pointer;
-  transition: all .2s;
+  transition: all .25s cubic-bezier(.34,1.56,.64,1);
   font-family: inherit;
-  color: #5e5468;
+  color: #7a6c8a;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  position: relative;
+  overflow: hidden;
 }
 .scene-card-v2:hover {
-  border-color: #c4b5d0;
-  background: #f8f4fb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0,0,0,.08);
 }
 .scene-card-v2.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  box-shadow: 0 2px 12px var(--accent-tint);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb),.30);
+  transform: translateY(-2px);
 }
-.scene-icon-v2 { font-size: 28px; }
-.scene-label-v2 { font-size: 13px; font-weight: 700; }
-.scene-desc-v2 { font-size: 10px; color: #a898b8; }
+.scene-card-v2.active::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+}
+.scene-icon-v2 { font-size: 26px; position: relative; z-index: 1; }
+.scene-label-v2 { font-size: 12px; font-weight: 700; position: relative; z-index: 1; }
+.scene-desc-v2 { font-size: 9px; opacity: .7; position: relative; z-index: 1; }
 </style>

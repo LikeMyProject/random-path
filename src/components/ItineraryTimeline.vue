@@ -82,37 +82,39 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
 
 <style scoped>
 .itimeline { margin-top: 4px; }
-.day-tabs { display: flex; gap: 4px; flex-wrap: wrap; padding-bottom: 6px; }
+.day-tabs { display: flex; gap: 4px; flex-wrap: wrap; padding-bottom: 8px; }
 .day-tab {
   flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
-  padding: 6px 12px; border-radius: 10px; border: 2px solid #e5dcec; background: #fff;
-  font-size: 12px; font-weight: 700; color: #8a7a98; cursor: pointer; font-family: inherit;
+  padding: 7px 14px; border-radius: 12px; border: none; background: #f7f5fa;
+  font-size: 12px; font-weight: 700; color: #7a6c8a; cursor: pointer; font-family: inherit;
   transition: all .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.03);
 }
 .day-tab .day-date { font-size: 9px; font-weight: 400; color: #b0a3bc; }
-.day-tab.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-color: var(--accent); }
+.day-tab:hover { background: var(--accent-soft); color: var(--accent); }
+.day-tab.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 3px 10px rgba(var(--accent-rgb),.25); }
 .day-tab.active .day-date { color: rgba(255,255,255,0.8); }
-.day-detail { background: #fdfbff; border: 1px solid #f2eaf4; border-radius: 12px; padding: 12px; }
-.day-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.day-title { font-size: 13px; font-weight: 700; color: #4a3f55; }
-.day-weather { font-size: 11px; color: #f0a870; font-weight: 700; }
-.free-day { text-align: center; padding: 18px; color: #a898b8; font-size: 12px; }
-.slot-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px dashed #f2eaf4; }
+.day-detail { background: #f7f5fa; border: none; border-radius: 14px; padding: 14px; }
+.day-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.day-title { font-size: 14px; font-weight: 800; color: #3a3045; }
+.day-weather { font-size: 11px; color: #f0a870; font-weight: 700; background: #fff7ed; padding: 3px 8px; border-radius: 8px; }
+.free-day { text-align: center; padding: 20px; color: #b0a3bc; font-size: 12px; }
+.slot-row { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,.04); }
 .slot-row:last-child { border-bottom: none; }
-.slot-row.meal { background: #fff8fb; border-radius: 8px; padding: 8px 10px; border-bottom: 1px dashed #f8e4ee; }
+.slot-row.meal { background: #fff8fb; border-radius: 10px; padding: 10px 12px; border: none; margin: 4px 0; }
 .slot-time { width: 52px; flex-shrink: 0; text-align: center; }
 .slot-icon { font-size: 16px; display: block; }
 .slot-label { font-size: 11px; font-weight: 700; }
 .slot-body { flex: 1; min-width: 0; }
-.slot-name { font-size: 13px; font-weight: 700; color: #5e5468; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.slot-name { font-size: 13px; font-weight: 700; color: #4a3f55; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .meal-name { color: #c2415e; }
-.meal-tag { font-size: 9px; background: #fbeaf0; color: #993556; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
+.meal-tag { font-size: 9px; background: #fbeaf0; color: #993556; border-radius: 6px; padding: 2px 7px; font-weight: 700; }
 .meal-price { color: #c2415e; font-weight: 700; }
 .slot-must { font-size: 10px; }
-.poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+.poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
 .slot-meta { display: flex; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
-.meta-item { font-size: 10px; color: #a898b8; }
-.type-chip { background: #f3f0f7; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.meta-item { font-size: 10px; color: #b0a3bc; }
+.type-chip { background: #f0edf5; padding: 2px 7px; border-radius: 6px; font-weight: 600; }
 .type-chip.t-nature { background: #e1f5ee; color: #0f6e56; }
 .type-chip.t-culture { background: #fbeaf0; color: #993556; }
 .type-chip.t-food { background: #faeeda; color: #854f0b; }

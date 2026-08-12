@@ -196,44 +196,45 @@ const routeContext = computed(() => {
       <div class="url">{{ buildNavUrl(homeObj || {}, workObj || {}, result.waypoints || []) }}</div>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn btn-sm btn-secondary" style="flex:1" @click="emit('copyNav')">📋 复制</button>
-      <button class="btn btn-sm btn-secondary" style="flex:1" @click="emit('downloadGpx')">📥 GPX</button>
-      <button class="btn btn-sm btn-secondary" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff" @click="emit('doShare')">📤 分享</button>
+      <button class="btn-sm" style="flex:1;background:#f0edf5;color:#7a6c8a;border:none" @click="emit('copyNav')">📋 复制</button>
+      <button class="btn-sm" style="flex:1;background:#f0edf5;color:#7a6c8a;border:none" @click="emit('downloadGpx')">📥 GPX</button>
+      <button class="btn-sm" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none" @click="emit('doShare')">📤 分享</button>
     </div>
-    <button class="btn btn-secondary" style="margin-top:8px;width:100%" @click="emit('regenerate')">🔄 换一条</button>
+    <button class="btn-sm" style="margin-top:8px;width:100%;background:var(--accent-soft);color:var(--accent);border:none;padding:10px" @click="emit('regenerate')">🔄 换一条</button>
   </div>
 </template>
 
 <style scoped>
-.result-view {
-  /* card class provides base styles */
-}
-
 .result-header {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0,0,0,.04);
 }
 .result-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 16px;
-  font-weight: 700;
-  color: #4a3f55;
+  font-size: 17px;
+  font-weight: 800;
+  color: #3a3045;
+  letter-spacing: -.3px;
 }
-.result-icon { font-size: 20px; }
+.result-icon { font-size: 22px; }
 .result-subtitle {
-  font-size: 11px;
+  font-size: 12px;
   color: #a898b8;
-  margin-top: 2px;
+  margin-top: 3px;
+  font-weight: 500;
 }
 
 .diff-badge {
   font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 8px;
+  padding: 3px 10px;
+  border-radius: 10px;
   color: #fff;
   font-weight: 700;
   margin-left: auto;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
 }
 
 .route-thumb-legend {
@@ -242,7 +243,7 @@ const routeContext = computed(() => {
   flex-wrap: wrap;
   margin: 8px 0 4px;
   font-size: 10px;
-  color: #8a8098;
+  color: #a898b8;
 }
 
 /* 沿途信息条 */
@@ -250,28 +251,28 @@ const routeContext = computed(() => {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin: 8px 0;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #f8f4fb, #fdf2f8);
+  margin: 10px 0;
+  padding: 10px 14px;
+  background: var(--accent-soft);
   border-radius: 12px;
-  border: 1px solid #f2eaf4;
+  border: none;
 }
 .context-chip {
   font-size: 11px;
   font-weight: 600;
-  color: #5e5468;
+  color: var(--accent);
   white-space: nowrap;
 }
 
 .route-summary {
   font-size: 12px;
-  color: #8a8098;
+  color: #7a6c8a;
   line-height: 1.6;
   margin: 8px 0;
-  padding: 8px 12px;
-  background: #fdfbff;
-  border-radius: 8px;
-  border: 1px dashed #ece0ec;
+  padding: 10px 14px;
+  background: #f7f5fa;
+  border-radius: 10px;
+  border: none;
 }
 
 .quality-tags {
@@ -287,7 +288,7 @@ const routeContext = computed(() => {
   border-radius: 6px;
   background: #f0fdf4;
   color: #166534;
-  border: 1px solid #bbf7d0;
+  border: 1px solid rgba(187,247,208,.6);
 }
 .qtag-nature { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
 .qtag-cycling { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
@@ -295,185 +296,20 @@ const routeContext = computed(() => {
 
 .nav-link-box {
   margin-top: 8px;
-  padding: 8px 10px;
-  background: #faf7fc;
-  border-radius: 8px;
-  border: 1px dashed #ece0ec;
+  padding: 10px 12px;
+  background: #f7f5fa;
+  border-radius: 10px;
+  border: none;
 }
 .nav-link-box .label {
   font-size: 10px;
-  color: #a898b8;
+  color: #b0a3bc;
   margin-bottom: 4px;
 }
 .nav-link-box .url {
   font-size: 10px;
-  color: #7c3aed;
+  color: var(--accent);
   word-break: break-all;
   line-height: 1.4;
 }
-
-/* collapse styles */
-.collapse-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: #8a8098;
-  cursor: pointer;
-  user-select: none;
-}
-.collapse-toggle .arrow {
-  transition: transform .2s;
-  font-size: 9px;
-}
-.collapse-toggle.open .arrow {
-  transform: rotate(90deg);
-}
-.collapse-body {
-  display: none;
-}
-.collapse-body.open {
-  display: block;
-}
-
-.segments {
-  margin-top: 8px;
-}
-.seg {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px 0;
-  border-bottom: 1px dashed #f2eaf4;
-  font-size: 11px;
-}
-.seg:last-child { border: none; }
-.seg-detail { color: #8a8098; flex: 1; }
-.seg-nums { color: #a898b8; white-space: nowrap; margin-left: 8px; font-weight: 600; }
-
-.waypoints-info {
-  margin-top: 8px;
-  font-size: 10px;
-  color: #a898b8;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.slope-box {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-}
-.slope-box.uphill {
-  background: linear-gradient(135deg, #fff7ed, #fef2f2);
-  border: 1px solid #fed7aa;
-}
-.slope-box.downhill {
-  background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
-  border: 1px solid #bbf7d0;
-}
-.slope-title {
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.slope-box.uphill .slope-title { color: #c2410c; }
-.slope-box.downhill .slope-title { color: #166534; }
-.slope-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  font-size: 11px;
-}
-.slope-box.uphill .slope-item { border-bottom: 1px dashed #fce4d0; }
-.slope-box.downhill .slope-item { border-bottom: 1px dashed #bbf7d0; }
-.slope-item:last-child { border-bottom: none; }
-.slope-badge {
-  font-weight: 700;
-  white-space: nowrap;
-  font-size: 11px;
-}
-.slope-badge.moderate { color: #ea580c; }
-.slope-badge.steep { color: #dc2626; }
-.slope-data {
-  font-weight: 600;
-  color: #5e5468;
-  white-space: nowrap;
-}
-.slope-grade {
-  color: #a898b8;
-  font-size: 10px;
-  white-space: nowrap;
-  margin-left: auto;
-}
-
-/* stat overrides for collapsed section */
-.stats {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-.stat {
-  flex: 1;
-  min-width: 60px;
-  background: linear-gradient(135deg, #fef6f8, #faf1f5);
-  border-radius: 10px;
-  padding: 10px 4px;
-  text-align: center;
-  border: 1.5px solid #fce8ee;
-}
-.stat .val {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--accent-2);
-}
-.stat .val.small {
-  font-size: 14px;
-}
-.stat .lbl {
-  font-size: 10px;
-  color: #a898b8;
-  margin-top: 2px;
-  font-weight: 600;
-}
-
-.btn {
-  display: block;
-  width: 100%;
-  border: none;
-  border-radius: 12px;
-  padding: 12px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  text-align: center;
-  transition: all .2s;
-}
-.btn:active { transform: scale(.95); }
-.btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
-}
-.btn-secondary {
-  background: #f3f0f7;
-  color: #8a7a98;
-}
-.btn-sm {
-  display: inline-block;
-  padding: 6px 12px;
-  font-size: 11px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: all .2s;
-  text-align: center;
-}
-.btn-sm:active { transform: scale(.95); }
 </style>

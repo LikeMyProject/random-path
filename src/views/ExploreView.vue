@@ -530,43 +530,47 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 </template>
 
 <style scoped>
-/* === Phase 1 新首页样式 === */
+/* === ExploreView 精致样式 === */
 .gps-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #f8f4fb, #fdf2f8);
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  background: #fff;
   border-radius: 16px;
   margin-top: 4px;
-  position: relative;
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
 }
 .gps-icon { font-size: 18px; flex-shrink: 0; }
 .gps-input {
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #e8e0ec;
+  padding: 8px 12px;
+  border: none;
   border-radius: 10px;
   font-size: 13px;
   font-family: inherit;
-  color: #5e5468;
-  background: #fff;
+  color: #4a3f55;
+  background: #f7f5fa;
   min-width: 0;
+  transition: all .2s;
 }
+.gps-input:focus { background: var(--accent-soft); }
 .gps-input::placeholder { color: #c4b5d0; }
-.gps-hint { font-size: 10px; color: #a898b8; white-space: nowrap; flex-shrink: 0; }
+.gps-hint { font-size: 10px; color: var(--accent); white-space: nowrap; flex-shrink: 0; font-weight: 700; background: var(--accent-soft); padding: 3px 8px; border-radius: 6px; }
 
 .gps-locate-btn {
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid #d4c4dc;
-  background: #fff;
-  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: none;
+  background: #f0edf5;
+  font-size: 15px;
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
+  transition: all .15s;
 }
-.gps-locate-btn:hover { background: #f8f4fb; }
+.gps-locate-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
+.gps-locate-btn:active { transform: scale(.92); }
 
 .gps-suggest {
   position: absolute;
@@ -577,22 +581,25 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 
 .gps-home-btn {
-  padding: 4px 8px;
-  border-radius: 8px;
-  border: 1px solid #d4c4dc;
-  background: #fff;
-  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: none;
+  background: #f0edf5;
+  font-size: 15px;
   cursor: pointer;
   flex-shrink: 0;
   line-height: 1;
+  transition: all .15s;
 }
-.gps-home-btn:hover { background: #f8f4fb; }
+.gps-home-btn:hover { background: var(--accent-soft); }
+.gps-home-btn:active { transform: scale(.92); }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #4a3f55;
-  margin: 16px 0 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #3a3045;
+  margin: 18px 2px 0;
+  letter-spacing: -.3px;
 }
 
 .btn-go {
@@ -600,75 +607,87 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   width: 100%;
   padding: 18px;
   border: none;
-  border-radius: 20px;
-  background: linear-gradient(135deg, var(--accent), #f97316);
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: #fff;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 19px;
+  font-weight: 800;
   font-family: inherit;
   cursor: pointer;
   transition: transform .15s, box-shadow .15s;
-  margin-top: 16px;
+  margin-top: 18px;
+  letter-spacing: .5px;
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb),.28);
 }
 .btn-go:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px var(--accent-tint);
+  box-shadow: 0 8px 28px rgba(var(--accent-rgb),.35);
 }
+.btn-go:active:not(:disabled) { transform: scale(.97); }
 .btn-go:disabled {
-  opacity: .6;
+  opacity: .5;
   cursor: not-allowed;
 }
 
 .btn-multi {
   display: block;
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: none;
   background: transparent;
   color: #a898b8;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   margin-top: 6px;
+  transition: color .15s;
 }
+.btn-multi:hover { color: var(--accent); }
 
 .advanced-toggle {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: 14px 16px;
   margin-top: 14px;
-  background: #faf7fc;
-  border-radius: 12px;
+  background: #fff;
+  border-radius: 14px;
   font-size: 12px;
-  color: #8a8098;
+  font-weight: 600;
+  color: #7a6c8a;
   cursor: pointer;
-  transition: background .15s;
+  transition: all .15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
 }
-.advanced-toggle:hover { background: #f0e8f5; }
+.advanced-toggle:hover { background: var(--accent-soft); color: var(--accent); }
 .advanced-toggle .arrow { transition: transform .2s; }
 .advanced-toggle .arrow.open { transform: rotate(180deg); }
 
 .advanced-panel {
-  padding: 12px 14px;
-  background: #fdfbff;
-  border: 1px solid #ece0ec;
+  padding: 14px 16px;
+  background: #fff;
+  border: none;
   border-radius: 0 0 14px 14px;
-  border-top: none;
+  margin-top: -8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
 }
 
 .addr-row {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .addr-row label {
   font-size: 11px;
   color: #8a8098;
-  font-weight: 600;
+  font-weight: 700;
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
 }
 .addr-row .hint {
   font-weight: 400;
-  color: #a898b8;
+  color: #b0a3bc;
+  text-transform: none;
 }
 
 .addr-quick-row {
@@ -679,17 +698,19 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 
 .chip-sm {
-  padding: 3px 10px;
+  padding: 5px 12px;
   border-radius: 10px;
-  border: 1px solid #d4c4dc;
-  background: #fff;
+  border: none;
+  background: #f0edf5;
   color: #5e5468;
   font-size: 10px;
+  font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  transition: all .15s;
 }
-.chip-sm:hover { background: #f8f4fb; }
-.chip-sm.add { border-color: var(--accent); color: var(--accent); }
+.chip-sm:hover { background: var(--accent-soft); color: var(--accent); }
+.chip-sm.add { background: var(--accent-soft); color: var(--accent); }
 
 .input-row {
   display: flex;
@@ -698,36 +719,48 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .input-row input {
   flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #e8e0ec;
+  padding: 9px 12px;
+  border: none;
   border-radius: 10px;
   font-size: 12px;
   font-family: inherit;
-  color: #5e5468;
-  background: #fff;
+  color: #4a3f55;
+  background: #f7f5fa;
+  transition: all .2s;
 }
+.input-row input:focus { background: var(--accent-soft); outline: none; }
 .btn-icon {
-  padding: 6px 10px;
+  padding: 7px 11px;
   border: none;
-  border-radius: 8px;
-  background: #fdfbff;
+  border-radius: 10px;
+  background: #f0edf5;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   flex-shrink: 0;
+  transition: all .15s;
 }
+.btn-icon:hover { background: var(--accent-soft); }
+.btn-icon:active { transform: scale(.9); }
 
 .adv-label {
   font-size: 11px;
   color: #8a8098;
-  font-weight: 600;
+  font-weight: 700;
   display: block;
-  margin: 10px 0 6px;
+  margin: 12px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
 }
 
 .dist-est {
-  font-size: 11px;
-  color: #a898b8;
+  font-size: 12px;
+  color: var(--accent);
   margin-top: 4px;
+  font-weight: 700;
+  padding: 6px 10px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  display: inline-block;
 }
 
 .dest-search {
@@ -735,22 +768,21 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .dest-estimate {
   margin-top: 10px;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, #fef6f8, #faf1f5);
-  border-radius: 10px;
-  border: 1px solid #fce8ee;
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  border-radius: 12px;
 }
 .dest-est-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #5e5468;
+  color: #4a3f55;
   margin-bottom: 4px;
 }
 .dest-est-row:last-child { margin-bottom: 0; }
 .dest-total {
-  font-weight: 700;
+  font-weight: 800;
   color: var(--accent);
 }
 </style>
