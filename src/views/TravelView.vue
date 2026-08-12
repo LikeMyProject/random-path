@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { CITY_LIST, getCity } from '../data/cities.js'
+import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
 import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
@@ -27,6 +27,9 @@ const def = defaultDates()
 startDate.value = def.s; endDate.value = def.e
 
 const remaining = computed(() => CITY_LIST.filter(c => !selectedCities.value.includes(c)))
+const remainingGroups = computed(() => CITY_GROUPS
+  .map(g => ({ ...g, cities: g.cities.filter(c => !selectedCities.value.includes(c)) }))
+  .filter(g => g.cities.length > 0))
 const cityToAdd = ref('')
 function onSelectCity() {
   if (!cityToAdd.value) return
@@ -227,8 +230,10 @@ function toggleHotelExpand(city, i) {
     <label class="lbl">📍 目的地城市 <span class="hint">(按顺序 = 行程顺序)</span></label>
     <div class="city-sel">
       <select v-model="cityToAdd" class="inp" @change="onSelectCity">
-        <option value="">-- 选择要去的城市 --</option>
-        <option v-for="c in remaining" :key="c" :value="c">{{ c }} · {{ getCity(c)?.days }}天建议</option>
+        <option value="">-- 选择要去的城市（共 {{ remaining.length }} 城可选）--</option>
+        <optgroup v-for="g in remainingGroups" :key="g.province" :label="g.province">
+          <option v-for="c in g.cities" :key="c" :value="c">{{ c }} · {{ getCity(c)?.days }}天建议</option>
+        </optgroup>
       </select>
     </div>
     <div v-if="selectedCities.length" class="city-chips">
