@@ -82,7 +82,7 @@ export function generateGuideImage(plan, hotel) {
   let totalH = 0
   function add(h, fn) { rows.push({ h, fn }); totalH += h }
 
-  // ===== 顶部 Banner（紫色渐变 200px）=====
+  // ===== 顶部 Banner（紫色渐变 220px）=====
   add(220, (ctx, y) => {
     // 渐变背景
     const grad = ctx.createLinearGradient(0, y, W, y + 220)
@@ -122,7 +122,7 @@ export function generateGuideImage(plan, hotel) {
   })
 
   // ===== 行程总览卡片 =====
-  add(60 + 38 * plan.cityPlans.length, (ctx, y) => {
+  add(76 + 38 * plan.cityPlans.length, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '🗺️ 行程总览', C.purple)
     y += 50
@@ -146,7 +146,7 @@ export function generateGuideImage(plan, hotel) {
 
   // ===== 城市间交通 =====
   if (plan.transports.length) {
-    add(60 + 34 * plan.transports.length, (ctx, y) => {
+    add(76 + 34 * plan.transports.length, (ctx, y) => {
       y += 16
       drawCardTitle(ctx, X, y, '🚄 城市间交通', C.blue)
       y += 50
@@ -164,8 +164,8 @@ export function generateGuideImage(plan, hotel) {
 
   // ===== 每日行程（核心，每城一节）=====
   plan.cityPlans.forEach(cp => {
-    // 城市节标题
-    add(50 + 12 + (110 + 36 * cp.daily.reduce((m, d) => m + 1 + d.slots.length, 0)), (ctx, y) => {
+    // 城市节标题（只预留标题栏本身高度，不再包含每日行程）
+    add(72, (ctx, y) => {
       y += 16
       // 城市标题栏（紫色条）
       ctx.fillStyle = C.purple
@@ -177,20 +177,21 @@ export function generateGuideImage(plan, hotel) {
       ctx.fillText(`${fmtMD(cp.dateRange.start)} ~ ${fmtMD(cp.dateRange.end)}`, X + CW - M * 2 - 16, y + 22)
     })
 
-    // 每天一张卡片
+    // 每天一张卡片（紧凑：52 头部 + 每槽 36，末尾 +10 内边距）
     cp.daily.forEach(d => {
-      add(90 + 36 * d.slots.length, (ctx, y) => {
+      add(62 + 36 * d.slots.length, (ctx, y) => {
         // 日期头部（彩色条 + 星期 + 天气）
         const dayColor = C.orange
+        const cardH = 52 + 36 * d.slots.length
         ctx.fillStyle = C.card
-        roundRect(ctx, X, y, CW - M * 2, 90 + 36 * d.slots.length, 14); ctx.fill()
+        roundRect(ctx, X, y, CW - M * 2, cardH, 14); ctx.fill()
         ctx.strokeStyle = C.line; ctx.lineWidth = 1
-        roundRect(ctx, X, y, CW - M * 2, 90 + 36 * d.slots.length, 14); ctx.stroke()
+        roundRect(ctx, X, y, CW - M * 2, cardH, 14); ctx.stroke()
         // 左侧色条
         ctx.fillStyle = dayColor
-        roundRect(ctx, X, y, 5, 90 + 36 * d.slots.length, 2); ctx.fill()
+        roundRect(ctx, X, y, 5, cardH, 2); ctx.fill()
         // 日期标题
-        const dayY = y + 18
+        const dayY = y + 14
         ctx.fillStyle = dayColor; ctx.font = `bold 22px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
         ctx.fillText(`D${d.day}`, X + 22, dayY)
         ctx.fillStyle = C.text; ctx.font = `bold 18px ${FONT}`
@@ -202,7 +203,7 @@ export function generateGuideImage(plan, hotel) {
           ctx.fillText(`${wt.low}~${wt.high}°C · ${wt.feel}`, X + CW - M * 2 - 14, dayY + 4)
         }
         // 槽位
-        let sy = y + 56
+        let sy = y + 52
         d.slots.forEach(s => {
           drawSlot(ctx, X + 16, sy, CW - M * 2 - 32, s, dayColor)
           sy += 36
@@ -212,7 +213,7 @@ export function generateGuideImage(plan, hotel) {
   })
 
   // ===== 天气 + 穿衣 =====
-  add(60 + 50 * plan.cityPlans.length, (ctx, y) => {
+  add(76 + 50 * plan.cityPlans.length, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '☀️ 天气 & 穿衣', C.orange)
     y += 50
@@ -232,7 +233,7 @@ export function generateGuideImage(plan, hotel) {
   })
 
   // ===== 预算（条形可视化）=====
-  add(70 + 56 * plan.budget.items.length, (ctx, y) => {
+  add(110 + 56 * plan.budget.items.length, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '💰 预算参考（人均）', C.green)
     y += 50
@@ -264,7 +265,7 @@ export function generateGuideImage(plan, hotel) {
   })
 
   // ===== 精选酒店 =====
-  add(140, (ctx, y) => {
+  add(hotel ? 176 : 116, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '🏨 精选酒店', C.pink)
     y += 50
@@ -311,7 +312,7 @@ export function generateGuideImage(plan, hotel) {
   })
 
   // ===== 必吃美食 =====
-  add(50 + 32 * plan.cityPlans.length, (ctx, y) => {
+  add(66 + 32 * plan.cityPlans.length, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '🍜 必吃美食', C.red)
     y += 50
@@ -329,17 +330,17 @@ export function generateGuideImage(plan, hotel) {
 
   // ===== 实用贴士 =====
   const totalTips = plan.cityPlans.reduce((s, cp) => s + cp.data.tips.length, 0)
-  add(50 + 26 * totalTips, (ctx, y) => {
+  add(66 + 30 * totalTips, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '💡 实用贴士', C.blue)
     y += 50
     plan.cityPlans.forEach(cp => {
       cp.data.tips.forEach(t => {
         ctx.fillStyle = C.bBg
-        roundRect(ctx, X, y, CW - M * 2, 22, 6); ctx.fill()
+        roundRect(ctx, X, y, CW - M * 2, 26, 6); ctx.fill()
         ctx.fillStyle = C.text; ctx.font = `13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
-        ctx.fillText(`💡 【${cp.name}】${truncate(t, 36)}`, X + 12, y + 11)
-        y += 26
+        ctx.fillText(`💡 【${cp.name}】${truncate(t, 50)}`, X + 12, y + 13)
+        y += 30
       })
     })
   })
