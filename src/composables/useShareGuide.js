@@ -5,6 +5,7 @@
 //   精选酒店 / 必吃美食 / 实用贴士 / footer
 // ============================================================
 import { shareImage } from './useShareCard.js'
+import { estimateTransit, TRANSIT_LABEL } from './useHotel.js'
 
 const W = 750, M = 0, CW = 750
 const FONT = '"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif'
@@ -270,8 +271,26 @@ export function generateGuideImage(plan, hotel) {
     ctx.fillText(`¥${plan.budget.total[0]} ~ ¥${plan.budget.total[1]}`, X + CW - M * 2 - 16, y + 22)
   })
 
-  // ===== 精选酒店 =====
-  add(hotel ? 176 : 116, (ctx, y) => {
+  // ===== 精选酒店 + 酒店→景点出行路线 =====
+  let hotelRoutes = []
+  if (hotel && hotel.city) {
+    const cityCp = plan.cityPlans.find(cp => cp.name === hotel.city)
+    if (cityCp) {
+      const seen = new Set()
+      const attrs = []
+      cityCp.daily.forEach(d => d.slots.forEach(s => {
+        if (!s.meal && !s.local && s.attraction?.coord && !seen.has(s.attraction.name)) {
+          seen.add(s.attraction.name); attrs.push({ name: s.attraction.name, coord: s.attraction.coord })
+        }
+      }))
+      if (attrs.length === 0) cityCp.data.attractions.forEach(a => {
+        if (a.coord && !seen.has(a.name)) { seen.add(a.name); attrs.push({ name: a.name, coord: a.coord }) }
+      })
+      hotelRoutes = estimateTransit(hotel, attrs).sort((x, y) => x.km - y.km).slice(0, 8)
+    }
+  }
+  const routeBlockH = hotelRoutes.length ? (14 + 26 + hotelRoutes.length * 26) : 0
+  add(hotel ? 100 + routeBlockH : 116, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '🏨 精选酒店', C.pink)
     y += 50
@@ -280,7 +299,6 @@ export function generateGuideImage(plan, hotel) {
       roundRect(ctx, X, y, CW - M * 2, 100, 14); ctx.fill()
       ctx.strokeStyle = '#fbd5e0'; ctx.lineWidth = 1
       roundRect(ctx, X, y, CW - M * 2, 100, 14); ctx.stroke()
-      // 名称 + 城市
       ctx.fillStyle = C.pink; ctx.font = `bold 22px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
       ctx.fillText(truncate(hotel.name, 20), X + 18, y + 14)
       if (hotel.city) {
@@ -290,12 +308,10 @@ export function generateGuideImage(plan, hotel) {
         ctx.fillStyle = C.pink
         ctx.fillText(`📍 ${hotel.city}`, X + CW - M * 2 - tagW - 4, y + 18)
       }
-      // 价格 + 评分
       ctx.fillStyle = C.pink; ctx.font = `bold 18px ${FONT}`; ctx.textBaseline = 'top'
       ctx.fillText(formatPrice(hotel), X + 18, y + 48)
       ctx.fillStyle = C.text; ctx.font = `15px ${FONT}`
-      ctx.fillText(`${formatRating(hotel)} · 距 ${hotel.attraction} ${formatDist(hotel)}`, X + 18, y + 76)
-      // 匹配标签
+      ctx.fillText(`${formatRating(hotel)} · 距 ${hotel.attraction || '景点'} ${formatDist(hotel)}`, X + 18, y + 76)
       if (hotel.tags?.length) {
         let tx = X + CW - M * 2 - 14
         hotel.tags.slice(0, 3).reverse().forEach(t => {
@@ -307,6 +323,22 @@ export function generateGuideImage(plan, hotel) {
           roundRect(ctx, tx, y + 78, w, 18, 9); ctx.stroke()
           ctx.fillStyle = C.pink; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
           ctx.fillText(t, tx + w / 2, y + 87)
+        })
+      }
+      if (hotelRoutes.length) {
+        let ry = y + 100 + 14
+        ctx.fillStyle = C.sub; ctx.font = `bold 14px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+        ctx.fillText('🚉 酒店 → 各景点 出行估算', X + 18, ry)
+        ry += 26
+        hotelRoutes.forEach(rt => {
+          ctx.fillStyle = C.card
+          roundRect(ctx, X, ry, CW - M * 2, 22, 6); ctx.fill()
+          ctx.fillStyle = C.ink; ctx.font = `13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+          ctx.fillText(`→ ${truncate(rt.attraction, 14)}`, X + 14, ry + 11)
+          const modeLabel = TRANSIT_LABEL[rt.mode] || rt.mode
+          ctx.fillStyle = C.sub; ctx.textAlign = 'right'
+          ctx.fillText(`${rt.km}km · ${modeLabel} ${rt.timeMin}min · ${rt.fee}`, X + CW - M * 2 - 14, ry + 11)
+          ry += 26
         })
       }
     } else {

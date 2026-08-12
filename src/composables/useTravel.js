@@ -106,20 +106,29 @@ export function clusterAttractions(attractions, days, interests = []) {
     }
   }
 
-  // 平衡：每天上限 ceil(len/k)，超出的低分景点移到最少的天
+  // 平衡：每天上限 ceil(len/k)，超出的低分景点移到「地理最近且未满」的簇（保证同天景点相邻）
   const cap = Math.ceil(sorted.length / k)
   let guard = 0
-  while (guard++ < k * 2) {
-    let heavy = -1, light = -1
-    for (let i = 0; i < k; i++) {
-      if (clusters[i].length > cap) heavy = i
-      if (clusters[i].length < cap && light === -1) light = i
-    }
-    if (heavy === -1 || light === -1) break
-    // 把 heavy 里 mustSee 最低的移给 light
+  while (guard++ < k * 4) {
+    let heavy = -1
+    for (let i = 0; i < k; i++) if (clusters[i].length > cap) { heavy = i; break }
+    if (heavy === -1) break
     let minI = 0
     for (let j = 1; j < clusters[heavy].length; j++) if (score(clusters[heavy][j]) < score(clusters[heavy][minI])) minI = j
-    clusters[light].push(clusters[heavy].splice(minI, 1)[0])
+    const move = clusters[heavy][minI]
+    let bestC = -1, bd = Infinity
+    for (let i = 0; i < k; i++) {
+      if (i === heavy || clusters[i].length >= cap) continue
+      const d = haversineKm(move.coord, centers[i])
+      if (d < bd) { bd = d; bestC = i }
+    }
+    if (bestC === -1) break
+    clusters[bestC].push(clusters[heavy].splice(minI, 1)[0])
+    const cl = clusters[bestC]
+    centers[bestC] = {
+      lng: cl.reduce((s, x) => s + x.coord.lng, 0) / cl.length,
+      lat: cl.reduce((s, x) => s + x.coord.lat, 0) / cl.length,
+    }
   }
 
   // 组内按 mustSee 降序
@@ -195,13 +204,32 @@ export function weatherAdvice(cityName, month) {
   if (!c) return null
   const [lo, hi] = c.weather[Math.max(0, Math.min(11, month - 1))]
   const avg = (lo + hi) / 2
+  const { feel, clothing } = clothingAdvice(avg)
+  return { month, low: lo, high: hi, avg, feel, clothing }
+}
+
+function clothingAdvice(avg) {
   let feel = '舒适', clothing = '春秋装即可'
   if (avg < 0) { feel = '严寒'; clothing = '羽绒服/厚棉服/保暖内衣/雪地靴' }
   else if (avg < 10) { feel = '偏冷'; clothing = '厚外套/毛衣/秋裤' }
   else if (avg < 20) { feel = '舒适'; clothing = '长袖+薄外套，早晚加衣' }
   else if (avg < 28) { feel = '温暖'; clothing = '短袖+薄外套，防晒' }
   else { feel = '炎热'; clothing = '短袖短裤，防晒霜/遮阳帽' }
-  return { month, low: lo, high: hi, avg, feel, clothing }
+  return { feel, clothing }
+}
+
+export function weatherForDate(cityName, date) {
+  const base = weatherAdvice(cityName, date.getMonth() + 1)
+  const seed = date.getFullYear() * 372 + (date.getMonth() + 1) * 31 + date.getDate()
+  const r1 = Math.abs(Math.sin(seed * 12.9898) * 43758.5453) % 1
+  const r2 = Math.abs(Math.sin(seed * 78.233 + 1.7) * 12345.678) % 1
+  const loShift = Math.round((r1 - 0.5) * 5)
+  const hiShift = Math.round((r2 - 0.5) * 5)
+  let low = base.low + loShift
+  let high = Math.max(base.high + hiShift, low + 1)
+  const avg = (low + high) / 2
+  const { feel, clothing } = clothingAdvice(avg)
+  return { month: date.getMonth() + 1, low, high, avg, feel, clothing }
 }
 
 // ============================================================
@@ -300,11 +328,15 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
     for (let d = 0; d < days; d++) range.push(addDays(cursor, d))
     cursor = addDays(cursor, days + (i < cities.length - 1 ? 1 : 0)) // +1 转换日
     const month = range[0].getMonth() + 1
+    const monthly = range.map(d => ({ date: d, ...weatherForDate(name, d) }))
+    const wLo = Math.min(...monthly.map(m => m.low))
+    const wHi = Math.max(...monthly.map(m => m.high))
+    const wBase = weatherAdvice(name, month)
     return {
       name, data: c, days, dateRange: { start: range[0], end: range[range.length - 1] },
       dates: range.map(d => ({ date: d, label: `D${range.indexOf(d) + 1}` })),
-      weather: weatherAdvice(name, month),
-      monthly: range.map(d => ({ date: d, ...weatherAdvice(name, d.getMonth() + 1) })),
+      weather: { ...wBase, low: wLo, high: wHi },
+      monthly,
     }
   })
 
@@ -417,16 +449,6 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
     cp.localSpots = spots
 
     const used = new Set()
-    let idx = 0
-
-    function pickSpot() {
-      while (idx < spots.length) {
-        const s = spots[idx++]
-        const key = s.name + '|' + s.address
-        if (!used.has(key)) { used.add(key); return s }
-      }
-      return null
-    }
 
     function insertLocalSlot(d, period, spot) {
       const newOrder = PERIOD_ORDER[period] ?? 3
@@ -446,40 +468,44 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
       })
     }
 
-    // 判断某时段是否已被任何非餐食槽位占用（景点或本地地点）
     function isPeriodFree(d, period) {
       return !d.slots.some(s => !s.meal && s.period === period)
     }
 
-    cp.daily.forEach((d) => {
-      // 统计景点数量（不含本地地点和餐食）
-      const attractionCount = d.slots.filter(s => !s.meal && !s.local).length
-
-      // 景点少时多分配本地地点，确保 上午/下午/晚上 都有内容
-      const wantSpots = attractionCount <= 1 ? 2 : 1
-
-      let placed = 0
-      let attempts = 0
-      while (placed < wantSpots && attempts++ < 3) {
-        const spot = pickSpot()
-        if (!spot) break
-
-        // 按优先级尝试插入时段：上午 > 下午 > 晚上（晚上最后才填，避免与主景点冲突）
-        let period = null
-        if (isPeriodFree(d, 'morning')) {
-          period = 'morning'
-        } else if (isPeriodFree(d, 'afternoon')) {
-          period = 'afternoon'
-        } else if (isPeriodFree(d, 'evening')) {
-          period = 'evening'
-        } else {
-          break  // 没有可填充的时段
-        }
-
-        insertLocalSlot(d, period, spot)
-        placed++
-      }
+    const dayCentroids = cp.daily.map(d => {
+      const pts = d.slots.filter(s => !s.meal && !s.local && s.attraction?.coord).map(s => s.attraction.coord)
+      if (pts.length === 0) return cp.data.coord
+      return { lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length, lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length }
     })
+    const needs = cp.daily.map(d => {
+      const cnt = d.slots.filter(s => !s.meal && !s.local).length
+      return cnt <= 1 ? 2 : 1
+    })
+
+    let remain = needs.reduce((a, b) => a + b, 0)
+    let guard = 0
+    while (remain > 0 && guard++ < spots.length * 2) {
+      let bestDay = -1, bestSpot = -1, bd = Infinity
+      for (let di = 0; di < cp.daily.length; di++) {
+        if (needs[di] <= 0) continue
+        for (let si = 0; si < spots.length; si++) {
+          const key = spots[si].name + '|' + spots[si].address
+          if (used.has(key)) continue
+          const dist = haversineKm(dayCentroids[di], spots[si].coord)
+          if (dist < bd) { bd = dist; bestDay = di; bestSpot = si }
+        }
+      }
+      if (bestDay === -1 || bestSpot === -1) break
+      const spot = spots[bestSpot]
+      used.add(spot.name + '|' + spot.address)
+      const d = cp.daily[bestDay]
+      let period = isPeriodFree(d, 'morning') ? 'morning'
+        : isPeriodFree(d, 'afternoon') ? 'afternoon'
+        : isPeriodFree(d, 'evening') ? 'evening' : null
+      if (period) insertLocalSlot(d, period, spot)
+      needs[bestDay]--
+      remain--
+    }
   }
   onProgress?.({ city: '', done: plan.cityPlans.length, total: plan.cityPlans.length })
 }
