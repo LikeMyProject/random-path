@@ -4,13 +4,30 @@
 //   - types=100000（住宿服务）
 //   - show_fields=rating,price → 获取真实评分与价格
 //   - distance 字段 = 酒店距景点距离（米）
+// 个性化推荐：出行/氛围/场景参数多选 → 按需采集环境数据
+//   （餐饮密度/地铁站/商圈 POI）→ matchScore 推荐度评分
 // 诚实降级：无评分显示"暂无评分"，无价格按类型推断并标注"参考价"
 // ============================================================
-import { AMAP_KEY } from './useAMap.js'
+import { AMAP_KEY, searchPOIs } from './useAMap.js'
 
 const HOTEL_TYPES = '100000'
 const SEARCH_RADIUS = 3000
-const REQ_DELAY = 350 // 高德 QPS 控制（约 2.8 req/s）
+const REQ_DELAY = 320 // 高德 QPS 控制（约 3 req/s）
+
+// ===== 个性化参数预制集（用户可多选）=====
+export const PERSONA_OPTIONS = [
+  { key: 'walk', label: '🚶 步行优先', group: '出行', desc: '离景点 ≤1km，步行即达' },
+  { key: 'bike', label: '🚴 骑行可达', group: '出行', desc: '3km 内骑行方便' },
+  { key: 'car', label: '🚗 自驾方便', group: '出行', desc: '酒店有停车条件' },
+  { key: 'metro', label: '🚇 地铁沿线', group: '出行', desc: '靠近地铁站更佳' },
+  { key: 'quiet', label: '🤫 安静舒适', group: '氛围', desc: '避开热闹商圈' },
+  { key: 'lively', label: '🎉 热闹繁华', group: '氛围', desc: '商圈/美食密集' },
+  { key: 'family', label: '👨‍👩‍👧 亲子友好', group: '场景', desc: '适合家庭出行' },
+  { key: 'food', label: '🍜 近美食街', group: '场景', desc: '周边餐饮丰富' },
+  { key: 'parking', label: '🅿️ 免费停车', group: '场景', desc: '有停车位' },
+  { key: 'view', label: '🌃 观景视野', group: '场景', desc: '江景/海景/山景房' },
+]
+export const PERSONA_GROUPS = ['出行', '氛围', '场景']
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
@@ -117,32 +134,118 @@ export async function searchHotelsNear(lng, lat, { min = 0, max = Infinity, radi
 }
 
 /**
- * 遍历多个景点搜索酒店，去重后按评分（好评优先）→距离排序
+ * 遍历多个景点搜索酒店，去重后按推荐度排序
  * @param {Array} attractions [{name, coord}]
+ * @param {Object} opts { min, max, personas: [], onProgress }
  */
-export async function searchHotelsForCity(attractions, { min, max, onProgress = null } = {}) {
+export async function searchHotelsForCity(attractions, { min, max, personas = [], onProgress = null } = {}) {
   const results = []
   const seen = new Set()
   const list = attractions.slice(0, 8) // 最多搜 8 个景点，控制请求量
+  const need = {
+    food: personas.includes('food') || personas.includes('lively') || personas.includes('quiet'),
+    metro: personas.includes('metro'),
+    mall: personas.includes('lively') || personas.includes('quiet'),
+  }
+
   for (let i = 0; i < list.length; i++) {
     const a = list[i]
-    const hotels = await searchHotelsNear(a.coord.lng, a.coord.lat, { min, max })
+    const [hotels, env] = await Promise.all([
+      searchHotelsNear(a.coord.lng, a.coord.lat, { min, max }),
+      collectEnv(a.coord.lng, a.coord.lat, need),
+    ])
     for (const h of hotels) {
       const key = h.id || `${h.name}|${h.coord.lng.toFixed(4)}|${h.coord.lat.toFixed(4)}`
       if (seen.has(key)) continue
       seen.add(key)
-      results.push({ ...h, attraction: a.name })
+      const ms = matchScore(h, personas, env)
+      results.push({ ...h, attraction: a.name, env, ...ms })
     }
     onProgress?.({ done: i + 1, total: list.length })
     if (i < list.length - 1) await sleep(REQ_DELAY)
   }
-  // 排序：有评分的优先（评分降序），再按距离
-  results.sort((x, y) => {
-    const rx = x.rating ?? -1, ry = y.rating ?? -1
-    if (rx !== ry) return ry - rx
-    return (x.distance ?? Infinity) - (y.distance ?? Infinity)
-  })
+
+  // 排序：有个性化参数按推荐度；否则按评分→距离
+  if (personas.length > 0) {
+    results.sort((x, y) => y.score - x.score)
+  } else {
+    results.sort((x, y) => {
+      const rx = x.rating ?? -1, ry = y.rating ?? -1
+      if (rx !== ry) return ry - rx
+      return (x.distance ?? Infinity) - (y.distance ?? Infinity)
+    })
+  }
   return results
+}
+
+// ===== 环境数据采集（按需，每景点一次）=====
+async function collectEnv(lng, lat, need) {
+  const env = { foodCount: 0, metroCount: 0, malls: [] }
+  const tasks = []
+  if (need.food) tasks.push(searchPOIs(lng, lat, '050000', 800, 8).then(list => { env.foodCount = list.length }).catch(() => {}))
+  if (need.metro) tasks.push(searchPOIs(lng, lat, '150500', 1200, 5).then(list => { env.metroCount = list.length }).catch(() => {}))
+  if (need.mall) tasks.push(searchPOIs(lng, lat, '060100', 2000, 6).then(list => {
+    env.malls = list
+      .filter(p => !/食品|超市|便利店|商店|药店|杂货/.test(p.name))
+      .map(p => ({ name: p.name, coord: { lng: p.lng, lat: p.lat } }))
+  }).catch(() => {}))
+  await Promise.all(tasks)
+  return env
+}
+
+function haversineKm(a, b) {
+  const toRad = x => x * Math.PI / 180
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}
+
+// 酒店距最近商圈（客户端计算，零额外请求）
+export function nearestMall(h) {
+  if (!h.env?.malls?.length) return null
+  let best = null, bd = Infinity
+  for (const m of h.env.malls) {
+    const d = haversineKm(h.coord, m.coord)
+    if (d < bd) { bd = d; best = m }
+  }
+  return best ? { name: best.name, km: bd } : null
+}
+
+// 景点热闹度（餐饮/商圈密度）
+function isLivelyEnv(env) {
+  return (env?.foodCount ?? 0) >= 4 || (env?.malls?.length ?? 0) > 0
+}
+
+/**
+ * 推荐度评分：参数匹配率为主，评分为辅
+ * @returns { score, pct, tags }
+ */
+export function matchScore(h, personas, env) {
+  const p = new Set(personas || [])
+  if (p.size === 0) return { score: (h.rating ?? 0), pct: null, tags: [] }
+  const d = h.distance ?? Infinity
+  const name = h.name || '', addr = h.address || ''
+  const lively = isLivelyEnv(env)
+  let hits = 0
+  const tags = []
+
+  // 出行
+  if (p.has('walk') && d <= 1000) { hits++; tags.push('步行友好') }
+  if (p.has('bike') && d <= 3000) { hits++; tags.push('骑行可达') }
+  if (p.has('car') && /停车|车位/.test(name + addr)) { hits++; tags.push('可停车') }
+  if (p.has('metro') && ((env?.metroCount ?? 0) > 0 || /地铁/.test(addr))) { hits++; tags.push('近地铁') }
+  // 氛围
+  if (p.has('quiet') && !lively) { hits++; tags.push('安静区域') }
+  if (p.has('lively') && lively) { hits++; tags.push('热闹地段') }
+  // 场景
+  if (p.has('family') && /亲子|家庭|度假|公寓|套房/.test(name)) { hits++; tags.push('亲子友好') }
+  if (p.has('food') && (env?.foodCount ?? 0) >= 4) { hits++; tags.push('美食聚集') }
+  if (p.has('parking') && /停车|车位/.test(name + addr)) { hits++; tags.push('免费停车') }
+  if (p.has('view') && /江景|海景|湖景|山景|观景|高空|天际|全景/.test(name)) { hits++; tags.push('景观房') }
+
+  const pct = Math.round(hits / p.size * 100)
+  const score = pct * 10 + (h.rating ?? 0) * 5 + (d <= 1500 ? 3 : 0)
+  return { score, pct, tags }
 }
 
 // ===== 展示格式化 =====

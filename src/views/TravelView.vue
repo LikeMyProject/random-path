@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { CITY_LIST, getCity } from '../data/cities.js'
 import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
-import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated } from '../composables/useHotel.js'
+import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS } from '../composables/useHotel.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
@@ -161,6 +161,15 @@ const hotelPreset = ref({})           // city -> budget/comfort/premium/custom
 const hotelCustomMin = ref({}), hotelCustomMax = ref({})
 const hotelAttraction = ref({})       // city -> 指定景点名（'' = 全部）
 const hotelState = ref({})            // city -> { loading, progress, list }
+const personas = ref([])              // 个性化参数（全局多选）
+
+function togglePersona(key) {
+  const i = personas.value.indexOf(key)
+  if (i >= 0) personas.value.splice(i, 1)
+  else personas.value.push(key)
+}
+function personaGroup(group) { return PERSONA_OPTIONS.filter(p => p.group === group) }
+function matchCls(pct) { return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low' }
 
 function toggleHotel(name) { hotelOpen.value = hotelOpen.value === name ? '' : name }
 function setHotelPreset(name, key) { hotelPreset.value[name] = key }
@@ -184,6 +193,7 @@ async function doSearchHotel(cp) {
       attrs.map(a => ({ name: a.name, coord: a.coord })),
       {
         min: range.min, max: range.max,
+        personas: personas.value,
         onProgress: ({ done, total }) => { hotelState.value[cp.name].progress = `正在搜索 ${done}/${total} 个景点周边…` },
       }
     )
@@ -318,6 +328,22 @@ function openHotelNav(h) {
         🏨 按预算找附近酒店
       </button>
       <div v-if="hotelOpen === cp.name" class="hotel-panel">
+        <!-- 个性化参数（多选） -->
+        <div class="persona-sec">
+          <div class="persona-title">🎯 个性化偏好 <span class="hint">多选，按匹配度推荐</span></div>
+          <div v-for="g in PERSONA_GROUPS" :key="g" class="persona-group">
+            <span class="persona-group-label">{{ g }}</span>
+            <div class="persona-chips">
+              <button
+                v-for="opt in personaGroup(g)" :key="opt.key"
+                :class="['chip-sm', { on: personas.includes(opt.key) }]"
+                :title="opt.desc"
+                @click="togglePersona(opt.key)"
+              >{{ opt.label }}</button>
+            </div>
+          </div>
+        </div>
+
         <div class="hotel-presets">
           <button
             v-for="p in HOTEL_PRESETS" :key="p.key"
@@ -348,7 +374,7 @@ function openHotelNav(h) {
           <span class="spin">⏳</span> {{ hotelState[cp.name]?.progress }}
         </div>
         <div v-else-if="hotelState[cp.name]?.list?.length" class="hotel-results">
-          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · 按评分排序</div>
+          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · 按推荐度排序</div>
           <div
             v-for="(h, i) in hotelState[cp.name].list"
             :key="i"
@@ -356,6 +382,7 @@ function openHotelNav(h) {
             @click="openHotelNav(h)"
           >
             <div class="h-row1">
+              <span v-if="h.pct != null" class="h-match" :class="matchCls(h.pct)">{{ h.pct }}% 匹配</span>
               <span class="h-name">{{ h.name }}</span>
               <span v-if="isGoodRated(h)" class="h-badge good">好评</span>
               <span v-if="h.priceInferred" class="h-badge ref">参考价</span>
@@ -364,6 +391,10 @@ function openHotelNav(h) {
               <span class="h-price">{{ formatPrice(h) }}/晚</span>
               <span class="h-rating" :class="{ none: h.rating == null && !h.reputation, [h.reputation?.cls]: !!h.reputation }">{{ formatRating(h) }}</span>
               <span class="h-dist">距 {{ h.attraction }} {{ formatDist(h) }}</span>
+            </div>
+            <div v-if="h.tags?.length" class="h-tags">
+              <span v-for="t in h.tags" :key="t" class="h-tag">{{ t }}</span>
+              <span v-if="nearestMall(h)" class="h-mall">🏬 近{{ nearestMall(h).name }} {{ nearestMall(h).km.toFixed(1) }}km</span>
             </div>
           </div>
         </div>
@@ -517,6 +548,12 @@ function openHotelNav(h) {
 .btn-hotel { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
 .btn-hotel.on { opacity: .85; }
 .hotel-panel { margin-top: 8px; background: #f8f7ff; border: 1px solid #e0e0f0; border-radius: 12px; padding: 10px; }
+.persona-sec { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #e0e0f0; }
+.persona-title { font-size: 12px; font-weight: 700; color: #5e5468; margin-bottom: 8px; }
+.persona-group { margin-bottom: 6px; }
+.persona-group-label { font-size: 10px; color: #a898b8; font-weight: 700; display: block; margin-bottom: 3px; }
+.persona-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.persona-chips .chip-sm.on { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
 .hotel-presets { display: flex; gap: 4px; flex-wrap: wrap; }
 .hotel-presets .chip-sm.on { background: #6366f1; color: #fff; border-color: #6366f1; }
 .hotel-custom { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
@@ -535,6 +572,10 @@ function openHotelNav(h) {
 .hotel-item:hover { border-color: #8b5cf6; box-shadow: 0 2px 8px rgba(139,92,246,.12); }
 .h-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .h-name { font-size: 13px; font-weight: 700; color: #4a3f55; flex: 1; }
+.h-match { font-size: 10px; font-weight: 800; border-radius: 5px; padding: 1px 7px; color: #fff; flex-shrink: 0; }
+.h-match.high { background: #16a34a; }
+.h-match.mid { background: #f59e0b; }
+.h-match.low { background: #a898b8; }
 .h-badge { font-size: 9px; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
 .h-badge.good { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .h-badge.ref { background: #faf7fc; color: #8a7a98; border: 1px solid #e5dcec; }
@@ -546,5 +587,8 @@ function openHotelNav(h) {
 .h-rating.chain { color: #0f6e56; }
 .h-rating.bnb { color: #d4537e; }
 .h-dist { font-size: 11px; color: #8a7a98; margin-left: auto; }
+.h-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; align-items: center; }
+.h-tag { font-size: 9px; background: #f3f0f7; color: #7c6fd8; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+.h-mall { font-size: 9px; color: #a898b8; margin-left: auto; }
 .hotel-empty { text-align: center; color: #a898b8; font-size: 11px; padding: 14px 8px; }
 </style>
