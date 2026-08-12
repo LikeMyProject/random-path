@@ -1,217 +1,369 @@
 // ============================================================
 // 旅行攻略长图生成 useShareGuide.js
-// Canvas 手绘长图（750px 宽，动态高度），白底清晰排版：
-//   标题 / 行程总览 / 城市间交通 / 每日行程 / 天气 / 预算 /
+// 小红书/马蜂窝风长图（750px 宽，动态高度），完整重设计：
+//   顶部 banner / 行程总览 / 每日行程卡 / 天气 / 预算可视化 /
 //   精选酒店 / 必吃美食 / 实用贴士 / footer
-// 复用 useShareCard.shareImage 实现下载与系统分享
 // ============================================================
 import { shareImage } from './useShareCard.js'
 
-const W = 750, M = 36, CW = W - M * 2
+const W = 750, M = 0, CW = 750
 const FONT = '"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif'
+
 const C = {
-  bg: '#ffffff', text: '#3c3844', sub: '#8a8098', mute: '#b0a3bc',
-  primary: '#e27790', purple: '#7c3aed', green: '#0f6e56', orange: '#f0a870',
-  blue: '#185fa5', line: '#f0eef5', card: '#faf8fd',
+  bg: '#f5f3f7',
+  card: '#ffffff',
+  ink: '#1e1b4b',
+  text: '#4a3f55',
+  sub: '#8a7a98',
+  mute: '#b0a3bc',
+  line: '#ece6f0',
+  purple: '#7c3aed', pBg: '#f8f6ff',
+  pink: '#e27790', pnkBg: '#fff5f8',
+  orange: '#f59e0b', oBg: '#fff7e6',
+  green: '#10b981', gBg: '#ecfdf5',
+  blue: '#3b82f6', bBg: '#eff6ff',
+  red: '#ef4444',
 }
 
-function fmtD(d) {
+function fmtMD(d) {
   if (!d) return ''
-  const m = d.getMonth() + 1, day = d.getDate()
-  return `${m}月${day}日`
+  return `${d.getMonth() + 1}月${d.getDate()}日`
 }
 function truncate(s, max) {
-  const t = String(s || '')
-  return t.length > max ? t.slice(0, max - 1) + '…' : t
+  s = String(s || '')
+  return s.length > max ? s.slice(0, max - 1) + '…' : s
+}
+function wrap(ctx, text, x, y, maxW, lineH = 22) {
+  // 简单换行（按字符宽度估算）
+  const lines = []
+  let cur = ''
+  for (const ch of String(text)) {
+    const w = ctx.measureText(cur + ch).width
+    if (w > maxW && cur) { lines.push(cur); cur = ch }
+    else cur += ch
+  }
+  if (cur) lines.push(cur)
+  let yy = y
+  for (const ln of lines) { ctx.fillText(ln, x, yy); yy += lineH }
+  return yy
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+function drawStar(ctx, cx, cy, size, color) {
+  ctx.fillStyle = color
+  ctx.beginPath()
+  const spikes = 5
+  const outer = size, inner = size * 0.4
+  let rot = -Math.PI / 2
+  for (let i = 0; i < spikes; i++) {
+    ctx.lineTo(cx + Math.cos(rot) * outer, cy + Math.sin(rot) * outer)
+    rot += Math.PI / spikes
+    ctx.lineTo(cx + Math.cos(rot) * inner, cy + Math.sin(rot) * inner)
+    rot += Math.PI / spikes
+  }
+  ctx.closePath()
+  ctx.fill()
 }
 
 /**
  * 生成攻略长图 canvas
- * @param {Object} plan buildFullPlan 结果
- * @param {Object|null} hotel 用户选择的酒店（可空）
  */
 export function generateGuideImage(plan, hotel) {
-  const rows = []
+  const M = 30 // 卡片左右留白
+  const X = M // 内容起始 X
+  const rows = [] // 渲染段 [{h, fn}]
   let totalH = 0
   function add(h, fn) { rows.push({ h, fn }); totalH += h }
-  function title(t, y, color, size, bold = true) {
-    return { t, y, color, size, bold }
-  }
 
-  // ===== 标题区 =====
-  add(150, (ctx, y) => {
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-    ctx.fillStyle = '#1e1b4b'; ctx.font = `bold 40px ${FONT}`
-    ctx.fillText('🚴 RandomPath 旅行攻略', M, y + 16)
-    ctx.fillStyle = C.primary; ctx.font = `bold 26px ${FONT}`
-    ctx.fillText(plan.cities.join(' → '), M, y + 76)
-    ctx.fillStyle = C.sub; ctx.font = `18px ${FONT}`
-    ctx.fillText(`${plan.startDate} ~ ${plan.endDate} · 共 ${plan.totalDays} 天 · ${plan.paceLabel}节奏`, M, y + 114)
+  // ===== 顶部 Banner（紫色渐变 200px）=====
+  add(220, (ctx, y) => {
+    // 渐变背景
+    const grad = ctx.createLinearGradient(0, y, W, y + 220)
+    grad.addColorStop(0, '#7c3aed'); grad.addColorStop(1, '#312e81')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, y, W, 220)
+    // 顶部小标识
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = `bold 18px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+    ctx.fillText('🚴 RandomPath', X + 10, y + 20)
+    // 主标题
+    ctx.fillStyle = '#ffffff'; ctx.font = `bold 52px ${FONT}`
+    ctx.fillText('旅行攻略', X + 10, y + 50)
+    // 城市链 chip
+    const cities = plan.cities
+    let cx = X + 10
+    ctx.font = `bold 26px ${FONT}`
+    cities.forEach((c, i) => {
+      const w = ctx.measureText(c).width + 32
+      ctx.fillStyle = i === 0 ? '#ffffff' : 'rgba(255,255,255,0.2)'
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'
+      roundRect(ctx, cx, y + 130, w, 42, 21); ctx.fill()
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1
+      roundRect(ctx, cx, y + 130, w, 42, 21); ctx.stroke()
+      ctx.fillStyle = '#ffffff'; ctx.textBaseline = 'middle'
+      ctx.fillText(c, cx + 16, y + 151)
+      cx += w + 8
+      if (i < cities.length - 1) {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'
+        ctx.fillText('→', cx + 6, y + 151)
+        cx += 24
+      }
+    })
+    // 行程信息
+    ctx.textBaseline = 'top'
+    ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = `18px ${FONT}`
+    ctx.fillText(`${plan.startDate} ~ ${plan.endDate}  ·  共 ${plan.totalDays} 天  ·  ${plan.paceLabel}节奏`, X + 10, y + 184)
   })
 
-  // ===== 行程总览 =====
-  add(52, (ctx, y) => {
-    ctx.fillStyle = C.purple; ctx.font = `bold 24px ${FONT}`; ctx.fillText('📋 行程总览', M, y)
-    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-  })
-  plan.cityPlans.forEach(cp => {
-    add(34, (ctx, y) => {
-      ctx.fillStyle = C.text; ctx.font = `bold 20px ${FONT}`
-      ctx.fillText(cp.name, M, y + 2)
-      ctx.fillStyle = C.sub; ctx.font = `18px ${FONT}`; ctx.textAlign = 'right'
-      ctx.fillText(`${cp.days} 天 · ${fmtD(cp.dateRange.start)}~${fmtD(cp.dateRange.end)}`, W - M, y + 3)
-      ctx.textAlign = 'left'
+  // ===== 行程总览卡片 =====
+  add(60 + 38 * plan.cityPlans.length, (ctx, y) => {
+    y += 16
+    drawCardTitle(ctx, X, y, '🗺️ 行程总览', C.purple)
+    y += 50
+    // 每城一行
+    plan.cityPlans.forEach(cp => {
+      ctx.fillStyle = C.card
+      roundRect(ctx, X, y, CW - M * 2, 30, 8); ctx.fill()
+      ctx.strokeStyle = C.line; ctx.lineWidth = 1
+      roundRect(ctx, X, y, CW - M * 2, 30, 8); ctx.stroke()
+      ctx.fillStyle = C.text; ctx.font = `bold 17px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
+      ctx.fillText(`📍 ${cp.name}`, X + 14, y + 15)
+      ctx.fillStyle = C.purple; ctx.font = `bold 14px ${FONT}`; ctx.textAlign = 'right'
+      const dateStr = `${fmtMD(cp.dateRange.start)}~${fmtMD(cp.dateRange.end)}`
+      const dateW = ctx.measureText(dateStr).width
+      ctx.fillText(dateStr, X + CW - M * 2 - 14 - dateW, y + 15)
+      ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`
+      ctx.fillText(`${cp.days} 天`, X + CW - M * 2 - 14, y + 15)
+      y += 38
     })
   })
 
   // ===== 城市间交通 =====
   if (plan.transports.length) {
-    add(52, (ctx, y) => {
-      ctx.fillStyle = C.blue; ctx.font = `bold 24px ${FONT}`; ctx.fillText('🚄 城市间交通', M, y)
-      ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-    })
-    plan.transports.forEach(t => {
-      add(32, (ctx, y) => {
-        ctx.fillStyle = C.text; ctx.font = `19px ${FONT}`
-        ctx.fillText(`${t.from} → ${t.to}`, M, y + 3)
+    add(60 + 34 * plan.transports.length, (ctx, y) => {
+      y += 16
+      drawCardTitle(ctx, X, y, '🚄 城市间交通', C.blue)
+      y += 50
+      plan.transports.forEach(t => {
+        ctx.fillStyle = C.bBg
+        roundRect(ctx, X, y, CW - M * 2, 26, 6); ctx.fill()
+        ctx.fillStyle = C.text; ctx.font = `bold 15px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+        ctx.fillText(`🚄 ${t.from}  →  ${t.to}`, X + 12, y + 13)
         ctx.fillStyle = C.sub; ctx.textAlign = 'right'
-        ctx.fillText(`${t.mode} 约 ${t.hours} 小时${t.estimated ? '（估算）' : ''}`, W - M, y + 3)
-        ctx.textAlign = 'left'
+        ctx.fillText(`${t.mode} 约 ${t.hours}h${t.estimated ? '（估算）' : ''}`, X + CW - M * 2 - 12, y + 13)
+        y += 34
       })
     })
   }
 
-  // ===== 每日行程 =====
+  // ===== 每日行程（核心，每城一节）=====
   plan.cityPlans.forEach(cp => {
-    add(50, (ctx, y) => {
-      ctx.fillStyle = C.primary; ctx.font = `bold 24px ${FONT}`
-      ctx.fillText(`🏙 ${cp.name}（${cp.days} 天）`, M, y)
-      ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
+    // 城市节标题
+    add(50 + 12 + (110 + 36 * cp.daily.reduce((m, d) => m + 1 + d.slots.length, 0)), (ctx, y) => {
+      y += 16
+      // 城市标题栏（紫色条）
+      ctx.fillStyle = C.purple
+      roundRect(ctx, X, y, CW - M * 2, 44, 10); ctx.fill()
+      ctx.fillStyle = '#ffffff'; ctx.font = `bold 20px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+      ctx.fillText(`🏙 ${cp.name}（${cp.days} 天）`, X + 16, y + 22)
+      ctx.textAlign = 'right'
+      ctx.font = `14px ${FONT}`
+      ctx.fillText(`${fmtMD(cp.dateRange.start)} ~ ${fmtMD(cp.dateRange.end)}`, X + CW - M * 2 - 16, y + 22)
     })
+
+    // 每天一张卡片
     cp.daily.forEach(d => {
-      const parts = d.slots.map(s => `${s.periodLabel}·${s.attraction.name}`)
-      const line = truncate(parts.join('  '), 34)
-      add(36, (ctx, y) => {
-        ctx.fillStyle = C.orange; ctx.font = `bold 18px ${FONT}`
-        ctx.fillText(`D${d.day}`, M, y + 2)
-        ctx.fillStyle = C.text; ctx.font = `18px ${FONT}`; ctx.textAlign = 'left'
-        ctx.fillText(truncate(line, 42), M + 52, y + 3)
-        if (d.slots.length === 0) { ctx.fillStyle = C.mute; ctx.fillText('自由活动/机动', M + 52, y + 3) }
+      add(90 + 36 * d.slots.length, (ctx, y) => {
+        // 日期头部（彩色条 + 星期 + 天气）
+        const dayColor = C.orange
+        ctx.fillStyle = C.card
+        roundRect(ctx, X, y, CW - M * 2, 90 + 36 * d.slots.length, 14); ctx.fill()
+        ctx.strokeStyle = C.line; ctx.lineWidth = 1
+        roundRect(ctx, X, y, CW - M * 2, 90 + 36 * d.slots.length, 14); ctx.stroke()
+        // 左侧色条
+        ctx.fillStyle = dayColor
+        roundRect(ctx, X, y, 5, 90 + 36 * d.slots.length, 2); ctx.fill()
+        // 日期标题
+        const dayY = y + 18
+        ctx.fillStyle = dayColor; ctx.font = `bold 22px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+        ctx.fillText(`D${d.day}`, X + 22, dayY)
+        ctx.fillStyle = C.text; ctx.font = `bold 18px ${FONT}`
+        ctx.fillText(truncate(d.dateLabel || '', 16), X + 70, dayY + 2)
+        // 天气
+        const wt = cp.monthly[d.day - 1]
+        if (wt) {
+          ctx.fillStyle = C.sub; ctx.font = `14px ${FONT}`; ctx.textAlign = 'right'
+          ctx.fillText(`${wt.low}~${wt.high}°C · ${wt.feel}`, X + CW - M * 2 - 14, dayY + 4)
+        }
+        // 槽位
+        let sy = y + 56
+        d.slots.forEach(s => {
+          drawSlot(ctx, X + 16, sy, CW - M * 2 - 32, s, dayColor)
+          sy += 36
+        })
       })
     })
   })
 
-  // ===== 天气 =====
-  add(52, (ctx, y) => {
-    ctx.fillStyle = C.orange; ctx.font = `bold 24px ${FONT}`; ctx.fillText('🌤 天气提示', M, y)
-    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-  })
-  plan.cityPlans.forEach(cp => {
-    const w = cp.weather
-    if (!w) return
-    add(32, (ctx, y) => {
-      ctx.fillStyle = C.text; ctx.font = `18px ${FONT}`
-      ctx.fillText(`${cp.name} ${w.month}月 ${w.low}~${w.high}°C · ${w.feel}`, M, y + 3)
-      ctx.fillStyle = C.sub
-      ctx.fillText(`建议${w.clothing}`, M + 300, y + 3)
+  // ===== 天气 + 穿衣 =====
+  add(60 + 50 * plan.cityPlans.length, (ctx, y) => {
+    y += 16
+    drawCardTitle(ctx, X, y, '☀️ 天气 & 穿衣', C.orange)
+    y += 50
+    plan.cityPlans.forEach(cp => {
+      const w = cp.weather
+      if (!w) return
+      ctx.fillStyle = C.oBg
+      roundRect(ctx, X, y, CW - M * 2, 42, 8); ctx.fill()
+      ctx.fillStyle = C.text; ctx.font = `bold 16px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+      ctx.fillText(`${cp.name}  ${w.month}月`, X + 14, y + 21)
+      ctx.fillStyle = C.orange; ctx.font = `bold 18px ${FONT}`
+      ctx.fillText(`${w.low}~${w.high}°C`, X + 130, y + 21)
+      ctx.fillStyle = C.sub; ctx.font = `14px ${FONT}`; ctx.textAlign = 'right'
+      ctx.fillText(`${w.feel} · ${w.clothing}`, X + CW - M * 2 - 14, y + 21)
+      y += 50
     })
   })
 
-  // ===== 预算 =====
-  add(52, (ctx, y) => {
-    ctx.fillStyle = C.green; ctx.font = `bold 24px ${FONT}`; ctx.fillText('💰 预算参考（人均）', M, y)
-    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-  })
-  plan.budget.items.forEach(it => {
-    add(30, (ctx, y) => {
-      ctx.fillStyle = C.sub; ctx.font = `18px ${FONT}`
-      ctx.fillText(it.label, M, y + 3)
-      ctx.textAlign = 'right'; ctx.fillStyle = C.text; ctx.font = `bold 18px ${FONT}`
-      ctx.fillText(it.value, W - M, y + 3); ctx.textAlign = 'left'
+  // ===== 预算（条形可视化）=====
+  add(70 + 56 * plan.budget.items.length, (ctx, y) => {
+    y += 16
+    drawCardTitle(ctx, X, y, '💰 预算参考（人均）', C.green)
+    y += 50
+    const totalHigh = plan.budget.total[1]
+    plan.budget.items.forEach(it => {
+      // 解析数字
+      const m = String(it.value).match(/\d+/g)
+      const val = m ? m.map(Number).reduce((a, b) => a + b, 0) / m.length : 0
+      const pct = totalHigh ? Math.min(100, val / totalHigh * 100) : 0
+      ctx.fillStyle = C.gBg
+      roundRect(ctx, X, y, CW - M * 2, 48, 8); ctx.fill()
+      ctx.fillStyle = C.text; ctx.font = `15px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+      ctx.fillText(it.label, X + 14, y + 8)
+      ctx.fillStyle = C.green; ctx.font = `bold 15px ${FONT}`; ctx.textAlign = 'right'
+      ctx.fillText(it.value, X + CW - M * 2 - 14, y + 8)
+      // 条
+      const barW = CW - M * 2 - 28
+      ctx.fillStyle = '#d1fae5'; roundRect(ctx, X + 14, y + 32, barW, 6, 3); ctx.fill()
+      ctx.fillStyle = C.green; roundRect(ctx, X + 14, y + 32, barW * pct / 100, 6, 3); ctx.fill()
+      y += 56
     })
-  })
-  add(38, (ctx, y) => {
-    ctx.fillStyle = C.primary; ctx.font = `bold 20px ${FONT}`
-    ctx.fillText(`合计 ¥${plan.budget.total[0]} ~ ¥${plan.budget.total[1]}`, M, y)
+    // 合计
+    ctx.fillStyle = C.green
+    roundRect(ctx, X, y, CW - M * 2, 44, 10); ctx.fill()
+    ctx.fillStyle = '#ffffff'; ctx.font = `bold 18px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+    ctx.fillText(`人均合计`, X + 16, y + 22)
+    ctx.textAlign = 'right'
+    ctx.fillText(`¥${plan.budget.total[0]} ~ ¥${plan.budget.total[1]}`, X + CW - M * 2 - 16, y + 22)
   })
 
   // ===== 精选酒店 =====
-  add(52, (ctx, y) => {
-    ctx.fillStyle = C.purple; ctx.font = `bold 24px ${FONT}`; ctx.fillText('🏨 精选酒店', M, y)
-    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-  })
-  if (hotel) {
-    // 酒店卡片
-    add(100, (ctx, y) => {
-      ctx.fillStyle = C.card
-      roundRect(ctx, M, y, CW, 92, 14); ctx.fill()
-      ctx.strokeStyle = '#e5e0f5'; ctx.lineWidth = 1
-      roundRect(ctx, M, y, CW, 92, 14); ctx.stroke()
-      ctx.fillStyle = C.text; ctx.font = `bold 22px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-      ctx.fillText(truncate(hotel.name, 22), M + 18, y + 14)
-      if (hotel.city) { ctx.fillStyle = C.mute; ctx.font = `15px ${FONT}`; ctx.fillText(`📍 ${hotel.city}`, W - M - 18, y + 16) }
-      ctx.fillStyle = C.primary; ctx.font = `bold 18px ${FONT}`
-      ctx.fillText(formatPrice(hotel), M + 18, y + 48)
-      ctx.fillStyle = C.sub; ctx.font = `17px ${FONT}`
-      ctx.fillText(`${formatRating(hotel)} · 距 ${hotel.attraction} ${formatDist(hotel)}`, M + 150, y + 50)
-      if (hotel.tags?.length) {
-        ctx.fillStyle = C.purple; ctx.font = `16px ${FONT}`
-        ctx.fillText(truncate(hotel.tags.join(' · '), 30), M + 18, y + 72)
+  add(140, (ctx, y) => {
+    y += 16
+    drawCardTitle(ctx, X, y, '🏨 精选酒店', C.pink)
+    y += 50
+    if (hotel) {
+      ctx.fillStyle = C.pnkBg
+      roundRect(ctx, X, y, CW - M * 2, 100, 14); ctx.fill()
+      ctx.strokeStyle = '#fbd5e0'; ctx.lineWidth = 1
+      roundRect(ctx, X, y, CW - M * 2, 100, 14); ctx.stroke()
+      // 名称 + 城市
+      ctx.fillStyle = C.pink; ctx.font = `bold 22px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+      ctx.fillText(truncate(hotel.name, 20), X + 18, y + 14)
+      if (hotel.city) {
+        ctx.fillStyle = '#fff'; ctx.font = `bold 13px ${FONT}`
+        const tagW = hotel.city.length * 14 + 16
+        roundRect(ctx, X + CW - M * 2 - tagW - 12, y + 14, tagW, 22, 11); ctx.fill()
+        ctx.fillStyle = C.pink
+        ctx.fillText(`📍 ${hotel.city}`, X + CW - M * 2 - tagW - 4, y + 18)
       }
-    })
-  } else {
-    add(34, (ctx, y) => {
-      ctx.fillStyle = C.mute; ctx.font = `18px ${FONT}`
-      ctx.fillText('（未选择酒店，可在生成前挑选）', M, y + 3)
-    })
-  }
+      // 价格 + 评分
+      ctx.fillStyle = C.pink; ctx.font = `bold 18px ${FONT}`; ctx.textBaseline = 'top'
+      ctx.fillText(formatPrice(hotel), X + 18, y + 48)
+      ctx.fillStyle = C.text; ctx.font = `15px ${FONT}`
+      ctx.fillText(`${formatRating(hotel)} · 距 ${hotel.attraction} ${formatDist(hotel)}`, X + 18, y + 76)
+      // 匹配标签
+      if (hotel.tags?.length) {
+        let tx = X + CW - M * 2 - 14
+        hotel.tags.slice(0, 3).reverse().forEach(t => {
+          ctx.font = `12px ${FONT}`
+          const w = ctx.measureText(t).width + 16
+          tx -= (w + 6)
+          ctx.fillStyle = '#ffffff'; roundRect(ctx, tx, y + 78, w, 18, 9); ctx.fill()
+          ctx.strokeStyle = C.pink; ctx.lineWidth = 1
+          roundRect(ctx, tx, y + 78, w, 18, 9); ctx.stroke()
+          ctx.fillStyle = C.pink; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
+          ctx.fillText(t, tx + w / 2, y + 87)
+        })
+      }
+    } else {
+      ctx.fillStyle = C.card
+      roundRect(ctx, X, y, CW - M * 2, 40, 8); ctx.fill()
+      ctx.fillStyle = C.mute; ctx.font = `13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
+      ctx.fillText('（未选择酒店，可分享前在弹窗挑选）', X + (CW - M * 2) / 2, y + 20)
+    }
+  })
 
   // ===== 必吃美食 =====
-  add(52, (ctx, y) => {
-    ctx.fillStyle = '#d4537e'; ctx.font = `bold 24px ${FONT}`; ctx.fillText('🍜 必吃美食', M, y)
-    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-  })
-  plan.cityPlans.forEach(cp => {
-    const line = truncate(cp.data.foods.map(f => `${f.name}(${f.price})`).join('  '), 40)
-    add(32, (ctx, y) => {
-      ctx.fillStyle = C.text; ctx.font = `bold 18px ${FONT}`
-      ctx.fillText(`${cp.name}：`, M, y + 3)
-      ctx.fillStyle = C.sub; ctx.font = `18px ${FONT}`
-      ctx.fillText(truncate(line, 34), M + 110, y + 3)
+  add(50 + 32 * plan.cityPlans.length, (ctx, y) => {
+    y += 16
+    drawCardTitle(ctx, X, y, '🍜 必吃美食', C.red)
+    y += 50
+    plan.cityPlans.forEach(cp => {
+      ctx.fillStyle = '#fff5f5'
+      roundRect(ctx, X, y, CW - M * 2, 24, 6); ctx.fill()
+      ctx.fillStyle = C.text; ctx.font = `bold 14px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+      ctx.fillText(`${cp.name}:`, X + 12, y + 12)
+      const line = truncate(cp.data.foods.map(f => `${f.name} ${f.price}`).join('  ·  '), 42)
+      ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`; ctx.textAlign = 'right'
+      ctx.fillText(line, X + CW - M * 2 - 12, y + 12)
+      y += 32
     })
   })
 
   // ===== 实用贴士 =====
-  add(52, (ctx, y) => {
-    ctx.fillStyle = C.blue; ctx.font = `bold 24px ${FONT}`; ctx.fillText('💡 实用贴士', M, y)
-    ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(M, y + 34); ctx.lineTo(W - M, y + 34); ctx.stroke()
-  })
-  plan.cityPlans.forEach(cp => {
-    cp.data.tips.forEach(t => {
-      add(32, (ctx, y) => {
-        ctx.fillStyle = C.sub; ctx.font = `17px ${FONT}`
-        ctx.fillText(truncate(`【${cp.name}】${t}`, 42), M, y + 3)
+  const totalTips = plan.cityPlans.reduce((s, cp) => s + cp.data.tips.length, 0)
+  add(50 + 26 * totalTips, (ctx, y) => {
+    y += 16
+    drawCardTitle(ctx, X, y, '💡 实用贴士', C.blue)
+    y += 50
+    plan.cityPlans.forEach(cp => {
+      cp.data.tips.forEach(t => {
+        ctx.fillStyle = C.bBg
+        roundRect(ctx, X, y, CW - M * 2, 22, 6); ctx.fill()
+        ctx.fillStyle = C.text; ctx.font = `13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+        ctx.fillText(`💡 【${cp.name}】${truncate(t, 36)}`, X + 12, y + 11)
+        y += 26
       })
     })
   })
 
-  // ===== footer =====
+  // ===== Footer =====
   add(80, (ctx, y) => {
-    ctx.fillStyle = C.mute; ctx.font = `16px ${FONT}`; ctx.textAlign = 'center'
+    y += 16
+    ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`; ctx.textAlign = 'center'
     const now = new Date()
-    ctx.fillText(`RandomPath · 骑行 & 旅行攻略 · ${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`, W / 2, y + 20)
+    ctx.fillText(`🚴 RandomPath · 骑行 & 旅行攻略`, X + (CW - M * 2) / 2, y + 10)
+    ctx.fillStyle = C.mute
+    ctx.fillText(`radom-path-vue.vercel.app  ·  生成于 ${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`, X + (CW - M * 2) / 2, y + 36)
     ctx.textAlign = 'left'
   })
 
-  // 创建 canvas
+  // ===== 创建 canvas 并逐段渲染 =====
   const canvas = document.createElement('canvas')
   canvas.width = W
-  canvas.height = totalH + 40
+  canvas.height = totalH
   const ctx = canvas.getContext('2d')
   ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.fillRect(0, 0, W, canvas.height)
 
-  let y = 20
+  let y = 0
   for (const r of rows) {
     ctx.save()
     r.fn(ctx, y)
@@ -221,12 +373,50 @@ export function generateGuideImage(plan, hotel) {
   return canvas
 }
 
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath()
+function drawCardTitle(ctx, x, y, title, accentColor) {
+  ctx.fillStyle = accentColor
+  roundRect(ctx, x, y, 4, 26, 2); ctx.fill()
+  ctx.fillStyle = C.ink; ctx.font = `bold 22px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+  ctx.fillText(title, x + 14, y)
+}
+
+function drawSlot(ctx, x, y, w, s, dayColor) {
+  const isMeal = !!s.meal
+  const isFree = s.period === 'free'
+  // 背景
+  ctx.fillStyle = isMeal ? '#fff5f8' : isFree ? '#faf8fd' : '#ffffff'
+  roundRect(ctx, x, y, w, 28, 6); ctx.fill()
+  ctx.strokeStyle = isMeal ? '#fbd5e0' : isFree ? '#ece6f0' : C.line; ctx.lineWidth = 1
+  roundRect(ctx, x, y, w, 28, 6); ctx.stroke()
+  // 左侧时段标签
+  const periodLabel = s.periodLabel || '时段'
+  const tagW = 44
+  ctx.fillStyle = isMeal ? C.pink : isFree ? C.mute : dayColor
+  roundRect(ctx, x, y, tagW, 28, 6); ctx.fill()
+  ctx.fillStyle = '#ffffff'; ctx.font = `bold 11px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
+  ctx.fillText(periodLabel, x + tagW / 2, y + 14)
+  // 内容
+  ctx.fillStyle = isMeal ? C.pink : isFree ? C.sub : C.ink; ctx.font = `bold 13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+  ctx.textAlign = 'left'
+  if (isMeal) {
+    ctx.fillText(`🍴 ${truncate(s.meal.name, 14)}`, x + tagW + 8, y + 14)
+    ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`
+    ctx.fillText(`${s.meal.price}`, x + w - 8 - ctx.measureText(s.meal.price).width, y + 14)
+  } else if (isFree) {
+    ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`
+    ctx.fillText(truncate(s.attraction.name, 22) + (s.attraction.desc ? `  ·  ${s.attraction.desc}` : ''), x + tagW + 8, y + 14)
+  } else {
+    ctx.fillText(truncate(s.attraction.name, 14), x + tagW + 8, y + 14)
+    const meta = []
+    if (s.attraction.ticket) meta.push(`🎫 ${s.attraction.ticket}`)
+    if (s.attraction.duration) meta.push(`⏱ ${s.attraction.duration}`)
+    const metaText = meta.join(' · ')
+    if (metaText) {
+      ctx.fillStyle = C.sub; ctx.font = `11px ${FONT}`
+      ctx.fillText(truncate(metaText, 28), x + tagW + 8, y + 26 - 12 + 14)
+      // 简短描述另起一行（紧凑）
+    }
+  }
 }
 
 function formatPrice(h) {
@@ -236,7 +426,7 @@ function formatPrice(h) {
 }
 function formatRating(h) {
   if (h.rating != null) return `${h.rating} 分`
-  if (h.reputation) return `${h.reputation.label}（参考）`
+  if (h.reputation) return `${h.reputation.label}`
   return '暂无评分'
 }
 function formatDist(h) {
