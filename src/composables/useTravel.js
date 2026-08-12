@@ -446,46 +446,38 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
       })
     }
 
+    // 判断某时段是否已被任何非餐食槽位占用（景点或本地地点）
+    function isPeriodFree(d, period) {
+      return !d.slots.some(s => !s.meal && s.period === period)
+    }
+
     cp.daily.forEach((d) => {
-      // 统计已有时段
-      const hasPeriod = (p) => d.slots.some(s => s.period === p && !s.meal)
-      const hasAfternoon = hasPeriod('afternoon')
-      const hasEvening = hasPeriod('evening')
+      // 统计景点数量（不含本地地点和餐食）
       const attractionCount = d.slots.filter(s => !s.meal && !s.local).length
 
-      // 每天至少分配1个本地地点
-      // 如果当天景点少（≤1）且没有下午内容，优先分配下午
-      // 如果没有晚上内容且有夜市类地点，分配晚上
-      const spot1 = pickSpot()
-      if (spot1) {
-        const isNight1 = spot1.category === 'nightmarket'
-        // 如果没有下午内容，优先填下午；夜市且没有晚上内容则填晚上
-        if (!hasAfternoon && !isNight1) {
-          insertLocalSlot(d, 'afternoon', spot1)
-        } else if (!hasEvening && isNight1) {
-          insertLocalSlot(d, 'evening', spot1)
-        } else {
-          insertLocalSlot(d, isNight1 ? 'evening' : 'afternoon', spot1)
-        }
-      }
+      // 景点少时多分配本地地点，确保 上午/下午/晚上 都有内容
+      const wantSpots = attractionCount <= 1 ? 2 : 1
 
-      // 如果当天景点很少（≤1），再分配一个填补另一个空时段
-      if (attractionCount <= 1) {
-        const spot2 = pickSpot()
-        if (spot2) {
-          const isNight2 = spot2.category === 'nightmarket'
-          const filledAfternoon = d.slots.some(s => s.period === 'afternoon' && s.local)
-          const filledEvening = d.slots.some(s => s.period === 'evening' && s.local)
-          if (!filledAfternoon && !isNight2) {
-            insertLocalSlot(d, 'afternoon', spot2)
-          } else if (!filledEvening && isNight2) {
-            insertLocalSlot(d, 'evening', spot2)
-          } else if (!filledAfternoon) {
-            insertLocalSlot(d, 'afternoon', spot2)
-          } else if (!filledEvening) {
-            insertLocalSlot(d, 'evening', spot2)
-          }
+      let placed = 0
+      let attempts = 0
+      while (placed < wantSpots && attempts++ < 3) {
+        const spot = pickSpot()
+        if (!spot) break
+
+        // 按优先级尝试插入时段：上午 > 下午 > 晚上（晚上最后才填，避免与主景点冲突）
+        let period = null
+        if (isPeriodFree(d, 'morning')) {
+          period = 'morning'
+        } else if (isPeriodFree(d, 'afternoon')) {
+          period = 'afternoon'
+        } else if (isPeriodFree(d, 'evening')) {
+          period = 'evening'
+        } else {
+          break  // 没有可填充的时段
         }
+
+        insertLocalSlot(d, period, spot)
+        placed++
       }
     })
   }
