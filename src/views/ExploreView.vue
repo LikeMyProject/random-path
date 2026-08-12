@@ -60,19 +60,31 @@ const DIST_RANGES = {
   random: { min: 10, max: 50, default: 25 },
 }
 
+// === 随便骑：真随机参数 ===
+const randomDist = ref(null)
+const randomDirKey = ref(null)
+const randomDirLabel = ref('🎲 随机')
+function rollRandom() {
+  randomDist.value = 10 + Math.floor(Math.random() * 41) // 10-50km
+  const dirs = COMPASS.filter(c => c.key !== 'random')
+  const d = dirs[Math.floor(Math.random() * dirs.length)]
+  randomDirKey.value = d.key
+  randomDirLabel.value = d.label
+}
+
 const distRange = computed(() => DIST_RANGES[scene.value] || null)
 
 watch(scene, (s) => {
-  if (s === 'random') { direction.value = 'random' }
+  if (s === 'random') { direction.value = 'random'; rollRandom() }
   else if (s === 'casual') { direction.value = 'random' }
-  else if (s === 'training') { direction.value = 'S' }
+  else if (s === 'training') { direction.value = 'random' }
   else if (s === 'destination') {
     destName.value = ''
     destCoord.value = null
     destEstimate.value = null
   }
-  // 切换场景时重置自定义距离为该场景默认值
-  if (s !== 'destination' && DIST_RANGES[s]) {
+  // 切换场景时重置自定义距离为该场景默认值（随便骑不用滑块）
+  if (s !== 'destination' && s !== 'random' && DIST_RANGES[s]) {
     customDist.value = DIST_RANGES[s].default
   }
 })
@@ -81,8 +93,7 @@ watch(scene, (s) => {
 const targetDist = computed(() => {
   if (scene.value === 'destination') return 20000
   if (scene.value === 'random') {
-    const d = customDist.value || (15 + Math.floor(Math.random() * 6) * 5)
-    return d * 1000
+    return (randomDist.value || 25) * 1000
   }
   if (customDist.value) return customDist.value * 1000
   const defaults = { casual: 12000, training: 30000 }
@@ -101,6 +112,7 @@ const workObj = computed(() => hasDest.value ? { name: to.value.name, lng: parse
 const loading = ref(false), loadingHint = ref(''), tryInfo = ref(''), progress = ref(0)
 const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
 const multiResults = ref([]), activeResultIdx = ref(0)
+const multiMode = ref(false) // 对比模式开关
 
 // === 沿途上下文 ===
 const { villages, supplyPoints, routeTags, loadContext } = useRouteContext()
@@ -116,6 +128,7 @@ onMounted(async () => {
 
   // 初始化距离滑块默认值
   customDist.value = DIST_RANGES[scene.value]?.default || null
+  if (scene.value === 'random') rollRandom()
 
   const last = loadLastRoute()
   if (last && (last.type === 'commute' || last.type === 'loop') && last.home) {
@@ -246,6 +259,17 @@ async function searchDestination() {
   destLoading.value = false
 }
 
+// === 统一生成入口 ===
+function handleGenerate() {
+  if (scene.value === 'destination') {
+    doGenerateRoundTrip()
+  } else if (multiMode.value) {
+    doGenerateMultiple()
+  } else {
+    doGenerate(false)
+  }
+}
+
 // === 生成路线 ===
 async function doGenerate(isRetry = false) {
   multiResults.value = []
@@ -258,7 +282,8 @@ async function doGenerate(isRetry = false) {
   if (!isRetry) { resultShow.value = false; multiResults.value = [] }
   loading.value = true; progress.value = 0; loadingHint.value = '正在规划路线…'; tryInfo.value = ''
   const td = targetDist.value
-  const dirDeg = COMPASS.find(c => c.key === direction.value)?.deg ?? null
+  const effDir = scene.value === 'random' ? randomDirKey.value : direction.value
+  const dirDeg = COMPASS.find(c => c.key === effDir)?.deg ?? null
   const onTry = (a, d, e) => {
     progress.value = Math.round((a / MAX_RETRIES) * 100)
     loadingHint.value = e ? `尝试第 ${a} 条路线…` : `已找到 ${(d/1000).toFixed(1)} km 路线，验证中…`
@@ -287,7 +312,8 @@ async function doGenerateMultiple() {
   const w = hasDest.value ? { name: to.value.name, lng: parseFloat(to.value.lng), lat: parseFloat(to.value.lat) } : h
   const isLoop = h.lng === w.lng && h.lat === w.lat
   const td = targetDist.value
-  const dirDeg = COMPASS.find(c => c.key === direction.value)?.deg ?? null
+  const effDir = scene.value === 'random' ? randomDirKey.value : direction.value
+  const dirDeg = COMPASS.find(c => c.key === effDir)?.deg ?? null
   loading.value = true; loadingHint.value = '正在同时生成 3 条路线…'
   try {
     const opts = isLoop
@@ -452,8 +478,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <p class="section-title">今天想怎么骑？</p>
   <SceneCards v-model="scene" />
 
-  <!-- 距离滑块（非目的地模式） -->
-  <div v-if="scene !== 'destination' && distRange" class="dist-card">
+  <!-- 距离滑块（仅休闲骑/训练骑） -->
+  <div v-if="(scene === 'casual' || scene === 'training') && distRange" class="dist-card">
     <div class="dist-header">
       <span class="dist-label">骑行距离</span>
       <span class="dist-value">{{ customDist || distRange.default }} <small>km</small></span>
@@ -470,6 +496,30 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       <span>{{ distRange.min }} km</span>
       <span class="dist-time">约 {{ estimatedTime }} 分钟</span>
       <span>{{ distRange.max }} km</span>
+    </div>
+  </div>
+
+  <!-- 随便骑：随机参数展示 -->
+  <div v-if="scene === 'random'" class="random-card">
+    <div class="random-display">
+      <div class="random-item">
+        <span class="random-label">距离</span>
+        <span class="random-value">{{ randomDist || '??' }} <small>km</small></span>
+      </div>
+      <div class="random-sep">·</div>
+      <div class="random-item">
+        <span class="random-label">方向</span>
+        <span class="random-value">{{ randomDirLabel }}</span>
+      </div>
+    </div>
+    <button class="btn-reroll" @click="rollRandom">🎲 换一组</button>
+  </div>
+
+  <!-- 训练骑：方向选择器 -->
+  <div v-if="scene === 'training'" class="dir-inline">
+    <span class="dir-inline-label">方向偏好</span>
+    <div class="dir-chips">
+      <button v-for="d in COMPASS" :key="d.key" :class="['dir-chip',{active:direction===d.key}]" @click="direction=d.key">{{ d.label }}</button>
     </div>
   </div>
 
@@ -496,37 +546,36 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
         <span class="dest-total">来回 {{ destEstimate.roundKm }}km · 约{{ Math.round(destEstimate.roundMin / 60) }}小时</span>
       </div>
     </div>
+    <div v-else class="dest-hint">💡 搜索目的地后，自动规划去程 + 返程路线</div>
   </div>
 
-  <!-- 大按钮 -->
+  <!-- 对比模式开关（非目的地模式） -->
+  <div v-if="scene !== 'destination'" class="multi-toggle">
+    <div class="multi-toggle-info">
+      <span class="multi-toggle-label">对比模式</span>
+      <small>{{ multiMode ? '一次生成 3 条路线对比' : '生成 1 条路线' }}</small>
+    </div>
+    <label class="switch">
+      <input type="checkbox" v-model="multiMode">
+      <span class="track"><span class="thumb"></span></span>
+    </label>
+  </div>
+
+  <!-- 生成按钮 -->
   <button
     class="btn-go"
-    :disabled="loading"
-    @click="scene === 'destination' ? doGenerateRoundTrip() : doGenerate(false)"
+    :disabled="loading || (scene === 'destination' && !destCoord)"
+    @click="handleGenerate"
   >
     {{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : scene === 'training' ? '🏋 开始训练！' : '🎯 骑过去！' }}
-  </button>
-  <button
-    v-if="scene !== 'destination'"
-    class="btn-multi"
-    :disabled="loading"
-    @click="doGenerateMultiple"
-  >
-    📋 多生成几条对比
   </button>
 
   <!-- 高级选项折叠 -->
   <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
-    <span>更多选项（方向 · 起终点）</span>
+    <span>编辑起终点</span>
     <span class="arrow" :class="{ open: showAdvanced }">▾</span>
   </div>
   <div v-if="showAdvanced" class="advanced-panel">
-    <!-- 方向 -->
-    <label class="adv-label">方向偏好</label>
-    <div class="compass-grid">
-      <button v-for="d in COMPASS" :key="d.key" :class="['chip', { active: direction === d.key }]" @click="direction = d.key">{{ d.label }}</button>
-    </div>
-
     <!-- 起终点 -->
     <div class="addr-row">
       <label class="field-label">起点</label>
@@ -895,6 +944,169 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .btn-multi:disabled { opacity: .5; cursor: not-allowed; }
 
+/* === 随便骑：随机参数卡片 === */
+.random-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, var(--accent-soft), #f7f5fa);
+  border-radius: 16px;
+  margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+}
+.random-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+.random-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.random-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a898b8;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.random-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -.5px;
+}
+.random-value small {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: .6;
+}
+.random-sep {
+  font-size: 20px;
+  color: #d0c8d8;
+  font-weight: 400;
+}
+.btn-reroll {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .15s;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.btn-reroll:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+.btn-reroll:active { transform: scale(.92); }
+
+/* === 训练骑：行内方向选择器 === */
+.dir-inline {
+  padding: 14px 16px;
+  background: #fff;
+  border-radius: 14px;
+  margin-top: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+}
+.dir-inline-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5e5468;
+  display: block;
+  margin-bottom: 8px;
+}
+.dir-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dir-chip {
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: none;
+  background: #f7f5fa;
+  color: #7a6c8a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.dir-chip:hover { background: var(--accent-soft); color: var(--accent); }
+.dir-chip.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25);
+}
+
+/* === 对比模式开关 === */
+.multi-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-top: 14px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+}
+.multi-toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.multi-toggle-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5e5468;
+}
+.multi-toggle-info small {
+  font-size: 11px;
+  color: #a898b8;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 28px;
+  cursor: pointer;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch .track {
+  position: absolute;
+  inset: 0;
+  background: #e0dae8;
+  border-radius: 14px;
+  transition: background .25s;
+}
+.switch .thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+.switch input:checked + .track {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.switch input:checked + .track .thumb {
+  transform: translateX(20px);
+}
+
 /* === 高级面板 === */
 .advanced-toggle {
   display: flex;
@@ -1040,6 +1252,15 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .dest-est-row:last-child { margin-bottom: 0; }
 .dest-total { font-weight: 800; color: var(--accent); }
+.dest-hint {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #f7f5fa;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #a898b8;
+  text-align: center;
+}
 
 .btn-search {
   padding: 10px 18px;

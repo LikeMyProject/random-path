@@ -5,10 +5,10 @@ defineProps({
 defineEmits(['update:modelValue'])
 
 const SCENES = [
-  { key: 'casual', icon: '🌅', label: '休闲骑', desc: '轻松兜风 · 平路为主', dist: '~12 km', time: '约 60 分钟' },
-  { key: 'training', icon: '🏋', label: '训练骑', desc: '挑战自我 · 含坡路', dist: '~30 km', time: '约 120 分钟' },
-  { key: 'random', icon: '🔀', label: '随便骑', desc: '随机距离 · 随机方向', dist: '15-45 km', time: '看心情' },
-  { key: 'destination', icon: '🎯', label: '骑到某处', desc: '选目的地 · 来回往返', dist: '看目的地', time: '看距离' },
+  { key: 'casual', icon: '🌅', label: '休闲骑', desc: '短途兜风 · 随心方向', dist: '8-20 km', time: '40-100 分钟', tag: '轻松' },
+  { key: 'training', icon: '🏋', label: '训练骑', desc: '中长距离 · 自选方向', dist: '20-50 km', time: '100-250 分钟', tag: '可控' },
+  { key: 'random', icon: '🎲', label: '随便骑', desc: '距离方向全随机', dist: '10-50 km', time: '盲盒惊喜', tag: '未知' },
+  { key: 'destination', icon: '🎯', label: '骑到某处', desc: '指定目的地 · 来回往返', dist: '看目的地', time: '看来回', tag: '往返' },
 ]
 </script>
 
@@ -23,6 +23,7 @@ const SCENES = [
       <div class="scene-top">
         <span class="scene-icon">{{ s.icon }}</span>
         <span class="scene-label">{{ s.label }}</span>
+        <span class="scene-tag" :class="s.key">{{ s.tag }}</span>
       </div>
       <div class="scene-desc">{{ s.desc }}</div>
       <div class="scene-stats">
@@ -97,6 +98,20 @@ const SCENES = [
 }
 .scene-icon { font-size: 28px; line-height: 1; }
 .scene-label { font-size: 16px; font-weight: 800; letter-spacing: -.3px; }
+.scene-tag {
+  margin-left: auto;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f0edf5;
+  color: #8a8098;
+  letter-spacing: .3px;
+}
+.scene-card.active .scene-tag {
+  background: rgba(255,255,255,.22);
+  color: #fff;
+}
 .scene-desc {
   font-size: 11px;
   opacity: .7;
