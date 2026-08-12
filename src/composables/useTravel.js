@@ -132,16 +132,26 @@ export function clusterAttractions(attractions, days, interests = []) {
 function assignPeriods(dayAttractions, pace) {
   const max = PACE_ATTRACTIONS[pace] || 3
   const list = dayAttractions.slice(0, max)
-  const slots = []
-  const periods = ['morning', 'afternoon', 'evening']
   const labels = { morning: '上午', afternoon: '下午', evening: '晚上' }
-  // 晚上只放 1 个（夜景/美食/演出），其余分配到上午下午
+  const slots = []
   const night = list.find(a => a.night) || null
-  const dayOnes = night ? list.filter(a => a !== night).slice(0, max - 1) : list
-  const mid = Math.ceil(dayOnes.length / 2)
-  dayOnes.forEach((a, i) => slots.push({ period: i < mid ? 'morning' : 'afternoon', attraction: a }))
-  if (night) slots.push({ period: 'evening', attraction: night })
-  else if (dayOnes.length === max && dayOnes[max - 1]) slots.push({ period: 'evening', attraction: dayOnes[max - 1] })
+
+  if (night) {
+    // 有夜景：白天景点按序放上午/下午，夜景固定晚上，互不重复
+    const dayOnes = list.filter(a => a !== night).slice(0, max - 1)
+    dayOnes.forEach((a, i) => slots.push({ period: i === 0 ? 'morning' : 'afternoon', attraction: a }))
+    slots.push({ period: 'evening', attraction: night })
+  } else {
+    // 无夜景：景点按顺序分配到上午/下午/晚上，每个只出现一次
+    const n = list.length
+    list.forEach((a, i) => {
+      let period
+      if (n <= 2) period = i === 0 ? 'morning' : 'afternoon'
+      else if (n === 3) period = ['morning', 'afternoon', 'evening'][i]
+      else period = i < 2 ? 'morning' : i === 2 ? 'afternoon' : 'evening'
+      slots.push({ period, attraction: a })
+    })
+  }
   return slots.map(s => ({ ...s, periodLabel: labels[s.period] }))
 }
 
