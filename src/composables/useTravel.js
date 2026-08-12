@@ -32,10 +32,12 @@ function haversineKm(a, b) {
   return 6371 * 2 * Math.asin(Math.sqrt(h))
 }
 
-// 同天景点地理半径上限（km）：超过则视为跨区域，尽量拆到不同天
-const MAX_CLUSTER_RADIUS = 35
+// 同天景点地理半径上限（km）：一天内景点最远不超过此值，超过则视为跨区域拆到不同天
+const MAX_CLUSTER_RADIUS = 50
 // 种子选择时，每远离已有种子 1km 的加分权重（让远郊景点自成一天，不与主城景点混排）
 const SEED_SPREAD_W = 0.8
+// 餐厅就近窗口（km）：只取离当天任一景点 10km 内的餐厅，距离越近优先级越高
+const RESTAURANT_MAX_KM = 10
 
 // ============================================================
 // 1. 天数分配：按城市建议天数权重，每城至少 1 天，转换日占用
@@ -420,30 +422,38 @@ function shuffle(arr) {
   return arr
 }
 
-function pickNearestRestaurant(pool, centroid, used) {
+// 餐厅就近分配：取「离当天任一景点最近」且 10km 窗口内的餐厅，距离越近优先级越高
+function pickMealRestaurant(pool, dayAttrCoords, used, maxKm = RESTAURANT_MAX_KM) {
   const avail = pool.filter(r => !used.has(r.name + '|' + r.address))
   if (avail.length === 0) return null
-  if (!centroid) return avail[0]
-  let best = 0, bd = Infinity
-  for (let i = 0; i < avail.length; i++) {
-    const r = avail[i]
-    if (!r.coord) continue
-    const d = haversineKm(r.coord, centroid)
-    if (d < bd) { bd = d; best = i }
-  }
-  return avail[best] || avail[0]
+  const withCoord = avail.filter(r => r.coord)
+  const src = withCoord.length ? withCoord : avail
+  // 每家餐厅到当天任一景点的最小距离
+  const scored = src.map(r => {
+    let md = Infinity
+    for (const a of (dayAttrCoords || [])) {
+      const d = haversineKm(r.coord, a)
+      if (d < md) md = d
+    }
+    return { r, md }
+  })
+  // 优先 10km 窗口内最近的；窗口外（无近店）退而求其次取全局最近，保证有店
+  const inWin = scored.filter(s => s.md <= maxKm)
+  const cand = inWin.length ? inWin : scored
+  cand.sort((a, b) => a.md - b.md)
+  return cand[0].r
 }
 
-// 餐厅按「当天景点质心」就近分配：吃的店跟着逛的路线走，不顺路就换更近的
-function distributeRestaurants(restaurants, days, dayCentroids) {
+// 餐厅按「当天景点」就近分配：吃的店跟着逛的路线走，不顺路就换更近的
+function distributeRestaurants(restaurants, days, dayAttrCoords) {
   const used = new Set()
   const daily = []
   for (let d = 0; d < days; d++) {
-    const centroid = dayCentroids?.[d] || null
+    const coords = dayAttrCoords?.[d] || []
     const pickMeal = (meal) => {
       const pool = restaurants.filter(r => r.mealType === meal)
-      // 优先同餐次且离当天景点最近；没有同餐次时退而求其次取最近（保证顺路优先）
-      return pickNearestRestaurant(pool, centroid, used) || pickNearestRestaurant(restaurants, centroid, used)
+      // 优先同餐次且离当天景点最近；无同餐次时退而求其次取最近（保证顺路优先）
+      return pickMealRestaurant(pool, coords, used) || pickMealRestaurant(restaurants, coords, used)
     }
     daily.push({ breakfast: pickMeal('breakfast'), lunch: pickMeal('lunch'), dinner: pickMeal('dinner') })
   }
@@ -456,13 +466,11 @@ export async function searchAndAssignFoods(plan, onProgress = null) {
     onProgress?.({ city: cp.name, done: i, total: plan.cityPlans.length })
     const needed = cp.days * 3 + 5
     const restaurants = await searchRestaurantsForCity(cp.name, cp.data.coord, needed)
-    // 每天景点质心：让餐厅就近分配（吃的店顺路）
-    const dayCentroids = cp.daily.map(d => {
-      const pts = d.slots.filter(s => !s.meal && !s.local && s.attraction?.coord).map(s => s.attraction.coord)
-      if (pts.length === 0) return cp.data.coord
-      return { lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length, lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length }
-    })
-    const dailyMeals = distributeRestaurants(restaurants, cp.days, dayCentroids)
+    // 每天景点坐标列表（含所有非餐/非本地景点）：让餐厅取「离当天任一景点最近 10km 内」
+    const dayAttrCoords = cp.daily.map(d =>
+      d.slots.filter(s => !s.meal && !s.local && s.attraction?.coord).map(s => s.attraction.coord)
+    )
+    const dailyMeals = distributeRestaurants(restaurants, cp.days, dayAttrCoords)
     cp.restaurants = restaurants
     cp.daily.forEach((d, di) => {
       const meals = dailyMeals[di] || {}

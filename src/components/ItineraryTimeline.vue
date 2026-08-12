@@ -10,8 +10,8 @@ const emit = defineEmits(['update:activeDay'])
 const PERIOD_ICON = { breakfast: '🍳', morning: '🌅', lunch: '🍜', afternoon: '☀️', dinner: '🍽️', evening: '🌙', free: '🚶' }
 const PERIOD_COLOR = { breakfast: '#f59e0b', morning: '#f0a870', lunch: '#d4537e', afternoon: '#f08ca4', dinner: '#e27790', evening: '#8b5cf6', free: '#a898b8' }
 const TYPE_LABEL = { nature: '自然', culture: '人文', food: '美食', family: '亲子', urban: '地标', local: '本地' }
-// 当日景点相对质心的最大半径超过此值，提示"跨区较远"（正常同城一天通常 < 20km）
-const SPAN_WARN_KM = 35
+// 当日景点相对质心的最大半径超过此值（50km），提示"跨区较远"
+const SPAN_WARN_KM = 50
 
 const currentDay = computed(() => props.city?.daily?.[props.activeDay] || null)
 function typeLabel(t) { return TYPE_LABEL[t] || t }
