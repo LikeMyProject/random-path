@@ -68,7 +68,7 @@ export function generateShareImage(routeData) {
 
   // Header
   ctx.fillStyle = '#fff'; ctx.font = 'bold 32px "Segoe UI", sans-serif'; ctx.textAlign = 'center'
-  ctx.fillText('🚴 RandomPath', W / 2, 56)
+  ctx.fillText('🧭 漫途', W / 2, 56)
   ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '15px "Segoe UI", sans-serif'
   ctx.fillText(title || '骑行路线', W / 2, 82)
 
@@ -122,7 +122,7 @@ export function generateShareImage(routeData) {
   // Footer
   const ftY = cardTop + cardH - 30
   ctx.fillStyle = '#9ca3af'; ctx.font = '11px "Segoe UI", sans-serif'; ctx.textAlign = 'center'
-  ctx.fillText('RandomPath · 随机骑行路线生成器 · radom-path-vue.vercel.app', W / 2, ftY)
+  ctx.fillText('漫途 · 骑行路线 & 旅行攻略', W / 2, ftY)
 
   return canvas
 }
@@ -135,12 +135,12 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath()
 }
 
-export async function shareImage(canvas, filename = 'RandomPath_route.png') {
+export async function shareImage(canvas, filename = 'mantu_route.png') {
   if (navigator.canShare) {
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'))
     const file = new File([blob], filename, { type: 'image/png' })
     if (navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: 'RandomPath 骑行路线' }); return 'shared' } catch(e) {}
+      try { await navigator.share({ files: [file], title: '漫途 骑行路线' }); return 'shared' } catch(e) {}
     }
   }
   canvas.toBlob(blob => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url) }, 'image/png')

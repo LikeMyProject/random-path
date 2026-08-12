@@ -230,7 +230,7 @@ function downloadGpx() {
   const { start, end } = presetObj.value
   const gpx = buildGPX(result.value, start, end)
   const blob = new Blob([gpx], { type: 'application/gpx+xml' }); const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob); a.download = `RandomPath_Preset_${start.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`
+  a.href = URL.createObjectURL(blob); a.download = `mantu_Preset_${start.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`
   a.click(); URL.revokeObjectURL(a.href)
 }
 async function doShare() {
@@ -248,7 +248,7 @@ async function doShare() {
       { label: '途经点', value: result.value.waypoints.length + ' 个' },
     ]
   })
-  const r = await shareImage(canvas, `RandomPath_${route.name}_${(result.value.totalDistance/1000).toFixed(1)}km.png`)
+  const r = await shareImage(canvas, `mantu_${route.name}_${(result.value.totalDistance/1000).toFixed(1)}km.png`)
   if (r === 'shared') toast('已分享 🎉')
   else toast('已下载 📥')
 }
@@ -346,7 +346,7 @@ onMounted(() => {
       <div>途经点: <strong>{{ activeRoute.waypoints.length }}个</strong></div>
     </div>
     <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:8px;font-size:10px;color:#8a7a98">
-      <span style="background:#e27790;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">起点</span>{{ activeRoute.start.name }}
+      <span style="background:var(--accent-2);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">起点</span>{{ activeRoute.start.name }}
       <span v-for="w in activeRoute.waypoints.slice(0,6)" :key="w.name">→ <span style="background:#8cb8a8;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">途经</span>{{ w.name }}</span>
       <span v-if="activeRoute.waypoints.length>6">... ({{ activeRoute.waypoints.length-6 }}+)</span>
       → <span style="background:#f0a870;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">终点</span>{{ activeRoute.end.name }}

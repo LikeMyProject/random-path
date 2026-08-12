@@ -90,7 +90,7 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
   transition: all .2s;
 }
 .day-tab .day-date { font-size: 9px; font-weight: 400; color: #b0a3bc; }
-.day-tab.active { background: linear-gradient(135deg, #f08ca4, #e27790); color: #fff; border-color: #f08ca4; }
+.day-tab.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-color: var(--accent); }
 .day-tab.active .day-date { color: rgba(255,255,255,0.8); }
 .day-detail { background: #fdfbff; border: 1px solid #f2eaf4; border-radius: 12px; padding: 12px; }
 .day-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

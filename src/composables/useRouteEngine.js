@@ -484,7 +484,7 @@ export function buildGPX(route, home, work) {
   }
   const distKm = (route.totalDistance / 1000).toFixed(1)
   const name = `${home.name} → ${work.name} (${distKm}km)`
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="RandomPath" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><trkseg>\n${trkpts}    </trkseg></trk></gpx>`
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="漫途" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><trkseg>\n${trkpts}    </trkseg></trk></gpx>`
 }
 
 export function isBadLocationName(name) {

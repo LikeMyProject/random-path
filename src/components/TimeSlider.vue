@@ -63,7 +63,7 @@ const label = computed(() => formatTime(props.modelValue))
 .time-val {
   font-size: 18px;
   font-weight: 700;
-  color: #f08ca4;
+  color: var(--accent);
 }
 .time-slider-track {
   position: relative;
@@ -76,7 +76,7 @@ const label = computed(() => formatTime(props.modelValue))
   top: 0; left: 0;
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, #f08ca4, #f97316);
+  background: linear-gradient(90deg, var(--accent), #f97316);
   pointer-events: none;
 }
 .time-slider-input {
@@ -97,15 +97,15 @@ const label = computed(() => formatTime(props.modelValue))
   width: 22px; height: 22px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #f08ca4;
-  box-shadow: 0 2px 8px rgba(240,140,164,.35);
+  border: 3px solid var(--accent);
+  box-shadow: 0 2px 8px var(--accent-tint);
 }
 .time-slider-input::-moz-range-thumb {
   width: 22px; height: 22px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid #f08ca4;
-  box-shadow: 0 2px 8px rgba(240,140,164,.35);
+  border: 3px solid var(--accent);
+  box-shadow: 0 2px 8px var(--accent-tint);
 }
 .time-slider-ticks {
   display: flex;
@@ -121,5 +121,5 @@ const label = computed(() => formatTime(props.modelValue))
   transition: all .15s;
 }
 .tick:hover { color: #8a8098; }
-.tick.active { color: #f08ca4; font-weight: 700; background: #fff0f5; }
+.tick.active { color: var(--accent); font-weight: 700; background: var(--accent-soft); }
 </style>

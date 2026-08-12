@@ -332,12 +332,12 @@ function doRegenerate() {
 const navUrl = computed(() => result.value && homeObj.value && workObj.value ? buildNavUrl(homeObj.value, workObj.value, result.value.waypoints) : '')
 function openNav() { if (result.value && homeObj.value && workObj.value) openNavigation(homeObj.value, workObj.value, result.value.waypoints) }
 function copyNav() { if (navUrl.value) { navigator.clipboard?.writeText(navUrl.value); toast('已复制') } }
-function downloadGpx() { if (result.value && homeObj.value && workObj.value) { const gpx = buildGPX(result.value, homeObj.value, workObj.value); const blob = new Blob([gpx], { type: 'application/gpx+xml' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `RandomPath_${homeObj.value.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`; a.click(); URL.revokeObjectURL(a.href) } }
+function downloadGpx() { if (result.value && homeObj.value && workObj.value) { const gpx = buildGPX(result.value, homeObj.value, workObj.value); const blob = new Blob([gpx], { type: 'application/gpx+xml' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `mantu_${homeObj.value.name}_${(result.value.totalDistance/1000).toFixed(1)}km.gpx`; a.click(); URL.revokeObjectURL(a.href) } }
 async function doShare() {
   if (!result.value) return
   const route = result.value; const h = homeObj.value, w = workObj.value
   const canvas = generateShareImage({ title: (h?.name||'?') + (hasDest.value ? ' → '+(w?.name||'?') : ' ↻ 环线'), subtitle: (route.totalDistance/1000).toFixed(1)+' km · '+Math.round(route.totalDuration/60)+' min', totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, segments: route.segments, waypoints: route.waypoints, home: h, work: w||h, uphillSections: route.uphillSections, downhillSections: route.downhillSections })
-  const r = await shareImage(canvas, `RandomPath_${(h?.name||'route')}_${(route.totalDistance/1000).toFixed(1)}km.png`)
+  const r = await shareImage(canvas, `mantu_${(h?.name||'route')}_${(route.totalDistance/1000).toFixed(1)}km.png`)
   if (r === 'shared') toast('已分享 🎉'); else toast('已下载 📥')
 }
 
@@ -394,7 +394,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
         @keyup.enter="searchDestination"
         style="flex:1"
       />
-      <button class="btn btn-sm" style="background:#f08ca4;color:#fff;flex-shrink:0" @click="searchDestination" :disabled="destLoading">
+      <button class="btn btn-sm" style="background:var(--accent);color:#fff;flex-shrink:0" @click="searchDestination" :disabled="destLoading">
         {{ destLoading ? '搜索中…' : '🔍 搜索' }}
       </button>
     </div>
@@ -440,8 +440,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
         <button class="chip-sm add" @click="showAddrModal = true">+管理</button>
       </div>
       <div v-if="devUnlocked" style="display:flex;gap:3px;margin-top:4px">
-        <button class="chip-sm" style="background:#f08ca4;color:#fff" @click="quickFill('from','家')">家</button>
-        <button class="chip-sm" style="background:#f08ca4;color:#fff" @click="quickFill('from','公司')">公司</button>
+        <button class="chip-sm" style="background:var(--accent);color:#fff" @click="quickFill('from','家')">家</button>
+        <button class="chip-sm" style="background:var(--accent);color:#fff" @click="quickFill('from','公司')">公司</button>
       </div>
       <div class="input-row" style="position:relative">
         <input v-model="from.name" placeholder="输入地名搜索" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
@@ -514,7 +514,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <!-- 地址管理弹窗 -->
   <div class="modal" v-if="showAddrModal" @click.self="showAddrModal=false">
     <div class="inner">
-      <div style="display:flex;align-items:center;justify-content:space-between"><h3>管理地址簿</h3><div style="display:flex;align-items:center;gap:4px"><span v-if="devUnlocked" style="font-size:10px;color:#22c55e">🔓</span><button v-if="!showPwdInput" class="btn btn-sm" style="background:transparent;color:#a898b8;font-size:9px;padding:2px 6px" @click="showPwdInput=true">🔧</button><input v-if="showPwdInput" v-model="pwdValue" type="password" placeholder="密码" style="width:80px;font-size:10px;padding:3px 6px" @keyup.enter="checkPassword"><button v-if="showPwdInput" class="btn btn-sm" style="background:#f08ca4;color:#fff;font-size:9px;padding:3px 8px" @click="checkPassword">OK</button></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between"><h3>管理地址簿</h3><div style="display:flex;align-items:center;gap:4px"><span v-if="devUnlocked" style="font-size:10px;color:#22c55e">🔓</span><button v-if="!showPwdInput" class="btn btn-sm" style="background:transparent;color:#a898b8;font-size:9px;padding:2px 6px" @click="showPwdInput=true">🔧</button><input v-if="showPwdInput" v-model="pwdValue" type="password" placeholder="密码" style="width:80px;font-size:10px;padding:3px 6px" @keyup.enter="checkPassword"><button v-if="showPwdInput" class="btn btn-sm" style="background:var(--accent);color:#fff;font-size:9px;padding:3px 8px" @click="checkPassword">OK</button></div></div>
       <div v-if="Object.keys(addresses).length>0" style="margin-bottom:10px;max-height:150px;overflow-y:auto"><div v-for="(v,k) in addresses" :key="k" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:3px 0;background:#faf7fc;border-radius:8px;font-size:12px"><span><strong>{{ k }}</strong> — {{ v.name }} <span style="color:#a898b8;font-size:10px">({{ typeof v.lng==='number'?v.lng.toFixed(4):v.lng }}, {{ typeof v.lat==='number'?v.lat.toFixed(4):v.lat }})</span></span><button class="btn btn-sm" style="background:#ff5252;color:#fff;font-size:9px;padding:2px 6px;flex-shrink:0;margin-left:8px" @click="deleteSavedAddr(k)">🗑</button></div></div>
       <div v-else style="text-align:center;color:#a898b8;font-size:12px;margin-bottom:10px">还没有保存的地址哦~</div>
       <hr style="border:none;border-top:1px dashed #ece0ec;margin:10px 0">
@@ -601,7 +601,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   padding: 18px;
   border: none;
   border-radius: 20px;
-  background: linear-gradient(135deg, #f08ca4, #f97316);
+  background: linear-gradient(135deg, var(--accent), #f97316);
   color: #fff;
   font-size: 20px;
   font-weight: 700;
@@ -612,7 +612,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .btn-go:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(240,140,164,.4);
+  box-shadow: 0 6px 24px var(--accent-tint);
 }
 .btn-go:disabled {
   opacity: .6;
@@ -689,7 +689,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   font-family: inherit;
 }
 .chip-sm:hover { background: #f8f4fb; }
-.chip-sm.add { border-color: #f08ca4; color: #f08ca4; }
+.chip-sm.add { border-color: var(--accent); color: var(--accent); }
 
 .input-row {
   display: flex;
@@ -751,6 +751,6 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 .dest-est-row:last-child { margin-bottom: 0; }
 .dest-total {
   font-weight: 700;
-  color: #f08ca4;
+  color: var(--accent);
 }
 </style>

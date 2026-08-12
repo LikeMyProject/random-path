@@ -91,7 +91,7 @@ export function generateGuideImage(plan, hotel) {
     ctx.fillRect(0, y, W, 220)
     // 顶部小标识
     ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = `bold 18px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-    ctx.fillText('🚴 RandomPath', X + 10, y + 20)
+    ctx.fillText('🧭 漫途', X + 10, y + 20)
     // 主标题
     ctx.fillStyle = '#ffffff'; ctx.font = `bold 52px ${FONT}`
     ctx.fillText('旅行攻略', X + 10, y + 50)
@@ -349,7 +349,7 @@ export function generateGuideImage(plan, hotel) {
     y += 16
     ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`; ctx.textAlign = 'center'
     const now = new Date()
-    ctx.fillText(`🚴 RandomPath · 骑行 & 旅行攻略`, X + (CW - M * 2) / 2, y + 10)
+    ctx.fillText(`🧭 漫途 · 骑行 & 旅行攻略`, X + (CW - M * 2) / 2, y + 10)
     ctx.fillStyle = C.mute
     ctx.fillText(`radom-path-vue.vercel.app  ·  生成于 ${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`, X + (CW - M * 2) / 2, y + 36)
     ctx.textAlign = 'left'

@@ -632,20 +632,20 @@ async function doShareGuide() {
 .date-row { display: flex; gap: 6px; align-items: center; }
 .date-sep { color: #d4c4dc; font-weight: 700; }
 .days-hint { font-size: 11px; color: #a898b8; margin-top: 6px; }
-.days-hint strong { color: #f08ca4; }
+.days-hint strong { color: var(--accent); }
 .chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .chip {
   border: 2px solid #e5dcec; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 600;
   background: #fff; color: #8a7a98; cursor: pointer; transition: all .2s; font-family: inherit;
 }
-.chip.active { background: linear-gradient(135deg, #f08ca4, #e27790); color: #fff; border-color: #f08ca4; }
+.chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border-color: var(--accent); }
 .city-sel { position: relative; }
 .city-chips { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .city-chip {
   display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #faf7fc;
   border: 1px solid #ece0ec; border-radius: 8px; font-size: 12px;
 }
-.cc-order { width: 18px; height: 18px; border-radius: 50%; background: #f08ca4; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.cc-order { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .cc-name { flex: 1; font-weight: 700; color: #5e5468; }
 .cc-btn { border: none; background: #f3f0f7; border-radius: 5px; width: 24px; height: 24px; cursor: pointer; font-size: 11px; color: #8a7a98; }
 .cc-btn:disabled { opacity: .3; }
@@ -656,12 +656,12 @@ async function doShareGuide() {
   padding: 3px 10px; border-radius: 10px; border: 1px solid #d4c4dc; background: #fff; color: #5e5468;
   font-size: 10px; cursor: pointer; font-family: inherit;
 }
-.chip-sm.on { background: #f08ca4; color: #fff; border-color: #f08ca4; }
+.chip-sm.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .btn-gen { margin-top: 14px; }
 
 /* 结果区 */
 .chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-.chain-city { background: linear-gradient(135deg, #f08ca4, #e27790); color: #fff; padding: 5px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.chain-city { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; padding: 5px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .chain-days { background: rgba(255,255,255,0.25); border-radius: 6px; padding: 1px 6px; font-size: 10px; }
 .chain-arrow { color: #d4c4dc; font-weight: 700; }
 .plan-meta { display: flex; gap: 10px; font-size: 11px; color: #a898b8; flex-wrap: wrap; }
@@ -688,7 +688,7 @@ async function doShareGuide() {
 .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .food-item { background: #fdfbff; border: 1px solid #f2eaf4; border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; }
 .food-name { font-size: 12px; font-weight: 700; color: #5e5468; }
-.food-price { font-size: 10px; color: #f08ca4; font-weight: 700; }
+.food-price { font-size: 10px; color: var(--accent); font-weight: 700; }
 .food-desc { font-size: 10px; color: #a898b8; margin-top: 2px; }
 .tips-list { margin: 0; padding-left: 16px; font-size: 11px; color: #8a7a98; line-height: 1.8; }
 .all-attractions { display: flex; flex-direction: column; }
@@ -704,7 +704,7 @@ async function doShareGuide() {
 .b-label { color: #8a7a98; }
 .b-value { font-weight: 700; color: #5e5468; }
 .budget-total { text-align: center; margin-top: 10px; font-size: 13px; color: #8a7a98; }
-.budget-total strong { color: #e27790; font-size: 16px; }
+.budget-total strong { color: var(--accent-2); font-size: 16px; }
 
 /* 酒店搜索 */
 .btn-hotel { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
@@ -742,7 +742,7 @@ async function doShareGuide() {
 .h-badge.good { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .h-badge.ref { background: #faf7fc; color: #8a7a98; border: 1px solid #e5dcec; }
 .h-row2 { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
-.h-price { font-size: 12px; font-weight: 800; color: #e27790; }
+.h-price { font-size: 12px; font-weight: 800; color: var(--accent-2); }
 .h-rating { font-size: 11px; font-weight: 700; color: #f59e0b; }
 .h-rating.none { color: #a898b8; font-weight: 400; }
 .h-rating.premium { color: #8b5cf6; }
@@ -772,7 +772,7 @@ async function doShareGuide() {
 .tr-mode.m-transit { background: #faeeda; color: #854f0b; }
 .tr-mode.m-taxi { background: #fbeaf0; color: #993556; }
 .tr-time { color: #8a7a98; width: 42px; text-align: right; font-size: 10px; }
-.tr-fee { font-weight: 700; color: #e27790; width: 56px; text-align: right; font-size: 11px; }
+.tr-fee { font-weight: 700; color: var(--accent-2); width: 56px; text-align: right; font-size: 11px; }
 .transit-note { margin-top: 6px; font-size: 9px; color: #b0a3bc; line-height: 1.5; }
 .hotel-empty { text-align: center; color: #a898b8; font-size: 11px; padding: 14px 8px; }
 .btn-share { background: linear-gradient(135deg, #1e1b4b, #312e81); color: #fff; }

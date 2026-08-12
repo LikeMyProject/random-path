@@ -430,7 +430,7 @@ const routeContext = computed(() => {
 .stat .val {
   font-size: 18px;
   font-weight: 800;
-  color: #e27790;
+  color: var(--accent-2);
 }
 .stat .val.small {
   font-size: 14px;
@@ -456,9 +456,9 @@ const routeContext = computed(() => {
 }
 .btn:active { transform: scale(.95); }
 .btn-primary {
-  background: linear-gradient(135deg, #f08ca4, #e27790);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: #fff;
-  box-shadow: 0 3px 12px rgba(240, 140, 164, 0.3);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
 }
 .btn-secondary {
   background: #f3f0f7;

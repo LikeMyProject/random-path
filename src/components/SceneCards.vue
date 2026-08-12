@@ -53,9 +53,9 @@ const SCENES = [
   background: #f8f4fb;
 }
 .scene-card-v2.active {
-  border-color: #f08ca4;
-  background: #fff0f5;
-  box-shadow: 0 2px 12px rgba(240,140,164,.25);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 2px 12px var(--accent-tint);
 }
 .scene-icon-v2 { font-size: 28px; }
 .scene-label-v2 { font-size: 13px; font-weight: 700; }
