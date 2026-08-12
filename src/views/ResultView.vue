@@ -190,17 +190,25 @@ const routeContext = computed(() => {
     </div>
 
     <!-- 操作按钮 -->
-    <button class="btn btn-primary" style="margin-top:10px" @click="emit('openNav')">🧭 开始导航</button>
-    <div class="nav-link-box">
-      <div class="label">高德导航链接（可复制）：</div>
-      <div class="url">{{ buildNavUrl(homeObj || {}, workObj || {}, result.waypoints || []) }}</div>
+    <button class="btn btn-primary" style="margin-top:12px;padding:16px;font-size:16px" @click="emit('openNav')">🧭 开始导航</button>
+    <div class="action-row">
+      <button class="action-btn" @click="emit('regenerate')">
+        <span class="action-icon">🔄</span>
+        <span class="action-label">换一条</span>
+      </button>
+      <button class="action-btn" @click="emit('copyNav')">
+        <span class="action-icon">📋</span>
+        <span class="action-label">复制链接</span>
+      </button>
+      <button class="action-btn" @click="emit('downloadGpx')">
+        <span class="action-icon">📥</span>
+        <span class="action-label">GPX</span>
+      </button>
+      <button class="action-btn" @click="emit('doShare')">
+        <span class="action-icon">📤</span>
+        <span class="action-label">分享</span>
+      </button>
     </div>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn-sm" style="flex:1;background:#f0edf5;color:#7a6c8a;border:none" @click="emit('copyNav')">📋 复制</button>
-      <button class="btn-sm" style="flex:1;background:#f0edf5;color:#7a6c8a;border:none" @click="emit('downloadGpx')">📥 GPX</button>
-      <button class="btn-sm" style="flex:1;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;border:none" @click="emit('doShare')">📤 分享</button>
-    </div>
-    <button class="btn-sm" style="margin-top:8px;width:100%;background:var(--accent-soft);color:var(--accent);border:none;padding:10px" @click="emit('regenerate')">🔄 换一条</button>
   </div>
 </template>
 
@@ -294,22 +302,31 @@ const routeContext = computed(() => {
 .qtag-cycling { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }
 .qtag-quality { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 
-.nav-link-box {
-  margin-top: 8px;
-  padding: 10px 12px;
-  background: #f7f5fa;
-  border-radius: 10px;
+.action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 4px;
   border: none;
+  border-radius: 14px;
+  background: #f7f5fa;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
 }
-.nav-link-box .label {
-  font-size: 10px;
-  color: #b0a3bc;
-  margin-bottom: 4px;
+.action-btn:hover {
+  background: var(--accent-soft);
+  transform: translateY(-2px);
 }
-.nav-link-box .url {
-  font-size: 10px;
-  color: var(--accent);
-  word-break: break-all;
-  line-height: 1.4;
-}
+.action-btn:active { transform: scale(.95); }
+.action-icon { font-size: 20px; line-height: 1; }
+.action-label { font-size: 11px; font-weight: 600; color: #5e5468; }
+.action-btn:hover .action-label { color: var(--accent); }
 </style>

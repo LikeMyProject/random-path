@@ -29,6 +29,10 @@ const nearbyMode = ref(false)
 const homeDist = ref(0)
 const homeAddr = ref(null)
 
+// === 位置搜索面板 ===
+const showLocationSearch = ref(false)
+const locationSearchName = ref('')
+
 function calcDistKm(a, b) {
   const R = 6371
   const dLat = (b.lat - a.lat) * Math.PI / 180
@@ -47,8 +51,16 @@ const hasDest = computed(() => !!(to.value.name && to.value.lng && to.value.lat)
 // === 自定义参数 ===
 const direction = ref('random')
 
-// 场景 → 固定目标距离(m)
-const SCENE_DIST = { casual: 12000, training: 30000, random: null }
+// === 距离滑块 ===
+const customDist = ref(null) // null = 用场景默认
+
+const DIST_RANGES = {
+  casual: { min: 8, max: 20, default: 12 },
+  training: { min: 20, max: 50, default: 30 },
+  random: { min: 10, max: 50, default: 25 },
+}
+
+const distRange = computed(() => DIST_RANGES[scene.value] || null)
 
 watch(scene, (s) => {
   if (s === 'random') { direction.value = 'random' }
@@ -59,20 +71,34 @@ watch(scene, (s) => {
     destCoord.value = null
     destEstimate.value = null
   }
+  // 切换场景时重置自定义距离为该场景默认值
+  if (s !== 'destination' && DIST_RANGES[s]) {
+    customDist.value = DIST_RANGES[s].default
+  }
 })
 
-// 目标距离：场景固定；random 模式 15~45km 随机
+// 目标距离
 const targetDist = computed(() => {
   if (scene.value === 'destination') return 20000
-  if (scene.value === 'random') return 15000 + Math.floor(Math.random() * 6) * 5000
-  return SCENE_DIST[scene.value] || 20000
+  if (scene.value === 'random') {
+    const d = customDist.value || (15 + Math.floor(Math.random() * 6) * 5)
+    return d * 1000
+  }
+  if (customDist.value) return customDist.value * 1000
+  const defaults = { casual: 12000, training: 30000 }
+  return defaults[scene.value] || 20000
 })
+
+const estimatedTime = computed(() => {
+  const km = targetDist.value / 1000
+  return Math.round(km / BIKE_SPEED * 60)
+})
+
 const homeObj = computed(() => { const l = parseFloat(from.value.lng), a = parseFloat(from.value.lat); return (l && a && from.value.name) ? { lng: l, lat: a, name: from.value.name } : null })
 const workObj = computed(() => hasDest.value ? { name: to.value.name, lng: parseFloat(to.value.lng), lat: parseFloat(to.value.lat) } : homeObj.value)
 
 // === 生成状态 ===
 const loading = ref(false), loadingHint = ref(''), tryInfo = ref(''), progress = ref(0)
-const retryDots = ref(Array(10).fill(''))
 const result = ref(null), resultShow = ref(false), collapseOpen = ref(false)
 const multiResults = ref([]), activeResultIdx = ref(0)
 
@@ -87,6 +113,9 @@ onMounted(async () => {
     homeAddr.value = { name: addresses['家'].name, lng: parseFloat(addresses['家'].lng), lat: parseFloat(addresses['家'].lat) }
   }
   if (addresses['公司']) to.value = { name: addresses['公司'].name, lng: addresses['公司'].lng, lat: addresses['公司'].lat }
+
+  // 初始化距离滑块默认值
+  customDist.value = DIST_RANGES[scene.value]?.default || null
 
   const last = loadLastRoute()
   if (last && (last.type === 'commute' || last.type === 'loop') && last.home) {
@@ -105,19 +134,16 @@ onMounted(async () => {
       const { longitude: lng, latitude: lat } = pos.coords
 
       if (!addresses['家'] || !homeAddr.value) {
-        // 没有家地址，直接用 GPS
         from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
         try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
       } else {
         const dist = calcDistKm({ lat, lng }, homeAddr.value)
         homeDist.value = Math.round(dist * 10) / 10
         if (dist > 2) {
-          // 离家 > 2km → 自动附近模式
           nearbyMode.value = true
           from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
           try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
         } else {
-          // 在家附近，保持家地址
           nearbyMode.value = false
         }
       }
@@ -125,7 +151,41 @@ onMounted(async () => {
   }
 })
 
-// === 地址操作 ===
+// === 位置搜索 ===
+function openLocationSearch() {
+  locationSearchName.value = from.value.name || ''
+  showLocationSearch.value = true
+}
+function onLocationInput() { activeSuggest.value = 'from'; searchAddress(locationSearchName.value) }
+function selectLocationSugg(i) {
+  const p = pickSuggestion(i)
+  if (!p) return
+  from.value = { name: p.name, lng: p.lng, lat: p.lat }
+  showLocationSearch.value = false
+  activeSuggest.value = ''
+  toast(p.name)
+}
+function confirmLocation() {
+  const n = locationSearchName.value.trim()
+  if (!n) { toast('请输入地名', 'warn'); return }
+  from.value = { name: n, lng: '', lat: '' }
+  doGeocode('from').then(() => {
+    if (from.value.lng) { showLocationSearch.value = false; toast('位置已更新') }
+  })
+}
+function locateFromSearch() {
+  if (!navigator.geolocation) { toast('浏览器不支持定位', 'warn'); return }
+  toast('正在定位…')
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const { longitude: lng, latitude: lat } = pos.coords
+    from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+    try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
+    showLocationSearch.value = false
+    toast('已获取当前位置')
+  }, () => { toast('定位失败', 'warn') }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 })
+}
+
+// === 地址操作（高级面板用） ===
 function onNameInput(target) { activeSuggest.value = target; searchAddress(target === 'from' ? from.value.name : to.value.name) }
 function selectSugg(i) { const p = pickSuggestion(i); if (!p) return; (activeSuggest.value === 'from' ? from : to).value = { name: p.name, lng: p.lng, lat: p.lat }; activeSuggest.value = ''; toast(p.name) }
 function pickAddr(a, t) { const ad = addresses[a]; if (!ad) return; (t === 'from' ? from : to).value = { name: ad.name, lng: ad.lng, lat: ad.lat }; toast(a) }
@@ -144,13 +204,11 @@ function locateMe(target) {
 
 function toggleNearby() {
   if (nearbyMode.value) {
-    // 切回家
     if (homeAddr.value) {
       from.value = { name: homeAddr.value.name, lng: String(homeAddr.value.lng), lat: String(homeAddr.value.lat) }
     }
     nearbyMode.value = false
   } else {
-    // 切到附近——重新 GPS 定位
     locateMe('from')
     nearbyMode.value = true
   }
@@ -167,7 +225,6 @@ async function searchDestination() {
     destCoord.value = { lng: r.lng, lat: r.lat, name: r.name }
     destName.value = r.name
 
-    // 预估单程距离
     const h = homeObj.value || { lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
     if (h.lng && h.lat && r.lng && r.lat) {
       const straightKm = calcDistKm({ lng: h.lng, lat: h.lat }, { lng: r.lng, lat: r.lat })
@@ -175,7 +232,7 @@ async function searchDestination() {
         toast('起点坐标可能未设置，请先在地图中定位起点', 'warn')
         destLoading.value = false; return
       }
-      const oneWayKm = Math.round(straightKm * 1.5 * 10) / 10 // 道路系数 ~1.5
+      const oneWayKm = Math.round(straightKm * 1.5 * 10) / 10
       const oneWayMin = Math.round(oneWayKm / BIKE_SPEED * 60)
       destEstimate.value = {
         oneWayKm,
@@ -200,26 +257,23 @@ async function doGenerate(isRetry = false) {
   const isLoop = h.lng === w.lng && h.lat === w.lat
   if (!isRetry) { resultShow.value = false; multiResults.value = [] }
   loading.value = true; progress.value = 0; loadingHint.value = '正在规划路线…'; tryInfo.value = ''
-  retryDots.value = Array(10).fill(''); retryDots.value[0] = 'current'
   const td = targetDist.value
   const dirDeg = COMPASS.find(c => c.key === direction.value)?.deg ?? null
   const onTry = (a, d, e) => {
     progress.value = Math.round((a / MAX_RETRIES) * 100)
-    retryDots.value = Array(10).fill('').map((_, i) => i < a ? (e ? 'bad' : 'ok') : (i === a ? 'current' : ''))
-    loadingHint.value = e ? `第${a}次: ${e}` : `第${a}次: ${(d/1000).toFixed(1)} km`
-    tryInfo.value = loadingHint.value
+    loadingHint.value = e ? `尝试第 ${a} 条路线…` : `已找到 ${(d/1000).toFixed(1)} km 路线，验证中…`
+    tryInfo.value = e ? '' : `${(d/1000).toFixed(1)} km`
   }
   try {
     const route = isLoop
       ? await tryGenerateRoute(h, h, { minDist: Math.round(td * 0.55), maxDist: Math.round(td * 1.5), waypointGenerator: () => generateCompassLoop(h, td, dirDeg), onTry })
       : await tryGenerateRoute(h, w, { minDist: Math.round(td * 0.6), maxDist: Math.round(td * 1.4), directionDeg: dirDeg, onTry })
     if (!route) { toast('生成失败，请重试', 'err'); loading.value = false; return }
-    if (route.waypoints.length > 0) { tryInfo.value = '正在获取途经点地名…'; await Promise.all(route.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) }
+    if (route.waypoints.length > 0) { loadingHint.value = '正在获取途经点地名…'; await Promise.all(route.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) }
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = route; resultShow.value = true; loading.value = false
     saveHistory({ type: 'explore', home: h.name, work: w.name, distance: route.totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
     saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, scene: scene.value })
-    // 后台获取沿途上下文，不阻塞结果展示
     loadContext(route.segments, route.waypoints, { totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, waypoints: route.waypoints, totalDistance: route.totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
@@ -234,7 +288,7 @@ async function doGenerateMultiple() {
   const isLoop = h.lng === w.lng && h.lat === w.lat
   const td = targetDist.value
   const dirDeg = COMPASS.find(c => c.key === direction.value)?.deg ?? null
-  loading.value = true; loadingHint.value = '正在生成多条路线…'
+  loading.value = true; loadingHint.value = '正在同时生成 3 条路线…'
   try {
     const opts = isLoop
       ? { minDist: Math.round(td * 0.55), maxDist: Math.round(td * 1.5), waypointGenerator: () => generateCompassLoop(h, td, dirDeg) }
@@ -258,17 +312,14 @@ async function doGenerateRoundTrip() {
 
   const onTryOut = (a, dist, e) => {
     progress.value = Math.round((a / MAX_RETRIES) * 50)
-    loadingHint.value = e ? `去程第${a}次: ${e}` : `去程第${a}次: ${(dist/1000).toFixed(1)} km`
-    tryInfo.value = loadingHint.value
+    loadingHint.value = e ? `去程尝试第 ${a} 条…` : `去程 ${(dist/1000).toFixed(1)} km，规划返程…`
   }
   const onTryBack = (a, dist, e) => {
     progress.value = 50 + Math.round((a / MAX_RETRIES) * 50)
-    loadingHint.value = e ? `返程第${a}次: ${e}` : `返程第${a}次: ${(dist/1000).toFixed(1)} km`
-    tryInfo.value = loadingHint.value
+    loadingHint.value = e ? `返程尝试第 ${a} 条…` : `返程 ${(dist/1000).toFixed(1)} km，合并路线…`
   }
 
   try {
-    // 去程：家 → 目的地
     const routeOut = await tryGenerateRoute(h, d, {
       minDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 0.6 || 10000),
       maxDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 1.4 || 30000),
@@ -276,7 +327,6 @@ async function doGenerateRoundTrip() {
     })
     if (!routeOut) { toast('去程生成失败，请重试', 'err'); loading.value = false; return }
 
-    // 返程：目的地 → 家（反方向）
     const returnDir = ((getBearing({ lng: d.lng, lat: d.lat }, { lng: h.lng, lat: h.lat }) + 180) % 360)
     const routeBack = await tryGenerateRoute(d, h, {
       minDist: Math.round(destEstimate.value?.oneWayKm * 1000 * 0.6 || 10000),
@@ -286,7 +336,6 @@ async function doGenerateRoundTrip() {
     })
     if (!routeBack) { toast('返程生成失败，请重试', 'err'); loading.value = false; return }
 
-    // 拼接路线
     const mergedSegments = [...routeOut.segments, ...routeBack.segments]
     const mergedWaypoints = [
       ...routeOut.waypoints,
@@ -306,9 +355,8 @@ async function doGenerateRoundTrip() {
       destName: d.name,
     }
 
-    // 获取途经点地名
     if (mergedRoute.waypoints.length > 0) {
-      tryInfo.value = '正在获取途经点地名…'
+      loadingHint.value = '正在获取途经点地名…'
       await Promise.all(mergedRoute.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) }))
     }
 
@@ -317,7 +365,6 @@ async function doGenerateRoundTrip() {
 
     saveHistory({ type: 'roundtrip', home: h.name, work: d.name, distance: mergedRoute.totalDistance, waypoints: mergedRoute.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
     saveLastRoute({ type: 'roundtrip', home: h, work: d, waypoints: mergedRoute.waypoints, segments: mergedRoute.segments, totalDistance: mergedRoute.totalDistance, totalDuration: mergedRoute.totalDuration, totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, direction: direction.value, scene: 'destination' })
-    // 后台获取沿途上下文
     loadContext(mergedRoute.segments, mergedRoute.waypoints, { totalClimb: mergedRoute.totalClimb, uphillSections: mergedRoute.uphillSections, downhillSections: mergedRoute.downhillSections, waypoints: mergedRoute.waypoints, totalDistance: mergedRoute.totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
@@ -358,35 +405,77 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
 <template>
 <div>
-  <!-- GPS 定位条 -->
-  <div class="gps-bar">
-    <span class="gps-icon">📍</span>
-    <input
-      v-model="from.name"
-      placeholder="输入起点或点击右侧按钮定位"
-      class="gps-input"
-      @focus="onNameInput('from')"
-      @input="onNameInput('from')"
-      @blur="setTimeout(closeSuggest,200)"
-    />
-    <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop gps-suggest">
-      <div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)">
+  <!-- 位置卡片 -->
+  <div class="loc-card">
+    <div class="loc-info" @click="openLocationSearch">
+      <span class="loc-pin">📍</span>
+      <div class="loc-text">
+        <div class="loc-label">起点</div>
+        <div class="loc-name">{{ from.name || '正在定位…' }}</div>
+      </div>
+      <span v-if="nearbyMode" class="loc-badge">离家{{ homeDist }}km</span>
+    </div>
+    <div class="loc-actions">
+      <button v-if="nearbyMode" class="loc-btn" @click.stop="toggleNearby" title="切回家">🏠</button>
+      <button class="loc-btn" @click.stop="locateMe('from')" title="GPS 定位">🎯</button>
+      <button class="loc-btn primary" @click.stop="openLocationSearch" title="切换位置">切换</button>
+    </div>
+  </div>
+
+  <!-- 位置搜索面板（展开式） -->
+  <div v-if="showLocationSearch" class="loc-search-panel">
+    <div class="loc-search-row">
+      <input
+        v-model="locationSearchName"
+        placeholder="输入地名搜索起点"
+        class="loc-search-input"
+        @input="onLocationInput"
+        @focus="onLocationInput"
+        @keyup.enter="confirmLocation"
+      />
+      <button class="loc-search-btn" @click="locateFromSearch">🎯</button>
+      <button class="loc-search-btn primary" @click="confirmLocation">搜索</button>
+    </div>
+    <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop">
+      <div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectLocationSugg(i)">
         <span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span>
       </div>
     </div>
-    <span v-if="nearbyMode" class="gps-hint">离家{{ homeDist }}km</span>
-    <button class="gps-locate-btn" @click="locateMe('from')" title="获取当前位置的经纬度">📍</button>
-    <button v-if="nearbyMode" class="gps-home-btn" @click.stop="toggleNearby" title="切回家">🏠</button>
-    <button class="gps-locate-btn" @click="doGeocode('from')" title="搜索地名获取坐标">🔍</button>
+    <div v-if="Object.keys(addresses).length > 0" class="loc-quick">
+      <span class="loc-quick-label">地址簿：</span>
+      <button v-for="(v,k) in addresses" :key="k" class="chip-sm" @click="() => { pickAddr(k,'from'); showLocationSearch = false }">{{ k }}</button>
+      <button class="chip-sm add" @click="showAddrModal = true">管理</button>
+    </div>
   </div>
 
   <!-- 模式卡片 -->
   <p class="section-title">今天想怎么骑？</p>
   <SceneCards v-model="scene" />
 
-  <!-- 骑到某处：目的地搜索（仅 destination 模式） -->
+  <!-- 距离滑块（非目的地模式） -->
+  <div v-if="scene !== 'destination' && distRange" class="dist-card">
+    <div class="dist-header">
+      <span class="dist-label">骑行距离</span>
+      <span class="dist-value">{{ customDist || distRange.default }} <small>km</small></span>
+    </div>
+    <input
+      type="range"
+      class="dist-slider"
+      :min="distRange.min"
+      :max="distRange.max"
+      :step="1"
+      v-model.number="customDist"
+    />
+    <div class="dist-footer">
+      <span>{{ distRange.min }} km</span>
+      <span class="dist-time">约 {{ estimatedTime }} 分钟</span>
+      <span>{{ distRange.max }} km</span>
+    </div>
+  </div>
+
+  <!-- 骑到某处：目的地搜索 -->
   <div v-if="scene === 'destination'" class="dest-search card">
-    <label style="font-size:12px;color:#8a8098;font-weight:600;display:block;margin-bottom:6px">🎯 想去哪儿？</label>
+    <label class="field-label">想去哪儿？</label>
     <div class="input-row">
       <input
         v-model="destName"
@@ -394,8 +483,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
         @keyup.enter="searchDestination"
         style="flex:1"
       />
-      <button class="btn btn-sm" style="background:var(--accent);color:#fff;flex-shrink:0" @click="searchDestination" :disabled="destLoading">
-        {{ destLoading ? '搜索中…' : '🔍 搜索' }}
+      <button class="btn-search" @click="searchDestination" :disabled="destLoading">
+        {{ destLoading ? '搜索中…' : '搜索' }}
       </button>
     </div>
     <div v-if="destEstimate" class="dest-estimate">
@@ -428,20 +517,22 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
   <!-- 高级选项折叠 -->
   <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
-    <span>⚙️ 方向 · 起终点 · 偏好</span>
+    <span>更多选项（方向 · 起终点）</span>
     <span class="arrow" :class="{ open: showAdvanced }">▾</span>
   </div>
   <div v-if="showAdvanced" class="advanced-panel">
-    <!-- 起点 -->
+    <!-- 方向 -->
+    <label class="adv-label">方向偏好</label>
+    <div class="compass-grid">
+      <button v-for="d in COMPASS" :key="d.key" :class="['chip', { active: direction === d.key }]" @click="direction = d.key">{{ d.label }}</button>
+    </div>
+
+    <!-- 起终点 -->
     <div class="addr-row">
-      <label>📍 起点</label>
-      <div class="addr-quick-row">
+      <label class="field-label">起点</label>
+      <div class="addr-quick-row" v-if="Object.keys(addresses).length > 0">
         <button v-for="(v,k) in addresses" :key="k" class="chip-sm" @click="pickAddr(k,'from')">{{ k }}</button>
         <button class="chip-sm add" @click="showAddrModal = true">+管理</button>
-      </div>
-      <div v-if="devUnlocked" style="display:flex;gap:3px;margin-top:4px">
-        <button class="chip-sm" style="background:var(--accent);color:#fff" @click="quickFill('from','家')">家</button>
-        <button class="chip-sm" style="background:var(--accent);color:#fff" @click="quickFill('from','公司')">公司</button>
       </div>
       <div class="input-row" style="position:relative">
         <input v-model="from.name" placeholder="输入地名搜索" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
@@ -451,25 +542,14 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       </div>
     </div>
 
-    <!-- 终点（可选） -->
     <div class="addr-row">
-      <label>📍 终点 <span class="hint">(不填=环线)</span></label>
+      <label class="field-label">终点 <span class="hint">(不填=环线)</span></label>
       <div class="input-row" style="position:relative">
         <input v-model="to.name" placeholder="可选目的地" @input="onNameInput('to')" @focus="onNameInput('to')" @blur="setTimeout(closeSuggest,200)">
         <button class="btn-icon" @click="doGeocode('to')">🔍</button>
         <button class="btn-icon" @click="locateMe('to')">📍</button>
       </div>
     </div>
-
-    <!-- 方向 -->
-    <label class="adv-label">🧭 方向</label>
-    <div class="compass-row">
-      <button v-for="d in COMPASS" :key="d.key" :class="['chip', { active: direction === d.key }]" @click="direction = d.key">{{ d.label }}</button>
-    </div>
-
-    <!-- 距离偏好 -->
-    <label class="adv-label">🎯 距离偏好</label>
-    <p class="dist-est">≈ {{ (targetDist / 1000).toFixed(0) }}km ({{ BIKE_SPEED }}km/h)</p>
   </div>
 
   <!-- Loading -->
@@ -479,8 +559,6 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       <div class="txt">{{ progress }}%</div>
     </div>
     <p class="loading-hint">{{ loadingHint }}</p>
-    <div class="retry-dots"><span v-for="(d,i) in retryDots" :key="i" :class="'retry-dot '+d"></span></div>
-    <p class="try-count">{{ tryInfo }}</p>
   </div>
 
   <!-- 多路线 -->
@@ -515,7 +593,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <div class="modal" v-if="showAddrModal" @click.self="showAddrModal=false">
     <div class="inner">
       <div style="display:flex;align-items:center;justify-content:space-between"><h3>管理地址簿</h3><div style="display:flex;align-items:center;gap:4px"><span v-if="devUnlocked" style="font-size:10px;color:#22c55e">🔓</span><button v-if="!showPwdInput" class="btn btn-sm" style="background:transparent;color:#a898b8;font-size:9px;padding:2px 6px" @click="showPwdInput=true">🔧</button><input v-if="showPwdInput" v-model="pwdValue" type="password" placeholder="密码" style="width:80px;font-size:10px;padding:3px 6px" @keyup.enter="checkPassword"><button v-if="showPwdInput" class="btn btn-sm" style="background:var(--accent);color:#fff;font-size:9px;padding:3px 8px" @click="checkPassword">OK</button></div></div>
-      <div v-if="Object.keys(addresses).length>0" style="margin-bottom:10px;max-height:150px;overflow-y:auto"><div v-for="(v,k) in addresses" :key="k" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:3px 0;background:#faf7fc;border-radius:8px;font-size:12px"><span><strong>{{ k }}</strong> — {{ v.name }} <span style="color:#a898b8;font-size:10px">({{ typeof v.lng==='number'?v.lng.toFixed(4):v.lng }}, {{ typeof v.lat==='number'?v.lat.toFixed(4):v.lat }})</span></span><button class="btn btn-sm" style="background:#ff5252;color:#fff;font-size:9px;padding:2px 6px;flex-shrink:0;margin-left:8px" @click="deleteSavedAddr(k)">🗑</button></div></div>
+      <div v-if="Object.keys(addresses).length>0" style="margin-bottom:10px;max-height:150px;overflow-y:auto"><div v-for="(v,k) in addresses" :key="k" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:3px 0;background:#f7f5fa;border-radius:8px;font-size:12px"><span><strong>{{ k }}</strong> — {{ v.name }} <span style="color:#a898b8;font-size:10px">({{ typeof v.lng==='number'?v.lng.toFixed(4):v.lng }}, {{ typeof v.lat==='number'?v.lat.toFixed(4):v.lat }})</span></span><button class="btn btn-sm" style="background:#ff5252;color:#fff;font-size:9px;padding:2px 6px;flex-shrink:0;margin-left:8px" @click="deleteSavedAddr(k)">🗑</button></div></div>
       <div v-else style="text-align:center;color:#a898b8;font-size:12px;margin-bottom:10px">还没有保存的地址哦~</div>
       <hr style="border:none;border-top:1px dashed #ece0ec;margin:10px 0">
       <h3 style="font-size:13px;color:#8a8098;margin-bottom:4px">添加新地址</h3>
@@ -530,69 +608,154 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 </template>
 
 <style scoped>
-/* === ExploreView 精致样式 === */
-.gps-bar {
+/* === 位置卡片 === */
+.loc-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 8px 8px 14px;
+  padding: 12px 14px;
   background: #fff;
   border-radius: 16px;
   margin-top: 4px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
 }
-.gps-icon { font-size: 18px; flex-shrink: 0; }
-.gps-input {
+.loc-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 1;
-  padding: 8px 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+.loc-pin { font-size: 20px; flex-shrink: 0; }
+.loc-text { min-width: 0; flex: 1; }
+.loc-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a898b8;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.loc-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3a3045;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.loc-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.loc-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.loc-btn {
+  padding: 7px 10px;
   border: none;
   border-radius: 10px;
+  background: #f0edf5;
+  font-size: 15px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all .15s;
+  font-family: inherit;
+}
+.loc-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
+.loc-btn:active { transform: scale(.92); }
+.loc-btn.primary {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 8px 12px;
+}
+
+/* === 位置搜索面板 === */
+.loc-search-panel {
+  padding: 14px;
+  background: #fff;
+  border-radius: 0 0 16px 16px;
+  margin-top: -8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.loc-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.loc-search-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 12px;
   font-size: 13px;
   font-family: inherit;
   color: #4a3f55;
   background: #f7f5fa;
-  min-width: 0;
   transition: all .2s;
 }
-.gps-input:focus { background: var(--accent-soft); }
-.gps-input::placeholder { color: #c4b5d0; }
-.gps-hint { font-size: 10px; color: var(--accent); white-space: nowrap; flex-shrink: 0; font-weight: 700; background: var(--accent-soft); padding: 3px 8px; border-radius: 6px; }
-
-.gps-locate-btn {
-  padding: 8px 10px;
-  border-radius: 10px;
+.loc-search-input:focus { background: #fff; outline: none; box-shadow: 0 0 0 4px var(--accent-tint); }
+.loc-search-btn {
+  padding: 9px 14px;
   border: none;
+  border-radius: 12px;
   background: #f0edf5;
   font-size: 15px;
   cursor: pointer;
   flex-shrink: 0;
-  line-height: 1;
   transition: all .15s;
+  font-family: inherit;
 }
-.gps-locate-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
-.gps-locate-btn:active { transform: scale(.92); }
+.loc-search-btn:hover { background: var(--accent-soft); }
+.loc-search-btn.primary {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+.loc-quick {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.loc-quick-label {
+  font-size: 10px;
+  color: #a898b8;
+  font-weight: 600;
+  margin-right: 2px;
+}
 
-.gps-suggest {
+/* === 通用 === */
+.suggest-drop {
   position: absolute;
   top: 100%;
-  left: 30px;
+  left: 0;
   right: 0;
-  z-index: 10;
+  z-index: 20;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  overflow: hidden;
+  margin-top: 4px;
 }
-
-.gps-home-btn {
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: none;
-  background: #f0edf5;
-  font-size: 15px;
+.suggest-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
   cursor: pointer;
-  flex-shrink: 0;
-  line-height: 1;
-  transition: all .15s;
+  transition: background .15s;
 }
-.gps-home-btn:hover { background: var(--accent-soft); }
-.gps-home-btn:active { transform: scale(.92); }
+.suggest-item:hover { background: var(--accent-soft); }
+.s-name { font-size: 12px; color: #4a3f55; }
+.s-dist { font-size: 10px; color: #a898b8; }
 
 .section-title {
   font-size: 17px;
@@ -602,6 +765,84 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   letter-spacing: -.3px;
 }
 
+/* === 距离滑块 === */
+.dist-card {
+  padding: 16px 18px;
+  background: #fff;
+  border-radius: 16px;
+  margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+}
+.dist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+.dist-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5e5468;
+}
+.dist-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+.dist-value small {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: .6;
+}
+.dist-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #ece8f0;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.dist-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.35);
+  cursor: pointer;
+  transition: transform .15s;
+}
+.dist-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.dist-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.35);
+  cursor: pointer;
+}
+.dist-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #a898b8;
+  font-weight: 600;
+}
+.dist-time {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* === 按钮区 === */
 .btn-go {
   display: block;
   width: 100%;
@@ -630,20 +871,31 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 
 .btn-multi {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
-  padding: 12px;
-  border: none;
-  background: transparent;
-  color: #a898b8;
-  font-size: 12px;
-  font-weight: 600;
+  padding: 14px;
+  border: 2px solid rgba(var(--accent-rgb),.15);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
-  margin-top: 6px;
-  transition: color .15s;
+  margin-top: 10px;
+  transition: all .15s;
+  font-family: inherit;
 }
-.btn-multi:hover { color: var(--accent); }
+.btn-multi:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.btn-multi:disabled { opacity: .5; cursor: not-allowed; }
 
+/* === 高级面板 === */
 .advanced-toggle {
   display: flex;
   justify-content: space-between;
@@ -652,19 +904,19 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   margin-top: 14px;
   background: #fff;
   border-radius: 14px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #7a6c8a;
   cursor: pointer;
   transition: all .15s;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
 }
 .advanced-toggle:hover { background: var(--accent-soft); color: var(--accent); }
 .advanced-toggle .arrow { transition: transform .2s; }
 .advanced-toggle .arrow.open { transform: rotate(180deg); }
 
 .advanced-panel {
-  padding: 14px 16px;
+  padding: 16px;
   background: #fff;
   border: none;
   border-radius: 0 0 14px 14px;
@@ -672,24 +924,52 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   box-shadow: 0 2px 8px rgba(0,0,0,.04);
 }
 
-.addr-row {
-  margin-bottom: 12px;
-}
-.addr-row label {
-  font-size: 11px;
-  color: #8a8098;
+.field-label {
+  font-size: 12px;
+  color: #5e5468;
   font-weight: 700;
   display: block;
-  margin-bottom: 5px;
-  text-transform: uppercase;
-  letter-spacing: .3px;
+  margin-bottom: 6px;
 }
-.addr-row .hint {
+.field-label .hint {
   font-weight: 400;
   color: #b0a3bc;
-  text-transform: none;
 }
 
+.adv-label {
+  font-size: 12px;
+  color: #5e5468;
+  font-weight: 700;
+  display: block;
+  margin: 0 0 8px;
+}
+
+.compass-grid {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.compass-grid .chip {
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: none;
+  background: #f7f5fa;
+  color: #7a6c8a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.compass-grid .chip:hover { background: var(--accent-soft); color: var(--accent); }
+.compass-grid .chip.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25);
+}
+
+.addr-row { margin-bottom: 14px; }
 .addr-quick-row {
   display: flex;
   gap: 4px;
@@ -703,7 +983,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   border: none;
   background: #f0edf5;
   color: #5e5468;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -714,25 +994,25 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
 .input-row {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
 }
 .input-row input {
   flex: 1;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border: none;
-  border-radius: 10px;
-  font-size: 12px;
+  border-radius: 12px;
+  font-size: 13px;
   font-family: inherit;
   color: #4a3f55;
   background: #f7f5fa;
   transition: all .2s;
 }
-.input-row input:focus { background: var(--accent-soft); outline: none; }
+.input-row input:focus { background: #fff; outline: none; box-shadow: 0 0 0 4px var(--accent-tint); }
 .btn-icon {
-  padding: 7px 11px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #f0edf5;
   cursor: pointer;
   font-size: 15px;
@@ -742,30 +1022,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 .btn-icon:hover { background: var(--accent-soft); }
 .btn-icon:active { transform: scale(.9); }
 
-.adv-label {
-  font-size: 11px;
-  color: #8a8098;
-  font-weight: 700;
-  display: block;
-  margin: 12px 0 6px;
-  text-transform: uppercase;
-  letter-spacing: .3px;
-}
-
-.dist-est {
-  font-size: 12px;
-  color: var(--accent);
-  margin-top: 4px;
-  font-weight: 700;
-  padding: 6px 10px;
-  background: var(--accent-soft);
-  border-radius: 8px;
-  display: inline-block;
-}
-
-.dest-search {
-  margin-top: 12px;
-}
+/* === 目的地搜索 === */
+.dest-search { margin-top: 12px; }
 .dest-estimate {
   margin-top: 10px;
   padding: 12px 14px;
@@ -781,8 +1039,81 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   margin-bottom: 4px;
 }
 .dest-est-row:last-child { margin-bottom: 0; }
-.dest-total {
+.dest-total { font-weight: 800; color: var(--accent); }
+
+.btn-search {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .15s;
+  font-family: inherit;
+}
+.btn-search:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(var(--accent-rgb),.25); }
+.btn-search:disabled { opacity: .5; }
+
+/* === Loading === */
+.loading-overlay {
+  text-align: center;
+  padding: 28px 20px;
+  margin-top: 16px;
+}
+.progress-ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+}
+.progress-ring svg { transform: rotate(-90deg); }
+.progress-ring .bg { fill: none; stroke: #ece8f0; stroke-width: 5; }
+.progress-ring .fg {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .4s;
+}
+.progress-ring .txt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  font-size: 16px;
   font-weight: 800;
   color: var(--accent);
+}
+.loading-hint {
+  font-size: 13px;
+  color: #7a6c8a;
+  font-weight: 600;
+}
+
+/* === 多路线 === */
+.multi-cards {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.multi-card {
+  flex-shrink: 0;
+  width: 160px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 14px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all .2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.multi-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px rgba(var(--accent-rgb),.15);
 }
 </style>
