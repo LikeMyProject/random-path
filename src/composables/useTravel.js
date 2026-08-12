@@ -133,6 +133,7 @@ export function clusterAttractions(attractions, days, interests = []) {
 // 3. 时段分配：每天景点+餐食 → 上午/午餐/下午/晚餐/晚上
 // ============================================================
 const PERIOD_LABELS = { breakfast: '早餐', morning: '上午', lunch: '午餐', afternoon: '下午', dinner: '晚餐', evening: '晚上', free: '自由' }
+const PERIOD_ORDER = { breakfast: 0, morning: 1, lunch: 2, afternoon: 3, dinner: 4, evening: 5, free: 6 }
 
 function assignPeriods(dayAttractions, pace, dayRestaurants = null) {
   const max = PACE_ATTRACTIONS[pace] || 3
@@ -429,17 +430,14 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
       const isNight = spot.category === 'nightmarket'
       const period = isNight ? 'evening' : 'afternoon'
 
-      // 找到插入位置：同类时段最后一个景点之后
+      // 按时段顺序插入：找到第一个比目标时段更晚的位置，插在它前面
+      const newOrder = PERIOD_ORDER[period] ?? 3
       let insertPos = d.slots.length
-      if (isNight) {
-        for (let si = 0; si < d.slots.length; si++) {
-          if (d.slots[si].period === 'evening') insertPos = si + 1
-        }
-      } else {
-        for (let si = d.slots.length - 1; si >= 0; si--) {
-          if (d.slots[si].period === 'afternoon' && !d.slots[si].meal && !d.slots[si].local) {
-            insertPos = si + 1; break
-          }
+      for (let si = 0; si < d.slots.length; si++) {
+        const existingOrder = PERIOD_ORDER[d.slots[si].period] ?? 3
+        if (existingOrder > newOrder) {
+          insertPos = si
+          break
         }
       }
 
