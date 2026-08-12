@@ -5,9 +5,9 @@ defineProps({
 defineEmits(['update:modelValue'])
 
 const SCENES = [
-  { key: 'casual', icon: '🌅', label: '休闲骑', desc: '短途兜风 · 随心方向', dist: '8-20 km', time: '40-100 分钟', tag: '轻松' },
-  { key: 'training', icon: '🏋', label: '训练骑', desc: '中长距离 · 自选方向', dist: '20-50 km', time: '100-250 分钟', tag: '可控' },
-  { key: 'random', icon: '🎲', label: '随便骑', desc: '距离方向全随机', dist: '10-50 km', time: '盲盒惊喜', tag: '未知' },
+  { key: 'casual', icon: '🌅', label: '休闲骑', desc: '短途兜风 · 随心方向', dist: '10-1000 km', time: '随心调', tag: '轻松' },
+  { key: 'training', icon: '🏋', label: '训练骑', desc: '中长距离 · 自选方向', dist: '10-1000 km', time: '随心调', tag: '可控' },
+  { key: 'random', icon: '🎲', label: '随便骑', desc: '距离方向全随机', dist: '10-1000 km', time: '盲盒惊喜', tag: '未知' },
   { key: 'destination', icon: '🎯', label: '骑到某处', desc: '指定目的地 · 来回往返', dist: '看目的地', time: '看来回', tag: '往返' },
 ]
 </script>

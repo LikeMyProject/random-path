@@ -55,9 +55,9 @@ const direction = ref('random')
 const customDist = ref(null) // null = 用场景默认
 
 const DIST_RANGES = {
-  casual: { min: 8, max: 20, default: 12 },
-  training: { min: 20, max: 50, default: 30 },
-  random: { min: 10, max: 50, default: 25 },
+  casual: { min: 10, max: 1000, default: 12 },
+  training: { min: 10, max: 1000, default: 30 },
+  random: { min: 10, max: 1000, default: 25 },
 }
 
 // === 随便骑：真随机参数 ===
@@ -65,7 +65,7 @@ const randomDist = ref(null)
 const randomDirKey = ref(null)
 const randomDirLabel = ref('🎲 随机')
 function rollRandom() {
-  randomDist.value = 10 + Math.floor(Math.random() * 41) // 10-50km
+  randomDist.value = 10 + Math.floor(Math.random() * 991) // 10-1000km
   const dirs = COMPASS.filter(c => c.key !== 'random')
   const d = dirs[Math.floor(Math.random() * dirs.length)]
   randomDirKey.value = d.key
