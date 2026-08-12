@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
@@ -94,10 +94,40 @@ function rebuild() {
   p.cityPlans.forEach(cp => { if (!(cp.name in activeDayMap.value)) activeDayMap.value[cp.name] = 0 })
 }
 
-function generate() {
+async function generate() {
   if (selectedCities.value.length === 0) { toast('请先选择目的地城市', 'warn'); return }
   if (!startDate.value || !endDate.value) { toast('请选择往返日期', 'warn'); return }
   loading.value = true
+  try {
+    // 预生成，检查各城景点是否满足 天数×每日景点数
+    const p = buildFullPlan({
+      cities: selectedCities.value,
+      startDate: startDate.value,
+      endDate: endDate.value,
+      pace: pace.value,
+      interests: interests.value,
+      originCity: origin.value,
+    })
+    if (p) {
+      const perDay = PACE_ATTRACTIONS[pace.value] || 3
+      const needSup = p.cityPlans.some(cp => cp.data.attractions.length < cp.days * perDay)
+      if (needSup) {
+        toast('景点不足，正在用高德实时补充…', 'warn')
+        for (const cp of p.cityPlans) {
+          const need = cp.days * perDay
+          let miss = need - cp.data.attractions.length
+          let round = 0
+          while (miss > 0 && round < 2) {
+            const added = await supplementAttractions(cp.name)
+            if (added.length === 0) break
+            cp.data.attractions.push(...added)
+            miss = need - cp.data.attractions.length
+            round++
+          }
+        }
+      }
+    }
+  } catch (e) { /* 补充失败不阻断 */ }
   setTimeout(() => { rebuild(); loading.value = false }, 200)
 }
 

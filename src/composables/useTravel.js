@@ -12,6 +12,7 @@ import { CITIES, getCity, getTransport } from '../data/cities.js'
 import { searchPOIsByText } from './useAMap.js'
 
 const PACE_ATTRACTIONS = { relax: 2, standard: 3, compact: 4 }
+export { PACE_ATTRACTIONS }
 const PACE_LABEL = { relax: '悠闲', standard: '标准', compact: '紧凑' }
 const INTEREST_LABEL = { nature: '自然风光', culture: '人文历史', food: '美食探店', family: '亲子休闲', urban: '城市地标' }
 
@@ -69,7 +70,7 @@ export function allocateDays(cityNames, totalDays, pace = 'standard') {
 // 2. 景点地理聚类：贪心种子 + 最近中心分配，再平衡
 // ============================================================
 export function clusterAttractions(attractions, days, interests = []) {
-  if (attractions.length === 0) return []
+  if (attractions.length === 0) return Array.from({ length: days }, () => [])
   if (days <= 1) return [attractions]
 
   // 兴趣标签过滤优先
@@ -123,28 +124,45 @@ export function clusterAttractions(attractions, days, interests = []) {
 
   // 组内按 mustSee 降序
   clusters.forEach(c => c.sort((a, b) => score(b) - score(a)))
+  // 景点不足天数时，补齐为 days 组（不足的天显示自由活动）
+  while (clusters.length < days) clusters.push([])
   return clusters
 }
 
 // ============================================================
-// 3. 时段分配：每天景点 → 上午/下午/晚上
+// 3. 时段分配：每天景点+餐食 → 上午/午餐/下午/晚餐/晚上
 // ============================================================
-function assignPeriods(dayAttractions, pace) {
+const PERIOD_LABELS = { morning: '上午', lunch: '午餐', afternoon: '下午', dinner: '晚餐', evening: '晚上', free: '自由' }
+
+function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0) {
   const max = PACE_ATTRACTIONS[pace] || 3
   const list = dayAttractions.slice(0, max)
-  const labels = { morning: '上午', afternoon: '下午', evening: '晚上' }
   const slots = []
+
+  // 空景点天：自由活动占位
+  if (list.length === 0) {
+    slots.push({ period: 'free', attraction: { name: '自由活动 / 机动时间', desc: '可逛城市、探店或休息' } })
+  }
+
   const night = list.find(a => a.night) || null
+  const dayOnes = night ? list.filter(a => a !== night).slice(0, max - 1) : list
+
+  // 餐食按天轮换（保证相邻天不重样）
+  const len = Math.max(1, foods.length)
+  const pickMeal = (offset) => {
+    const idx = (dayIndex + offset) % len
+    const f = foods[idx]
+    return f ? { name: f.name, price: f.price, desc: f.desc } : null
+  }
+  const lunch = pickMeal(0)
+  const dinner = pickMeal(Math.ceil(len / 2))
 
   if (night) {
-    // 有夜景：白天景点按序放上午/下午，夜景固定晚上，互不重复
-    const dayOnes = list.filter(a => a !== night).slice(0, max - 1)
     dayOnes.forEach((a, i) => slots.push({ period: i === 0 ? 'morning' : 'afternoon', attraction: a }))
     slots.push({ period: 'evening', attraction: night })
   } else {
-    // 无夜景：景点按顺序分配到上午/下午/晚上，每个只出现一次
-    const n = list.length
-    list.forEach((a, i) => {
+    const n = dayOnes.length
+    dayOnes.forEach((a, i) => {
       let period
       if (n <= 2) period = i === 0 ? 'morning' : 'afternoon'
       else if (n === 3) period = ['morning', 'afternoon', 'evening'][i]
@@ -152,7 +170,25 @@ function assignPeriods(dayAttractions, pace) {
       slots.push({ period, attraction: a })
     })
   }
-  return slots.map(s => ({ ...s, periodLabel: labels[s.period] }))
+
+  // 统一插入午餐与晚餐（各至多一个），保证全天有餐
+  const withMeals = []
+  let hasLunch = false, hasDinner = false
+  for (const s of slots) {
+    if (!hasLunch && lunch && s.period !== 'morning') {
+      withMeals.push({ period: 'lunch', meal: lunch })
+      hasLunch = true
+    }
+    withMeals.push(s)
+    if (!hasDinner && dinner && s.period === 'evening') {
+      withMeals.push({ period: 'dinner', meal: dinner })
+      hasDinner = true
+    }
+  }
+  if (!hasLunch && lunch) withMeals.splice(Math.min(1, withMeals.length), 0, { period: 'lunch', meal: lunch })
+  if (!hasDinner && dinner) withMeals.push({ period: 'dinner', meal: dinner })
+
+  return withMeals.map(s => ({ ...s, periodLabel: PERIOD_LABELS[s.period] }))
 }
 
 // ============================================================
@@ -297,7 +333,7 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
       day: di + 1,
       date: cp.dates[di]?.date || cp.dateRange.start,
       dateLabel: cp.dates[di] ? `${cp.dates[di].label} ${fmtShort(cp.dates[di].date)} ${weekday(cp.dates[di].date)}` : '',
-      slots: assignPeriods(cl, pace),
+      slots: assignPeriods(cl, pace, cp.data.foods || [], di),
       count: cl.length,
     }))
   })
@@ -345,6 +381,10 @@ export function buildTextGuide(plan) {
       lines.push(`\n### ${d.dateLabel}`)
       if (d.slots.length === 0) { lines.push('- 自由活动 / 机动时间'); return }
       d.slots.forEach(s => {
+        if (s.meal) {
+          lines.push(`- **${s.periodLabel}** 🍜 ${s.meal.name}｜${s.meal.price}${s.meal.desc ? ' — ' + s.meal.desc : ''}`)
+          return
+        }
         const a = s.attraction
         lines.push(`- **${s.periodLabel}** ${a.name}｜${a.ticket}｜建议${a.duration}${a.desc ? ' — ' + a.desc : ''}`)
       })
