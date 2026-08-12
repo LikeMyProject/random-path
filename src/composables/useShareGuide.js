@@ -177,12 +177,14 @@ export function generateGuideImage(plan, hotel) {
       ctx.fillText(`${fmtMD(cp.dateRange.start)} ~ ${fmtMD(cp.dateRange.end)}`, X + CW - M * 2 - 16, y + 22)
     })
 
-    // 每天一张卡片（紧凑：52 头部 + 每槽 36，末尾 +10 内边距）
+    // 每天一张卡片（高度按实际槽位动态计算）
     cp.daily.forEach(d => {
-      add(62 + 36 * d.slots.length, (ctx, y) => {
-        // 日期头部（彩色条 + 星期 + 天气）
+      // 计算每个槽位高度：有门店的餐食=50px，普通=36px
+      const slotHeights = d.slots.map(s => (s.meal && s.meal.shop) ? 50 : 36)
+      const totalSlotH = slotHeights.reduce((a, b) => a + b, 0)
+      const cardH = 52 + totalSlotH
+      add(62 + totalSlotH, (ctx, y) => {
         const dayColor = C.orange
-        const cardH = 52 + 36 * d.slots.length
         ctx.fillStyle = C.card
         roundRect(ctx, X, y, CW - M * 2, cardH, 14); ctx.fill()
         ctx.strokeStyle = C.line; ctx.lineWidth = 1
@@ -202,11 +204,11 @@ export function generateGuideImage(plan, hotel) {
           ctx.fillStyle = C.sub; ctx.font = `14px ${FONT}`; ctx.textAlign = 'right'
           ctx.fillText(`${wt.low}~${wt.high}°C · ${wt.feel}`, X + CW - M * 2 - 14, dayY + 4)
         }
-        // 槽位
+        // 槽位（高度可变）
         let sy = y + 52
-        d.slots.forEach(s => {
+        d.slots.forEach((s, si) => {
           drawSlot(ctx, X + 16, sy, CW - M * 2 - 32, s, dayColor)
-          sy += 36
+          sy += slotHeights[si]
         })
       })
     })
@@ -311,22 +313,65 @@ export function generateGuideImage(plan, hotel) {
     }
   })
 
-  // ===== 必吃美食 =====
-  add(66 + 32 * plan.cityPlans.length, (ctx, y) => {
-    y += 16
-    drawCardTitle(ctx, X, y, '🍜 必吃美食', C.red)
-    y += 50
+  // ===== 必吃美食（每城分组，每个美食独立卡片含推荐门店）=====
+  {
+    // 计算总高度：header(52) + 每城(28 + 46*N + 12) + 底部padding(8)
+    let foodTotalH = 60 // 顶部 padding + 标题
     plan.cityPlans.forEach(cp => {
-      ctx.fillStyle = '#fff5f5'
-      roundRect(ctx, X, y, CW - M * 2, 24, 6); ctx.fill()
-      ctx.fillStyle = C.text; ctx.font = `bold 14px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
-      ctx.fillText(`${cp.name}:`, X + 12, y + 12)
-      const line = truncate(cp.data.foods.map(f => `${f.name} ${f.price}`).join('  ·  '), 42)
-      ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`; ctx.textAlign = 'right'
-      ctx.fillText(line, X + CW - M * 2 - 12, y + 12)
-      y += 32
+      const foods = (cp.data.foods || []).slice(0, 10) // 最多展示10个
+      foodTotalH += 28 // 城市子标题
+      foodTotalH += foods.length * 46 + (foods.length > 0 ? (foods.length - 1) * 4 : 0) // 美食卡片
+      foodTotalH += 14 // 城市间隔
     })
-  })
+    foodTotalH += 8 // 底部 padding
+
+    add(foodTotalH, (ctx, y) => {
+      y += 16
+      drawCardTitle(ctx, X, y, '🍜 必吃美食', C.red)
+      y += 44
+
+      plan.cityPlans.forEach(cp => {
+        const foods = (cp.data.foods || []).slice(0, 10)
+        if (foods.length === 0) return
+
+        // 城市子标题
+        ctx.fillStyle = C.red; ctx.font = `bold 17px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+        ctx.fillText(`📍 ${cp.name}`, X + 4, y)
+        y += 28
+
+        // 每个美食一个卡片
+        foods.forEach((f, fi) => {
+          const cardH = 42
+          const cardY = y
+
+          // 背景
+          ctx.fillStyle = '#fff5f5'
+          roundRect(ctx, X, cardY, CW - M * 2, cardH, 8); ctx.fill()
+          ctx.strokeStyle = '#fde2e2'; ctx.lineWidth = 1
+          roundRect(ctx, X, cardY, CW - M * 2, cardH, 8); ctx.stroke()
+
+          // 美食名称（左上）
+          ctx.fillStyle = C.ink; ctx.font = `bold 15px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+          ctx.fillText(truncate(f.name, 16), X + 14, cardY + 8)
+
+          // 价格（右上）
+          ctx.fillStyle = C.red; ctx.font = `bold 14px ${FONT}`; ctx.textAlign = 'right'
+          ctx.fillText(f.price || '', X + CW - M * 2 - 14, cardY + 8)
+
+          // 推荐门店 / 描述（第二行）
+          const shopText = f.shop ? `🏪 ${truncate(f.shop, 28)}` : (f.desc ? truncate(f.desc, 32) : '')
+          if (shopText) {
+            ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`; ctx.textAlign = 'left'
+            ctx.fillText(shopText, X + 14, cardY + 26)
+          }
+
+          y += cardH + 4
+        })
+
+        y += 10 // 城市间隔
+      })
+    })
+  }
 
   // ===== 实用贴士 =====
   const totalTips = plan.cityPlans.reduce((s, cp) => s + cp.data.tips.length, 0)
@@ -384,29 +429,38 @@ function drawCardTitle(ctx, x, y, title, accentColor) {
 function drawSlot(ctx, x, y, w, s, dayColor) {
   const isMeal = !!s.meal
   const isFree = s.period === 'free'
+  const hasShop = isMeal && s.meal.shop
+  const slotH = hasShop ? 42 : 28
   // 背景
   ctx.fillStyle = isMeal ? '#fff5f8' : isFree ? '#faf8fd' : '#ffffff'
-  roundRect(ctx, x, y, w, 28, 6); ctx.fill()
+  roundRect(ctx, x, y, w, slotH, 6); ctx.fill()
   ctx.strokeStyle = isMeal ? '#fbd5e0' : isFree ? '#ece6f0' : C.line; ctx.lineWidth = 1
-  roundRect(ctx, x, y, w, 28, 6); ctx.stroke()
+  roundRect(ctx, x, y, w, slotH, 6); ctx.stroke()
   // 左侧时段标签
   const periodLabel = s.periodLabel || '时段'
   const tagW = 44
   ctx.fillStyle = isMeal ? C.pink : isFree ? C.mute : dayColor
-  roundRect(ctx, x, y, tagW, 28, 6); ctx.fill()
+  roundRect(ctx, x, y, tagW, slotH, 6); ctx.fill()
   ctx.fillStyle = '#ffffff'; ctx.font = `bold 11px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
-  ctx.fillText(periodLabel, x + tagW / 2, y + 14)
+  ctx.fillText(periodLabel, x + tagW / 2, y + slotH / 2)
   // 内容
-  ctx.fillStyle = isMeal ? C.pink : isFree ? C.sub : C.ink; ctx.font = `bold 13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
   ctx.textAlign = 'left'
   if (isMeal) {
-    ctx.fillText(`🍴 ${truncate(s.meal.name, 14)}`, x + tagW + 8, y + 14)
-    ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`
-    ctx.fillText(`${s.meal.price}`, x + w - 8 - ctx.measureText(s.meal.price).width, y + 14)
+    // 第一行：餐名 + 价格
+    ctx.fillStyle = C.pink; ctx.font = `bold 13px ${FONT}`; ctx.textBaseline = 'top'
+    ctx.fillText(`🍴 ${truncate(s.meal.name, 14)}`, x + tagW + 8, y + 6)
+    ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`; ctx.textAlign = 'right'
+    ctx.fillText(`${s.meal.price}`, x + w - 8, y + 7)
+    // 第二行：推荐门店
+    if (hasShop) {
+      ctx.fillStyle = C.mute; ctx.font = `11px ${FONT}`; ctx.textAlign = 'left'
+      ctx.fillText(`🏪 ${truncate(s.meal.shop, 30)}`, x + tagW + 8, y + 26)
+    }
   } else if (isFree) {
-    ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`
+    ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`; ctx.textBaseline = 'middle'
     ctx.fillText(truncate(s.attraction.name, 22) + (s.attraction.desc ? `  ·  ${s.attraction.desc}` : ''), x + tagW + 8, y + 14)
   } else {
+    ctx.fillStyle = C.ink; ctx.font = `bold 13px ${FONT}`; ctx.textBaseline = 'middle'
     ctx.fillText(truncate(s.attraction.name, 14), x + tagW + 8, y + 14)
     const meta = []
     if (s.attraction.ticket) meta.push(`🎫 ${s.attraction.ticket}`)
@@ -415,7 +469,6 @@ function drawSlot(ctx, x, y, w, s, dayColor) {
     if (metaText) {
       ctx.fillStyle = C.sub; ctx.font = `11px ${FONT}`
       ctx.fillText(truncate(metaText, 28), x + tagW + 8, y + 26 - 12 + 14)
-      // 简短描述另起一行（紧凑）
     }
   }
 }

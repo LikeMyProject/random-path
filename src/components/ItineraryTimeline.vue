@@ -58,7 +58,8 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
             <div class="slot-meta">
               <span class="meta-item meal-price">💴 {{ s.meal.price }}</span>
             </div>
-            <div v-if="s.meal.desc" class="slot-desc">{{ s.meal.desc }}</div>
+            <div v-if="s.meal.shop" class="slot-desc">🏪 {{ s.meal.shop }}</div>
+            <div v-else-if="s.meal.desc" class="slot-desc">{{ s.meal.desc }}</div>
           </template>
           <!-- 景点槽位 -->
           <template v-else>

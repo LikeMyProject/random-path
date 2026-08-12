@@ -9,6 +9,7 @@
 //   6. buildTextGuide      导出文本攻略（markdown）
 // ============================================================
 import { CITIES, getCity, getTransport } from '../data/cities.js'
+import { enrichFoods } from '../data/foodSupplements.js'
 import { searchPOIsByText } from './useAMap.js'
 
 const PACE_ATTRACTIONS = { relax: 2, standard: 3, compact: 4 }
@@ -134,7 +135,7 @@ export function clusterAttractions(attractions, days, interests = []) {
 // ============================================================
 const PERIOD_LABELS = { morning: '上午', lunch: '午餐', afternoon: '下午', dinner: '晚餐', evening: '晚上', free: '自由' }
 
-function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0) {
+function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0, foodState = null) {
   const max = PACE_ATTRACTIONS[pace] || 3
   const list = dayAttractions.slice(0, max)
   const slots = []
@@ -147,15 +148,17 @@ function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0) {
   const night = list.find(a => a.night) || null
   const dayOnes = night ? list.filter(a => a !== night).slice(0, max - 1) : list
 
-  // 餐食按天轮换（保证相邻天不重样）
-  const len = Math.max(1, foods.length)
-  const pickMeal = (offset) => {
-    const idx = (dayIndex + offset) % len
-    const f = foods[idx]
-    return f ? { name: f.name, price: f.price, desc: f.desc } : null
+  // 餐食分配：使用 foodState 管理轮换，避免重复
+  // foodState 在 buildFullPlan 中创建，跨天共享
+  let lunch = null, dinner = null
+  if (foods.length > 0 && foodState) {
+    lunch = foodState.next()
+    dinner = foodState.next()
+    // 确保午餐和晚餐不一样
+    if (lunch && dinner && lunch.name === dinner.name && foods.length > 1) {
+      dinner = foodState.next()
+    }
   }
-  const lunch = pickMeal(0)
-  const dinner = pickMeal(Math.ceil(len / 2))
 
   if (night) {
     dayOnes.forEach((a, i) => slots.push({ period: i === 0 ? 'morning' : 'afternoon', attraction: a }))
@@ -189,6 +192,41 @@ function assignPeriods(dayAttractions, pace, foods = [], dayIndex = 0) {
   if (!hasDinner && dinner) withMeals.push({ period: 'dinner', meal: dinner })
 
   return withMeals.map(s => ({ ...s, periodLabel: PERIOD_LABELS[s.period] }))
+}
+
+/**
+ * 美食轮换管理器：确保跨天不重复，用完一轮才 reshuffle
+ */
+function createFoodRotation(foods) {
+  let pool = []
+  let cursor = 0
+  let lastServed = null
+
+  function reshuffle() {
+    pool = [...foods]
+    // Fisher-Yates shuffle
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    }
+    // 如果新一轮第一个和上一轮最后一个一样，交换
+    if (lastServed && pool[0] && pool[0].name === lastServed.name && pool.length > 1) {
+      ;[pool[0], pool[1]] = [pool[1], pool[0]]
+    }
+    cursor = 0
+  }
+
+  reshuffle()
+
+  return {
+    next() {
+      if (pool.length === 0) return null
+      if (cursor >= pool.length) reshuffle()
+      const f = pool[cursor++]
+      lastServed = f
+      return f ? { name: f.name, price: f.price, desc: f.desc, shop: f.shop } : null
+    },
+  }
 }
 
 // ============================================================
@@ -321,19 +359,24 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
     transports.push({ from: cities[i], to: cities[i + 1], mode: t.mode, hours: t.hours, estimated: !!t.estimated, date: tDate })
   }
 
-  // 每日行程
+  // 每日行程（使用增强美食数据 + 轮换管理器避免重复）
   cityPlans.forEach(cp => {
     const all = [...cp.data.attractions]
     // 标记夜景类
     all.forEach(a => {
       if (/夜景|演出|酒吧|夜市|灯光|演艺/.test(a.name + (a.desc || ''))) a.night = true
     })
+    // 合并补充美食数据（推荐门店 + 扩充品种）
+    const enrichedFoods = enrichFoods(cp.name, cp.data.foods || [])
+    cp.data = { ...cp.data, foods: enrichedFoods }
+    // 创建轮换管理器
+    const foodRotation = createFoodRotation(enrichedFoods)
     const clusters = clusterAttractions(all, cp.days, interests)
     cp.daily = clusters.map((cl, di) => ({
       day: di + 1,
       date: cp.dates[di]?.date || cp.dateRange.start,
       dateLabel: cp.dates[di] ? `${cp.dates[di].label} ${fmtShort(cp.dates[di].date)} ${weekday(cp.dates[di].date)}` : '',
-      slots: assignPeriods(cl, pace, cp.data.foods || [], di),
+      slots: assignPeriods(cl, pace, enrichedFoods, di, foodRotation),
       count: cl.length,
     }))
   })
@@ -403,7 +446,12 @@ export function buildTextGuide(plan) {
   // 美食
   lines.push('## 🍜 必吃美食')
   plan.cityPlans.forEach(cp => {
-    lines.push(`- **${cp.name}**：${cp.data.foods.map(f => `${f.name}(${f.price})`).join('、')}`)
+    lines.push(`\n### ${cp.name}`)
+    cp.data.foods.forEach(f => {
+      const shop = f.shop ? `｜推荐：${f.shop}` : ''
+      const desc = f.desc ? ` — ${f.desc}` : ''
+      lines.push(`- ${f.name}（${f.price}）${shop}${desc}`)
+    })
   })
   lines.push('')
 
