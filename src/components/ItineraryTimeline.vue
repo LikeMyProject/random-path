@@ -10,6 +10,8 @@ const emit = defineEmits(['update:activeDay'])
 const PERIOD_ICON = { breakfast: '🍳', morning: '🌅', lunch: '🍜', afternoon: '☀️', dinner: '🍽️', evening: '🌙', free: '🚶' }
 const PERIOD_COLOR = { breakfast: '#f59e0b', morning: '#f0a870', lunch: '#d4537e', afternoon: '#f08ca4', dinner: '#e27790', evening: '#8b5cf6', free: '#a898b8' }
 const TYPE_LABEL = { nature: '自然', culture: '人文', food: '美食', family: '亲子', urban: '地标', local: '本地' }
+// 当日景点相对质心的最大半径超过此值，提示"跨区较远"（正常同城一天通常 < 20km）
+const SPAN_WARN_KM = 35
 
 const currentDay = computed(() => props.city?.daily?.[props.activeDay] || null)
 function typeLabel(t) { return TYPE_LABEL[t] || t }
@@ -36,6 +38,9 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
         <span class="day-title">{{ currentDay.dateLabel }}</span>
         <span class="day-weather">
           {{ city.monthly[activeDay]?.low }}~{{ city.monthly[activeDay]?.high }}°C
+        </span>
+        <span v-if="currentDay.geoSpanKm > SPAN_WARN_KM" class="day-span-warn">
+          ⚠ 今日景点相距约 {{ Math.round(currentDay.geoSpanKm) }}km
         </span>
       </div>
 
@@ -108,7 +113,8 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
 .day-tab.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 3px 10px rgba(var(--accent-rgb),.25); }
 .day-tab.active .day-date { color: rgba(255,255,255,0.8); }
 .day-detail { background: #f7f5fa; border: none; border-radius: 14px; padding: 14px; }
-.day-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.day-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.day-span-warn { font-size: 10px; color: #b45309; background: #fef3c7; padding: 3px 8px; border-radius: 8px; font-weight: 700; }
 .day-title { font-size: 14px; font-weight: 800; color: #3a3045; }
 .day-weather { font-size: 11px; color: #f0a870; font-weight: 700; background: #fff7ed; padding: 3px 8px; border-radius: 8px; }
 .free-day { text-align: center; padding: 20px; color: #b0a3bc; font-size: 12px; }

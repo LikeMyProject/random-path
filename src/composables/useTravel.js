@@ -32,6 +32,11 @@ function haversineKm(a, b) {
   return 6371 * 2 * Math.asin(Math.sqrt(h))
 }
 
+// 同天景点地理半径上限（km）：超过则视为跨区域，尽量拆到不同天
+const MAX_CLUSTER_RADIUS = 35
+// 种子选择时，每远离已有种子 1km 的加分权重（让远郊景点自成一天，不与主城景点混排）
+const SEED_SPREAD_W = 0.8
+
 // ============================================================
 // 1. 天数分配：按城市建议天数权重，每城至少 1 天，转换日占用
 // ============================================================
@@ -84,18 +89,37 @@ export function clusterAttractions(attractions, days, interests = []) {
   const score = a => a.mustSee + (interests.includes(a.type) ? 1.5 : 0)
   const sorted = [...pool].sort((a, b) => score(b) - score(a))
 
-  // 种子：得分最高的 days 个
+  // 种子：第 1 个取最高分；后续种子强烈偏好「远离已有种子」，保证每天地理成片
   const k = Math.min(days, sorted.length)
-  const seeds = sorted.slice(0, k)
-  const clusters = seeds.map(s => [s])
-  const centers = seeds.map(s => ({ lng: s.coord.lng, lat: s.coord.lat }))
+  const seedIdx = [0]
+  for (let s = 1; s < k; s++) {
+    let best = -1, bestVal = -Infinity
+    for (let i = 0; i < sorted.length; i++) {
+      if (seedIdx.includes(i)) continue
+      const a = sorted[i]
+      let nearest = Infinity
+      for (const si of seedIdx) {
+        const dd = haversineKm(a.coord, sorted[si].coord)
+        if (dd < nearest) nearest = dd
+      }
+      // 远离已有种子 + 高mustSee 共同决定，远郊景点（如桐庐/建德）会自成种子
+      const val = score(a) + SEED_SPREAD_W * nearest
+      if (val > bestVal) { bestVal = val; best = i }
+    }
+    if (best === -1) break
+    seedIdx.push(best)
+  }
+  const clusters = seedIdx.map(i => [sorted[i]])
+  const centers = seedIdx.map(i => ({ lng: sorted[i].coord.lng, lat: sorted[i].coord.lat }))
 
   // 其余景点分配给最近中心
-  for (const a of sorted.slice(k)) {
+  for (let i = 0; i < sorted.length; i++) {
+    if (seedIdx.includes(i)) continue
+    const a = sorted[i]
     let best = 0, bd = Infinity
-    for (let i = 0; i < centers.length; i++) {
-      const d = haversineKm(a.coord, centers[i])
-      if (d < bd) { bd = d; best = i }
+    for (let c = 0; c < centers.length; c++) {
+      const d = haversineKm(a.coord, centers[c])
+      if (d < bd) { bd = d; best = c }
     }
     clusters[best].push(a)
     // 中心微调（取均值）
@@ -106,10 +130,11 @@ export function clusterAttractions(attractions, days, interests = []) {
     }
   }
 
-  // 平衡：每天上限 ceil(len/k)，超出的低分景点移到「地理最近且未满」的簇（保证同天景点相邻）
+  // 平衡：每天上限 ceil(len/k)，超出的低分景点移到「地理最近且未满且在半径内」的簇
+  // （半径约束避免把主城景点搬到远郊簇，保证同天景点相邻成片）
   const cap = Math.ceil(sorted.length / k)
   let guard = 0
-  while (guard++ < k * 4) {
+  while (guard++ < k * 6) {
     let heavy = -1
     for (let i = 0; i < k; i++) if (clusters[i].length > cap) { heavy = i; break }
     if (heavy === -1) break
@@ -120,7 +145,7 @@ export function clusterAttractions(attractions, days, interests = []) {
     for (let i = 0; i < k; i++) {
       if (i === heavy || clusters[i].length >= cap) continue
       const d = haversineKm(move.coord, centers[i])
-      if (d < bd) { bd = d; bestC = i }
+      if (d <= MAX_CLUSTER_RADIUS && d < bd) { bd = d; bestC = i }
     }
     if (bestC === -1) break
     clusters[bestC].push(clusters[heavy].splice(minI, 1)[0])
@@ -136,6 +161,14 @@ export function clusterAttractions(attractions, days, interests = []) {
   // 景点不足天数时，补齐为 days 组（不足的天显示自由活动）
   while (clusters.length < days) clusters.push([])
   return clusters
+}
+
+// 某天景点相对质心的最大半径（km）：用于判断"是否跨区较远"给出提示
+function daySpanKm(attractions) {
+  const pts = attractions.filter(a => a.coord).map(a => a.coord)
+  if (pts.length < 2) return 0
+  const cl = { lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length, lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length }
+  return Math.max(...pts.map(p => haversineKm(p, cl)))
 }
 
 // ============================================================
@@ -362,6 +395,7 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
       dateLabel: cp.dates[di] ? `${cp.dates[di].label} ${fmtShort(cp.dates[di].date)} ${weekday(cp.dates[di].date)}` : '',
       slots: assignPeriods(cl, pace, null),
       count: cl.length,
+      geoSpanKm: daySpanKm(cl),
     }))
   })
 
@@ -386,36 +420,32 @@ function shuffle(arr) {
   return arr
 }
 
-function distributeRestaurants(restaurants, days) {
-  const byMeal = {
-    breakfast: shuffle(restaurants.filter(r => r.mealType === 'breakfast')),
-    lunch: shuffle(restaurants.filter(r => r.mealType === 'lunch')),
-    dinner: shuffle(restaurants.filter(r => r.mealType === 'dinner')),
+function pickNearestRestaurant(pool, centroid, used) {
+  const avail = pool.filter(r => !used.has(r.name + '|' + r.address))
+  if (avail.length === 0) return null
+  if (!centroid) return avail[0]
+  let best = 0, bd = Infinity
+  for (let i = 0; i < avail.length; i++) {
+    const r = avail[i]
+    if (!r.coord) continue
+    const d = haversineKm(r.coord, centroid)
+    if (d < bd) { bd = d; best = i }
   }
-  const general = shuffle([...restaurants])
+  return avail[best] || avail[0]
+}
+
+// 餐厅按「当天景点质心」就近分配：吃的店跟着逛的路线走，不顺路就换更近的
+function distributeRestaurants(restaurants, days, dayCentroids) {
   const used = new Set()
-
-  function pick(pool, fallbackPool) {
-    while (pool.length > 0) {
-      const r = pool.shift()
-      const key = r.name + '|' + r.address
-      if (!used.has(key)) { used.add(key); return r }
-    }
-    while (fallbackPool.length > 0) {
-      const r = fallbackPool.shift()
-      const key = r.name + '|' + r.address
-      if (!used.has(key)) { used.add(key); return r }
-    }
-    return null
-  }
-
   const daily = []
   for (let d = 0; d < days; d++) {
-    daily.push({
-      breakfast: pick(byMeal.breakfast, [...general]),
-      lunch: pick(byMeal.lunch, [...general]),
-      dinner: pick(byMeal.dinner, [...general]),
-    })
+    const centroid = dayCentroids?.[d] || null
+    const pickMeal = (meal) => {
+      const pool = restaurants.filter(r => r.mealType === meal)
+      // 优先同餐次且离当天景点最近；没有同餐次时退而求其次取最近（保证顺路优先）
+      return pickNearestRestaurant(pool, centroid, used) || pickNearestRestaurant(restaurants, centroid, used)
+    }
+    daily.push({ breakfast: pickMeal('breakfast'), lunch: pickMeal('lunch'), dinner: pickMeal('dinner') })
   }
   return daily
 }
@@ -426,7 +456,13 @@ export async function searchAndAssignFoods(plan, onProgress = null) {
     onProgress?.({ city: cp.name, done: i, total: plan.cityPlans.length })
     const needed = cp.days * 3 + 5
     const restaurants = await searchRestaurantsForCity(cp.name, cp.data.coord, needed)
-    const dailyMeals = distributeRestaurants(restaurants, cp.days)
+    // 每天景点质心：让餐厅就近分配（吃的店顺路）
+    const dayCentroids = cp.daily.map(d => {
+      const pts = d.slots.filter(s => !s.meal && !s.local && s.attraction?.coord).map(s => s.attraction.coord)
+      if (pts.length === 0) return cp.data.coord
+      return { lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length, lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length }
+    })
+    const dailyMeals = distributeRestaurants(restaurants, cp.days, dayCentroids)
     cp.restaurants = restaurants
     cp.daily.forEach((d, di) => {
       const meals = dailyMeals[di] || {}
