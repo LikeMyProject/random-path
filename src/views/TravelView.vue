@@ -62,7 +62,30 @@ function loadLastSearch() {
 const restored = loadLastSearch()
 onMounted(() => {
   if (restored && selectedCities.value.length) {
-    setTimeout(() => { if (!plan.value) rebuild() }, 150)
+    setTimeout(() => {
+      if (!plan.value) {
+        rebuild()
+        // 自动搜索餐厅和本地地点
+        if (plan.value) {
+          foodLoading.value = true
+          searchAndAssignFoods(plan.value, ({ city, done, total }) => {
+            if (city) foodProgress.value = `正在搜索 ${city} 的餐厅…（${done + 1}/${total}）`
+            else foodProgress.value = ''
+          }).then(() => {
+            plan.value = { ...plan.value }
+            return searchAndAssignLocalSpots(plan.value, ({ city, done, total }) => {
+              if (city) foodProgress.value = `正在搜索 ${city} 的本地好去处…（${done + 1}/${total}）`
+              else foodProgress.value = ''
+            })
+          }).then(() => {
+            plan.value = { ...plan.value }
+          }).catch(() => {}).finally(() => {
+            foodLoading.value = false
+            foodProgress.value = ''
+          })
+        }
+      }
+    }, 150)
   }
 })
 // 输入变化防抖保存
@@ -173,7 +196,8 @@ async function generate() {
       }
     }
   } catch (e) { /* 补充失败不阻断 */ }
-  setTimeout(() => { rebuild(); loading.value = false }, 200)
+  rebuild()
+  loading.value = false
 
   // 异步搜索真实餐厅并分配到每日行程
   if (plan.value) {
