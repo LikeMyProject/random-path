@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
 import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
+import { shareGuideImage } from '../composables/useShareGuide.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
@@ -203,6 +204,8 @@ async function doSearchHotel(cp) {
     )
     hotelState.value[cp.name].list = list
     hotelState.value[cp.name].searched = true
+    // 给每家酒店补城市标记（用于分享长图选择）
+    list.forEach(h => { h.city = cp.name })
     if (list.length === 0) toast('没有符合价位的酒店，试试调整范围', 'warn')
     else toast(`找到 ${list.length} 家酒店`)
   } catch (e) { toast('酒店搜索失败: ' + e.message, 'err') }
@@ -214,6 +217,38 @@ function openHotelNav(h) {
 }
 function toggleHotelExpand(city, i) {
   hotelExpand.value[city] = hotelExpand.value[city] === i ? -1 : i
+}
+
+// ===== 长图分享（需先选酒店）=====
+const shareModal = ref(false)
+const shareHotel = ref(null)
+const sharing = ref(false)
+const allHotels = computed(() => {
+  const list = []
+  for (const [city, st] of Object.entries(hotelState.value)) {
+    for (const h of (st.list || [])) list.push({ ...h, city: h.city || city })
+  }
+  return list
+})
+function openShareModal() {
+  if (allHotels.value.length === 0) {
+    toast('请先在任意城市搜索酒店，再生成分享长图', 'warn')
+    return
+  }
+  shareHotel.value = null
+  shareModal.value = true
+}
+async function doShareGuide() {
+  if (!plan.value) return
+  if (!shareHotel.value) { toast('请先选择一家酒店', 'warn'); return }
+  sharing.value = true
+  try {
+    const r = await shareGuideImage(plan.value, shareHotel.value)
+    shareModal.value = false
+    if (r === 'shared') toast('已分享 🎉')
+    else toast('长图已下载 📥')
+  } catch (e) { toast('生成失败: ' + e.message, 'err') }
+  sharing.value = false
 }
 </script>
 
@@ -482,6 +517,35 @@ function toggleHotelExpand(city, i) {
         <button class="btn btn-sm btn-secondary" style="flex:1" @click="copyGuide">📋 复制文本</button>
         <button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGuide">📥 下载 .md</button>
       </div>
+      <button class="btn btn-sm btn-share" style="margin-top:8px;width:100%" @click="openShareModal">🖼 生成分享长图（含精选酒店）</button>
+    </div>
+
+    <!-- 酒店选择弹窗（长图分享前） -->
+    <div class="modal" v-if="shareModal" @click.self="shareModal = false">
+      <div class="inner">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h3>🏨 选择一家酒店入图</h3>
+          <button class="btn btn-sm" style="background:transparent;color:#a898b8" @click="shareModal=false">✕</button>
+        </div>
+        <p style="font-size:11px;color:#a898b8;margin:4px 0 8px">长图将包含你选中的酒店信息（共 {{ allHotels.length }} 家可选）</p>
+        <div class="share-hotel-list">
+          <div
+            v-for="(h, i) in allHotels" :key="i"
+            :class="['share-hotel-item', { on: shareHotel === h }]"
+            @click="shareHotel = h"
+          >
+            <span class="sh-city">{{ h.city }}</span>
+            <div class="sh-main">
+              <div class="sh-name">{{ h.name }}</div>
+              <div class="sh-meta">{{ formatPrice(h) }} · {{ formatRating(h) }} · 距 {{ h.attraction }} {{ formatDist(h) }}</div>
+            </div>
+            <span class="sh-check" :class="{ on: shareHotel === h }">✓</span>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:10px" :disabled="sharing || !shareHotel" @click="doShareGuide">
+          {{ sharing ? '生成中…' : '🖼 生成长图并分享' }}
+        </button>
+      </div>
     </div>
   </template>
 </div>
@@ -638,4 +702,20 @@ function toggleHotelExpand(city, i) {
 .tr-fee { font-weight: 700; color: #e27790; width: 56px; text-align: right; font-size: 11px; }
 .transit-note { margin-top: 6px; font-size: 9px; color: #b0a3bc; line-height: 1.5; }
 .hotel-empty { text-align: center; color: #a898b8; font-size: 11px; padding: 14px 8px; }
+.btn-share { background: linear-gradient(135deg, #1e1b4b, #312e81); color: #fff; }
+.share-hotel-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.share-hotel-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
+  border: 2px solid #ece5f8; background: #fff; cursor: pointer; transition: all .15s;
+}
+.share-hotel-item.on { border-color: #7c3aed; background: #f8f6ff; }
+.sh-city { font-size: 10px; background: #f3f0f7; color: #7c6fd8; border-radius: 5px; padding: 2px 6px; font-weight: 700; flex-shrink: 0; }
+.sh-main { flex: 1; min-width: 0; }
+.sh-name { font-size: 13px; font-weight: 700; color: #4a3f55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-meta { font-size: 11px; color: #a898b8; margin-top: 2px; }
+.sh-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #d4c4dc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: transparent; flex-shrink: 0; }
+.sh-check.on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.modal { position: fixed; inset: 0; background: rgba(30,27,75,0.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.inner { background: #fff; border-radius: 16px; padding: 16px; width: 100%; max-width: 440px; max-height: 82vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(30,27,75,0.25); }
+.inner h3 { font-size: 15px; color: #4a3f55; }
 </style>
