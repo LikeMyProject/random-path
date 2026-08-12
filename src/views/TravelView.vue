@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { CITY_LIST, getCity } from '../data/cities.js'
 import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated } from '../composables/useHotel.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
@@ -148,6 +149,55 @@ watch([selectedCities, startDate, endDate, pace, interests], () => {
   clearTimeout(rbTimer)
   rbTimer = setTimeout(() => { if (plan.value) rebuild() }, 400)
 }, { deep: true })
+
+// ===== 酒店搜索 =====
+const HOTEL_PRESETS = [
+  { key: 'budget', label: '经济 <300', min: 0, max: 300 },
+  { key: 'comfort', label: '舒适 300-600', min: 300, max: 600 },
+  { key: 'premium', label: '高档 600-1200', min: 600, max: 1200 },
+]
+const hotelOpen = ref('')             // 展开酒店面板的城市名
+const hotelPreset = ref({})           // city -> budget/comfort/premium/custom
+const hotelCustomMin = ref({}), hotelCustomMax = ref({})
+const hotelAttraction = ref({})       // city -> 指定景点名（'' = 全部）
+const hotelState = ref({})            // city -> { loading, progress, list }
+
+function toggleHotel(name) { hotelOpen.value = hotelOpen.value === name ? '' : name }
+function setHotelPreset(name, key) { hotelPreset.value[name] = key }
+function hotelRange(name) {
+  const p = hotelPreset.value[name]
+  const preset = HOTEL_PRESETS.find(x => x.key === p)
+  if (preset) return { min: preset.min, max: preset.max }
+  const mn = parseFloat(hotelCustomMin.value[name]), mx = parseFloat(hotelCustomMax.value[name])
+  if (isNaN(mn) && isNaN(mx)) return null
+  return { min: isNaN(mn) ? 0 : mn, max: isNaN(mx) ? Infinity : mx }
+}
+async function doSearchHotel(cp) {
+  const range = hotelRange(cp.name)
+  if (!range) { toast('请选择或输入价位范围', 'warn'); return }
+  hotelState.value[cp.name] = { loading: true, progress: '准备搜索…', list: [], searched: false }
+  let attrs = cp.data.attractions
+  const pick = hotelAttraction.value[cp.name]
+  if (pick) attrs = attrs.filter(a => a.name === pick)
+  try {
+    const list = await searchHotelsForCity(
+      attrs.map(a => ({ name: a.name, coord: a.coord })),
+      {
+        min: range.min, max: range.max,
+        onProgress: ({ done, total }) => { hotelState.value[cp.name].progress = `正在搜索 ${done}/${total} 个景点周边…` },
+      }
+    )
+    hotelState.value[cp.name].list = list
+    hotelState.value[cp.name].searched = true
+    if (list.length === 0) toast('没有符合价位的酒店，试试调整范围', 'warn')
+    else toast(`找到 ${list.length} 家酒店`)
+  } catch (e) { toast('酒店搜索失败: ' + e.message, 'err') }
+  hotelState.value[cp.name].loading = false
+}
+function openHotelNav(h) {
+  const url = `https://uri.amap.com/navigation?to=${h.coord.lng},${h.coord.lat},${encodeURIComponent(h.name)}&mode=car&coordinate=gaode&callnative=1`
+  window.open(url, '_blank')
+}
 </script>
 
 <template>
@@ -262,6 +312,65 @@ watch([selectedCities, startDate, endDate, pace, interests], () => {
       <button class="btn btn-sm btn-supp" :disabled="suppLoading === cp.name" @click="doSupplement(cp.name)">
         {{ suppLoading === cp.name ? '搜索中…' : '🔍 补充更多景点（高德实时）' }}
       </button>
+
+      <!-- 酒店搜索 -->
+      <button class="btn btn-sm btn-hotel" :class="{ on: hotelOpen === cp.name }" @click="toggleHotel(cp.name)">
+        🏨 按预算找附近酒店
+      </button>
+      <div v-if="hotelOpen === cp.name" class="hotel-panel">
+        <div class="hotel-presets">
+          <button
+            v-for="p in HOTEL_PRESETS" :key="p.key"
+            :class="['chip-sm', { on: hotelPreset[cp.name] === p.key }]"
+            @click="setHotelPreset(cp.name, p.key)"
+          >{{ p.label }}</button>
+          <button
+            :class="['chip-sm', { on: hotelPreset[cp.name] === 'custom' }]"
+            @click="setHotelPreset(cp.name, 'custom')"
+          >✏️ 自定义</button>
+        </div>
+        <div v-if="hotelPreset[cp.name] === 'custom'" class="hotel-custom">
+          <input v-model="hotelCustomMin[cp.name]" type="number" min="0" placeholder="最低 ¥" class="inp" />
+          <span class="date-sep">~</span>
+          <input v-model="hotelCustomMax[cp.name]" type="number" min="0" placeholder="最高 ¥" class="inp" />
+        </div>
+        <div class="hotel-attraction-sel">
+          <select v-model="hotelAttraction[cp.name]" class="inp">
+            <option value="">📍 全部热门景点周边</option>
+            <option v-for="a in cp.data.attractions" :key="a.name" :value="a.name">{{ a.name }}</option>
+          </select>
+        </div>
+        <button class="btn btn-sm btn-hotel-search" :disabled="hotelState[cp.name]?.loading" @click="doSearchHotel(cp)">
+          {{ hotelState[cp.name]?.loading ? '搜索中…' : '🔍 搜索酒店' }}
+        </button>
+
+        <div v-if="hotelState[cp.name]?.loading" class="hotel-loading">
+          <span class="spin">⏳</span> {{ hotelState[cp.name]?.progress }}
+        </div>
+        <div v-else-if="hotelState[cp.name]?.list?.length" class="hotel-results">
+          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · 按评分排序</div>
+          <div
+            v-for="(h, i) in hotelState[cp.name].list"
+            :key="i"
+            class="hotel-item"
+            @click="openHotelNav(h)"
+          >
+            <div class="h-row1">
+              <span class="h-name">{{ h.name }}</span>
+              <span v-if="isGoodRated(h)" class="h-badge good">好评</span>
+              <span v-if="h.priceInferred" class="h-badge ref">参考价</span>
+            </div>
+            <div class="h-row2">
+              <span class="h-price">{{ formatPrice(h) }}/晚</span>
+              <span class="h-rating" :class="{ none: h.rating == null && !h.reputation, [h.reputation?.cls]: !!h.reputation }">{{ formatRating(h) }}</span>
+              <span class="h-dist">距 {{ h.attraction }} {{ formatDist(h) }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="hotel-empty">
+          {{ hotelState[cp.name]?.searched ? '没有符合该价位的酒店，试试放宽范围' : '设置价位范围后点击搜索，实时查找景点周边酒店' }}
+        </div>
+      </div>
 
       <!-- 折叠：美食 / 贴士 / 全部景点 -->
       <div v-if="showAdvanced === cp.name" class="city-more">
@@ -398,10 +507,44 @@ watch([selectedCities, startDate, endDate, pace, interests], () => {
 .attr-nav { font-size: 13px; }
 .poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
 
-.budget-items { display: flex; flex-direction: column; }
-.budget-item { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #f2eaf4; font-size: 12px; }
+.budget-items { display: flex; flex-direction: column; }.budget-item { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #f2eaf4; font-size: 12px; }
 .b-label { color: #8a7a98; }
 .b-value { font-weight: 700; color: #5e5468; }
 .budget-total { text-align: center; margin-top: 10px; font-size: 13px; color: #8a7a98; }
 .budget-total strong { color: #e27790; font-size: 16px; }
+
+/* 酒店搜索 */
+.btn-hotel { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+.btn-hotel.on { opacity: .85; }
+.hotel-panel { margin-top: 8px; background: #f8f7ff; border: 1px solid #e0e0f0; border-radius: 12px; padding: 10px; }
+.hotel-presets { display: flex; gap: 4px; flex-wrap: wrap; }
+.hotel-presets .chip-sm.on { background: #6366f1; color: #fff; border-color: #6366f1; }
+.hotel-custom { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.hotel-custom .inp { flex: 1; }
+.hotel-attraction-sel { margin-top: 8px; }
+.btn-hotel-search { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; width: 100%; }
+.hotel-loading { text-align: center; color: #7c6fd8; font-size: 12px; padding: 14px 0; }
+.hotel-loading .spin { display: inline-block; animation: hspin 1s linear infinite; }
+@keyframes hspin { to { transform: rotate(360deg) } }
+.hotel-results { margin-top: 8px; }
+.hotel-count { font-size: 11px; color: #a898b8; margin-bottom: 6px; }
+.hotel-item {
+  background: #fff; border: 1px solid #ece5f8; border-radius: 10px; padding: 8px 10px;
+  margin-bottom: 6px; cursor: pointer; transition: all .15s;
+}
+.hotel-item:hover { border-color: #8b5cf6; box-shadow: 0 2px 8px rgba(139,92,246,.12); }
+.h-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.h-name { font-size: 13px; font-weight: 700; color: #4a3f55; flex: 1; }
+.h-badge { font-size: 9px; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
+.h-badge.good { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+.h-badge.ref { background: #faf7fc; color: #8a7a98; border: 1px solid #e5dcec; }
+.h-row2 { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.h-price { font-size: 12px; font-weight: 800; color: #e27790; }
+.h-rating { font-size: 11px; font-weight: 700; color: #f59e0b; }
+.h-rating.none { color: #a898b8; font-weight: 400; }
+.h-rating.premium { color: #8b5cf6; }
+.h-rating.chain { color: #0f6e56; }
+.h-rating.bnb { color: #d4537e; }
+.h-dist { font-size: 11px; color: #8a7a98; margin-left: auto; }
+.hotel-empty { text-align: center; color: #a898b8; font-size: 11px; padding: 14px 8px; }
 </style>
