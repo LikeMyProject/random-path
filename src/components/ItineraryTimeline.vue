@@ -9,7 +9,7 @@ const emit = defineEmits(['update:activeDay'])
 
 const PERIOD_ICON = { breakfast: '🍳', morning: '🌅', lunch: '🍜', afternoon: '☀️', dinner: '🍽️', evening: '🌙', free: '🚶' }
 const PERIOD_COLOR = { breakfast: '#f59e0b', morning: '#f0a870', lunch: '#d4537e', afternoon: '#f08ca4', dinner: '#e27790', evening: '#8b5cf6', free: '#a898b8' }
-const TYPE_LABEL = { nature: '自然', culture: '人文', food: '美食', family: '亲子', urban: '地标' }
+const TYPE_LABEL = { nature: '自然', culture: '人文', food: '美食', family: '亲子', urban: '地标', local: '本地' }
 
 const currentDay = computed(() => props.city?.daily?.[props.activeDay] || null)
 function typeLabel(t) { return TYPE_LABEL[t] || t }
@@ -43,7 +43,7 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
         🚶 自由活动 / 机动时间 — 可逛城市、探店或休息
       </div>
 
-      <div v-for="(s, i) in currentDay.slots" :key="i" :class="['slot-row', { meal: s.meal }]">
+      <div v-for="(s, i) in currentDay.slots" :key="i" :class="['slot-row', { meal: s.meal, local: s.local }]">
         <div class="slot-time">
           <span class="slot-icon">{{ PERIOD_ICON[s.period] }}</span>
           <span class="slot-label" :style="{ color: PERIOD_COLOR[s.period] }">{{ s.periodLabel }}</span>
@@ -61,6 +61,17 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
               <span v-if="s.meal.tag" class="meta-item rest-type-tag">{{ s.meal.tag }}</span>
             </div>
             <div v-if="s.meal.address" class="slot-desc">📍 {{ s.meal.address }}</div>
+          </template>
+          <!-- 本地小众地点槽位 -->
+          <template v-else-if="s.local">
+            <div class="slot-name local-name">
+              🏮 {{ s.spot.name }}
+              <span class="local-badge">{{ s.spot.label }}</span>
+            </div>
+            <div class="slot-meta">
+              <span v-if="s.spot.tag" class="meta-item local-tag">{{ s.spot.tag }}</span>
+            </div>
+            <div v-if="s.spot.address" class="slot-desc">📍 {{ s.spot.address }}</div>
           </template>
           <!-- 景点槽位 -->
           <template v-else>
@@ -104,12 +115,16 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
 .slot-row { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,.04); }
 .slot-row:last-child { border-bottom: none; }
 .slot-row.meal { background: #fff8fb; border-radius: 10px; padding: 10px 12px; border: none; margin: 4px 0; }
+.slot-row.local { background: #fffbeb; border-radius: 10px; padding: 10px 12px; border: none; margin: 4px 0; border-left: 3px solid #f59e0b; }
 .slot-time { width: 52px; flex-shrink: 0; text-align: center; }
 .slot-icon { font-size: 16px; display: block; }
 .slot-label { font-size: 11px; font-weight: 700; }
 .slot-body { flex: 1; min-width: 0; }
 .slot-name { font-size: 13px; font-weight: 700; color: #4a3f55; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .meal-name { color: #c2415e; }
+.local-name { color: #92400e; }
+.local-badge { font-size: 9px; background: #fef3c7; color: #92400e; border-radius: 6px; padding: 2px 7px; font-weight: 700; }
+.local-tag { background: #fef3c7; color: #92400e; padding: 2px 7px; border-radius: 6px; font-weight: 600; }
 .meal-tag { font-size: 9px; background: #fbeaf0; color: #993556; border-radius: 6px; padding: 2px 7px; font-weight: 700; }
 .meal-price { color: #c2415e; font-weight: 700; }
 .meal-rating { font-size: 10px; color: #f59e0b; font-weight: 700; }
@@ -124,5 +139,6 @@ function mustSeeStars(n) { return '★'.repeat(Math.max(0, n || 0)) }
 .type-chip.t-food { background: #faeeda; color: #854f0b; }
 .type-chip.t-family { background: #e6f1fb; color: #185fa5; }
 .type-chip.t-urban { background: #eeedfe; color: #534ab7; }
+.type-chip.t-local { background: #fef3c7; color: #92400e; }
 .slot-desc { font-size: 11px; color: #a898b8; margin-top: 3px; line-height: 1.5; }
 </style>

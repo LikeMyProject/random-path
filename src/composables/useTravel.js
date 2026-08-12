@@ -9,7 +9,7 @@
 //   6. buildTextGuide      导出文本攻略（markdown）
 // ============================================================
 import { CITIES, getCity, getTransport } from '../data/cities.js'
-import { searchPOIsByText, searchRestaurantsForCity } from './useAMap.js'
+import { searchPOIsByText, searchRestaurantsForCity, searchLocalSpotsForCity } from './useAMap.js'
 
 const PACE_ATTRACTIONS = { relax: 2, standard: 3, compact: 4 }
 export { PACE_ATTRACTIONS }
@@ -402,7 +402,57 @@ export async function searchAndAssignFoods(plan, onProgress = null) {
 }
 
 // ============================================================
-// 8. 文本攻略导出（markdown）
+// 7.6 异步搜索本地小众地点并插入每日行程（本地人去的地方）
+// ============================================================
+export async function searchAndAssignLocalSpots(plan, onProgress = null) {
+  for (let i = 0; i < plan.cityPlans.length; i++) {
+    const cp = plan.cityPlans[i]
+    onProgress?.({ city: cp.name, done: i, total: plan.cityPlans.length })
+    const needed = cp.days + 5  // 每天1个 + 缓冲
+    const spots = await searchLocalSpotsForCity(cp.name, cp.data.coord, needed)
+    cp.localSpots = spots
+
+    const used = new Set()
+    let idx = 0
+
+    cp.daily.forEach((d) => {
+      // 挑1个未用过的本地地点
+      let spot = null
+      while (idx < spots.length) {
+        const s = spots[idx++]
+        const key = s.name + '|' + s.address
+        if (!used.has(key)) { used.add(key); spot = s; break }
+      }
+      if (!spot) return
+
+      // 夜市→晚上时段，其他→下午时段
+      const isNight = spot.category === 'nightmarket'
+      const period = isNight ? 'evening' : 'afternoon'
+
+      // 找到插入位置：同类时段最后一个景点之后
+      let insertPos = d.slots.length
+      if (isNight) {
+        for (let si = 0; si < d.slots.length; si++) {
+          if (d.slots[si].period === 'evening') insertPos = si + 1
+        }
+      } else {
+        for (let si = d.slots.length - 1; si >= 0; si--) {
+          if (d.slots[si].period === 'afternoon' && !d.slots[si].meal && !d.slots[si].local) {
+            insertPos = si + 1; break
+          }
+        }
+      }
+
+      d.slots.splice(insertPos, 0, {
+        period,
+        periodLabel: PERIOD_LABELS[period],
+        local: true,
+        spot,
+      })
+    })
+  }
+  onProgress?.({ city: '', done: plan.cityPlans.length, total: plan.cityPlans.length })
+}
 // ============================================================
 export function buildTextGuide(plan) {
   if (!plan) return ''
@@ -444,6 +494,15 @@ export function buildTextGuide(plan) {
           lines.push(`- ${parts.join('｜')}`)
           return
         }
+        if (s.local) {
+          const sp = s.spot
+          const parts = [`**${s.periodLabel}** 🏮 ${sp.name}`]
+          parts.push(sp.label)
+          if (sp.tag) parts.push(sp.tag)
+          if (sp.address) parts.push(`📍 ${sp.address}`)
+          lines.push(`- ${parts.join('｜')}`)
+          return
+        }
         const a = s.attraction
         lines.push(`- **${s.periodLabel}** ${a.name}｜${a.ticket}｜建议${a.duration}${a.desc ? ' — ' + a.desc : ''}`)
       })
@@ -473,6 +532,26 @@ export function buildTextGuide(plan) {
           if (m.price) parts.push(m.price)
           if (m.rating) parts.push(`${m.rating}分`)
           if (m.address) parts.push(`📍 ${m.address}`)
+          lines.push(`- ${parts.join('｜')}`)
+        }
+      })
+    })
+  })
+  lines.push('')
+
+  // 本地推荐（从每日行程中提取不重复的本地地点）
+  lines.push('## 🏮 本地人去的地方（实时搜索）')
+  plan.cityPlans.forEach(cp => {
+    lines.push(`\n### ${cp.name}`)
+    const seen = new Set()
+    cp.daily.forEach(d => {
+      d.slots.forEach(s => {
+        if (s.local && !seen.has(s.spot.name)) {
+          seen.add(s.spot.name)
+          const sp = s.spot
+          const parts = [`🏮 ${sp.name}`, sp.label]
+          if (sp.tag) parts.push(sp.tag)
+          if (sp.address) parts.push(`📍 ${sp.address}`)
           lines.push(`- ${parts.join('｜')}`)
         }
       })

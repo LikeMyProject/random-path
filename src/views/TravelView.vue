@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildFullPlan, buildTextGuide, supplementAttractions, searchAndAssignFoods, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import { buildFullPlan, buildTextGuide, supplementAttractions, searchAndAssignFoods, searchAndAssignLocalSpots, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
@@ -184,9 +184,16 @@ async function generate() {
         else foodProgress.value = ''
       })
       plan.value = { ...plan.value }
-      toast('餐厅搜索完成，已为每日行程分配早中晚餐')
+      toast('餐厅搜索完成，正在搜索本地好去处…')
+      // 搜索本地小众地点
+      await searchAndAssignLocalSpots(plan.value, ({ city, done, total }) => {
+        if (city) foodProgress.value = `正在搜索 ${city} 的本地好去处…（${done + 1}/${total}）`
+        else foodProgress.value = ''
+      })
+      plan.value = { ...plan.value }
+      toast('餐厅和本地好去处搜索完成，已为每日行程分配早中晚餐和本地推荐')
     } catch (e) {
-      toast('部分餐厅搜索失败，行程仍可使用', 'warn')
+      toast('部分搜索失败，行程仍可使用', 'warn')
     }
     foodLoading.value = false
     foodProgress.value = ''
@@ -256,6 +263,21 @@ function cityRestaurants(cp) {
 
 const MEAL_TYPE_LABELS = { breakfast: '🌅 早餐', lunch: '☀️ 午餐', dinner: '🌙 晚餐', snack: '🍮 小吃' }
 function mealTypeLabel(t) { return MEAL_TYPE_LABELS[t] || t }
+
+// 从每日行程中提取不重复的本地地点列表
+function cityLocalSpots(cp) {
+  const seen = new Set()
+  const list = []
+  cp.daily?.forEach(d => {
+    d.slots?.forEach(s => {
+      if (s.local && !seen.has(s.spot.name)) {
+        seen.add(s.spot.name)
+        list.push(s.spot)
+      }
+    })
+  })
+  return list
+}
 
 // 监听输入变化自动重新生成（防抖）
 let rbTimer = null
@@ -599,6 +621,24 @@ async function doShareGuide() {
           </div>
         </div>
         <div class="more-sec">
+          <div class="more-title">🏮 本地人去的地方 <span class="hint">（实时搜索 · 菜市场/老街/夜市/老字号…）</span></div>
+          <div v-if="cityLocalSpots(cp).length" class="food-grid">
+            <div v-for="(s, i) in cityLocalSpots(cp)" :key="i" class="food-item local-spot-item">
+              <div class="rest-header">
+                <span class="food-name">🏮 {{ s.name }}</span>
+                <span class="local-cat-badge">{{ s.label }}</span>
+              </div>
+              <div class="rest-meta">
+                <span v-if="s.tag" class="rest-tag">{{ s.tag }}</span>
+              </div>
+              <div v-if="s.address" class="food-desc">📍 {{ s.address }}</div>
+            </div>
+          </div>
+          <div v-else class="food-empty">
+            {{ foodLoading ? '正在搜索本地好去处…' : '点击「一键生成攻略」搜索本地小众地点' }}
+          </div>
+        </div>
+        <div class="more-sec">
           <div class="more-title">💡 实用贴士</div>
           <ul class="tips-list">
             <li v-for="(t, i) in cp.data.tips" :key="i">{{ t }}</li>
@@ -749,6 +789,8 @@ async function doShareGuide() {
 .rest-tag { font-size: 9px; background: #f0edf5; color: #7c6fd8; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
 .rest-meal-type { font-size: 9px; background: #fff5f8; color: #c2415e; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
 .food-empty { font-size: 12px; color: #b0a3bc; padding: 16px 8px; text-align: center; }
+.local-spot-item { border-left: 3px solid #f59e0b; padding-left: 10px; }
+.local-cat-badge { font-size: 9px; background: #fef3c7; color: #92400e; border-radius: 6px; padding: 2px 7px; font-weight: 700; flex-shrink: 0; }
 .food-loading-bar { margin-top: 8px; padding: 8px 14px; background: var(--accent-soft); border-radius: 10px; font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
 .food-loading-bar .spin { display: inline-block; animation: hspin 1s linear infinite; }
 @keyframes hspin { to { transform: rotate(360deg) } }

@@ -179,8 +179,12 @@ export function generateGuideImage(plan, hotel) {
 
     // 每天一张卡片（高度按实际槽位动态计算）
     cp.daily.forEach(d => {
-      // 计算每个槽位高度：有门店的餐食=50px，普通=36px
-      const slotHeights = d.slots.map(s => (s.meal && (s.meal.address || s.meal.tag)) ? 50 : 36)
+      // 计算每个槽位高度：有地址的餐食/本地地点=50px，普通=36px
+      const slotHeights = d.slots.map(s => {
+        if (s.meal && (s.meal.address || s.meal.tag)) return 50
+        if (s.local && s.spot.address) return 50
+        return 36
+      })
       const totalSlotH = slotHeights.reduce((a, b) => a + b, 0)
       const cardH = 52 + totalSlotH
       add(62 + totalSlotH, (ctx, y) => {
@@ -370,6 +374,60 @@ export function generateGuideImage(plan, hotel) {
     })
   }
 
+  // ===== 本地人去的地方（从每日行程中提取，按城市分组）=====
+  {
+    let localTotalH = 60
+    plan.cityPlans.forEach(cp => {
+      const spotList = extractCityLocalSpots(cp)
+      if (spotList.length === 0) return
+      localTotalH += 28
+      localTotalH += spotList.length * 42 + (spotList.length > 0 ? (spotList.length - 1) * 4 : 0)
+      localTotalH += 14
+    })
+    localTotalH += 8
+
+    add(localTotalH, (ctx, y) => {
+      y += 16
+      drawCardTitle(ctx, X, y, '🏮 本地人去的地方', C.orange)
+      y += 44
+
+      plan.cityPlans.forEach(cp => {
+        const spotList = extractCityLocalSpots(cp)
+        if (spotList.length === 0) return
+
+        ctx.fillStyle = C.orange; ctx.font = `bold 17px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+        ctx.fillText(`📍 ${cp.name}（${spotList.length} 处）`, X + 4, y)
+        y += 28
+
+        spotList.forEach((sp) => {
+          const cardH = 38
+          ctx.fillStyle = '#fffbeb'
+          roundRect(ctx, X, y, CW - M * 2, cardH, 8); ctx.fill()
+          ctx.strokeStyle = '#fde6c8'; ctx.lineWidth = 1
+          roundRect(ctx, X, y, CW - M * 2, cardH, 8); ctx.stroke()
+
+          ctx.fillStyle = C.ink; ctx.font = `bold 15px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
+          ctx.fillText(`🏮 ${truncate(sp.name, 16)}`, X + 14, y + 8)
+
+          if (sp.label) {
+            ctx.fillStyle = C.orange; ctx.font = `bold 12px ${FONT}`; ctx.textAlign = 'right'
+            ctx.fillText(sp.label, X + CW - M * 2 - 14, y + 8)
+          }
+
+          const infoParts = []
+          if (sp.tag) infoParts.push(truncate(sp.tag, 18))
+          if (sp.address) infoParts.push(`📍 ${truncate(sp.address, 22)}`)
+          if (infoParts.length) {
+            ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`; ctx.textAlign = 'left'
+            ctx.fillText(infoParts.join('  '), X + 14, y + 24)
+          }
+          y += cardH + 4
+        })
+        y += 10
+      })
+    })
+  }
+
   // ===== 实用贴士 =====
   const totalTips = plan.cityPlans.reduce((s, cp) => s + cp.data.tips.length, 0)
   add(66 + 30 * totalTips, (ctx, y) => {
@@ -438,19 +496,37 @@ function extractCityRestaurants(cp) {
   return list
 }
 
+/** 从城市行程中提取不重复的本地地点列表 */
+function extractCityLocalSpots(cp) {
+  const seen = new Set()
+  const list = []
+  cp.daily?.forEach(d => {
+    d.slots?.forEach(s => {
+      if (s.local && !seen.has(s.spot.name)) {
+        seen.add(s.spot.name)
+        list.push(s.spot)
+      }
+    })
+  })
+  return list
+}
+
 function drawSlot(ctx, x, y, w, s, dayColor) {
   const isMeal = !!s.meal
+  const isLocal = !!s.local
   const isFree = s.period === 'free'
   const hasShop = isMeal && (s.meal.address || s.meal.tag)
-  const slotH = hasShop ? 42 : 28
+  const hasLocalAddr = isLocal && s.spot.address
+  const slotH = (hasShop || hasLocalAddr) ? 42 : 28
   const mealColor = s.period === 'breakfast' ? C.orange : C.pink
-  ctx.fillStyle = isMeal ? (s.period === 'breakfast' ? '#fff7e6' : '#fff5f8') : isFree ? '#faf8fd' : '#ffffff'
+  const localColor = C.orange
+  ctx.fillStyle = isMeal ? (s.period === 'breakfast' ? '#fff7e6' : '#fff5f8') : isLocal ? '#fffbeb' : isFree ? '#faf8fd' : '#ffffff'
   roundRect(ctx, x, y, w, slotH, 6); ctx.fill()
-  ctx.strokeStyle = isMeal ? (s.period === 'breakfast' ? '#fde6c8' : '#fbd5e0') : isFree ? '#ece6f0' : C.line; ctx.lineWidth = 1
+  ctx.strokeStyle = isMeal ? (s.period === 'breakfast' ? '#fde6c8' : '#fbd5e0') : isLocal ? '#fde6c8' : isFree ? '#ece6f0' : C.line; ctx.lineWidth = 1
   roundRect(ctx, x, y, w, slotH, 6); ctx.stroke()
   const periodLabel = s.periodLabel || '时段'
   const tagW = 44
-  ctx.fillStyle = isMeal ? mealColor : isFree ? C.mute : dayColor
+  ctx.fillStyle = isMeal ? mealColor : isLocal ? localColor : isFree ? C.mute : dayColor
   roundRect(ctx, x, y, tagW, slotH, 6); ctx.fill()
   ctx.fillStyle = '#ffffff'; ctx.font = `bold 11px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'
   ctx.fillText(periodLabel, x + tagW / 2, y + slotH / 2)
@@ -471,6 +547,19 @@ function drawSlot(ctx, x, y, w, s, dayColor) {
       const addrText = s.meal.address ? `📍 ${truncate(s.meal.address, 22)}` : ''
       ctx.fillStyle = C.mute; ctx.font = `11px ${FONT}`; ctx.textAlign = 'left'
       ctx.fillText([infoText, addrText].filter(Boolean).join('  '), x + tagW + 8, y + 26)
+    }
+  } else if (isLocal) {
+    ctx.fillStyle = localColor; ctx.font = `bold 13px ${FONT}`; ctx.textBaseline = 'top'
+    ctx.fillText(`🏮 ${truncate(s.spot.name, 14)}`, x + tagW + 8, y + 6)
+    if (s.spot.label) {
+      ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`; ctx.textAlign = 'right'
+      ctx.fillText(s.spot.label, x + w - 8, y + 7)
+    }
+    if (hasLocalAddr) {
+      const tagText = s.spot.tag ? truncate(s.spot.tag, 20) : ''
+      const addrText = `📍 ${truncate(s.spot.address, 22)}`
+      ctx.fillStyle = C.mute; ctx.font = `11px ${FONT}`; ctx.textAlign = 'left'
+      ctx.fillText([tagText, addrText].filter(Boolean).join('  '), x + tagW + 8, y + 26)
     }
   } else if (isFree) {
     ctx.fillStyle = C.sub; ctx.font = `12px ${FONT}`; ctx.textBaseline = 'middle'

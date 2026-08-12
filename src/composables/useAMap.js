@@ -101,6 +101,70 @@ export async function searchRestaurantsForCity(cityName, cityCoord, needed = 40)
   return results
 }
 
+// ============================================================
+// 城市本地小众地点搜索：菜市场/老街/夜市/老字号/文创园等
+// ============================================================
+const LOCAL_SPOT_QUERIES = [
+  { kw: '菜市场', cat: 'market', label: '市井烟火' },
+  { kw: '农贸市场', cat: 'market', label: '市井烟火' },
+  { kw: '老街', cat: 'oldstreet', label: '老街古巷' },
+  { kw: '古街', cat: 'oldstreet', label: '老街古巷' },
+  { kw: '历史街区', cat: 'oldstreet', label: '老街古巷' },
+  { kw: '胡同', cat: 'oldstreet', label: '老街古巷' },
+  { kw: '夜市', cat: 'nightmarket', label: '夜市灯火' },
+  { kw: '老字号', cat: 'heritage', label: '百年老店' },
+  { kw: '步行街', cat: 'pedestrian', label: '逛街好去处' },
+  { kw: '文创园', cat: 'creative', label: '文艺创意' },
+  { kw: '创意园', cat: 'creative', label: '文艺创意' },
+  { kw: '书店', cat: 'bookstore', label: '书香角落' },
+  { kw: '美术馆', cat: 'art', label: '艺术空间' },
+  { kw: '画廊', cat: 'art', label: '艺术空间' },
+  { kw: '寺庙', cat: 'temple', label: '禅意时光' },
+  { kw: '道观', cat: 'temple', label: '禅意时光' },
+  { kw: '大学', cat: 'campus', label: '学府漫步' },
+  { kw: '文化广场', cat: 'plaza', label: '城市客厅' },
+  { kw: '手工坊', cat: 'craft', label: '手作体验' },
+  { kw: '特色小镇', cat: 'town', label: '小镇风情' },
+]
+
+export async function searchLocalSpotsForCity(cityName, cityCoord, needed = 30) {
+  const results = []
+  const seen = new Set()
+  // 过滤掉明显的噪声 POI
+  const NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|洗车|维修|批发市场$/
+  for (const { kw, cat, label } of LOCAL_SPOT_QUERIES) {
+    if (results.length >= needed) break
+    try {
+      let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
+        `&keywords=${encodeURIComponent(kw)}` +
+        `&city=${encodeURIComponent(cityName)}` +
+        `&city_limit=true` +
+        `&offset=20` +
+        `&show_fields=tag,address`
+      const d = await fetchJSON(url)
+      if (d.status === '1' && d.pois) {
+        for (const p of d.pois) {
+          const loc = (p.location || '').split(',')
+          const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
+          if (!lng || !lat) continue
+          const name = p.name || ''
+          if (NOISE_RE.test(name)) continue
+          const key = name + '|' + (p.address || '')
+          if (seen.has(key)) continue
+          seen.add(key)
+          results.push({
+            name, address: p.address || '', tag: p.tag || '',
+            category: cat, label, coord: { lng, lat },
+          })
+          if (results.length >= needed) break
+        }
+      }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 200))
+  }
+  return results
+}
+
 export async function searchPOIsByText(keywords, city = '', limit = 5) {
   try {
     let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}&keywords=${encodeURIComponent(keywords)}&offset=${limit}`
