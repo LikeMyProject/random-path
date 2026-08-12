@@ -1,0 +1,407 @@
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { CITY_LIST, getCity } from '../data/cities.js'
+import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import ItineraryTimeline from '../components/ItineraryTimeline.vue'
+
+const toast = (m, t) => window.$toast?.(m, t)
+
+// ===== 输入状态 =====
+const origin = ref('')                     // 出发地（可选）
+const selectedCities = ref([])             // 目的地城市（按顺序）
+const startDate = ref(''), endDate = ref('')
+const pace = ref('standard')
+const interests = ref([])
+const loading = ref(false)
+
+// 默认日期：下周一开始，4 天
+function defaultDates() {
+  const t = new Date()
+  const s = new Date(t); s.setDate(s.getDate() + 7)
+  const e = new Date(s); e.setDate(e.getDate() + 3)
+  return { s: fmt(s), e: fmt(e) }
+}
+function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+const def = defaultDates()
+startDate.value = def.s; endDate.value = def.e
+
+const remaining = computed(() => CITY_LIST.filter(c => !selectedCities.value.includes(c)))
+const cityToAdd = ref('')
+function onSelectCity() {
+  if (!cityToAdd.value) return
+  if (!selectedCities.value.includes(cityToAdd.value)) selectedCities.value.push(cityToAdd.value)
+  cityToAdd.value = ''
+}
+function toggleHot(c) {
+  const i = selectedCities.value.indexOf(c)
+  if (i >= 0) selectedCities.value.splice(i, 1)
+  else selectedCities.value.push(c)
+}
+function toggleInterest(k) {
+  const i = interests.value.indexOf(k)
+  if (i >= 0) interests.value.splice(i, 1)
+  else interests.value.push(k)
+}
+function toggleCity(name) {
+  showAdvanced.value = showAdvanced.value === name ? '' : name
+}
+const totalDays = computed(() => {
+  if (!startDate.value || !endDate.value) return 0
+  const a = new Date(startDate.value), b = new Date(endDate.value)
+  if (b < a) return 0
+  return Math.round((b - a) / 86400000) + 1
+})
+
+function addCity() {
+  if (remaining.value.length === 0) return
+  selectedCities.value.push(remaining.value[0])
+}
+function removeCity(i) { selectedCities.value.splice(i, 1) }
+function moveCity(i, dir) {
+  const j = i + dir
+  if (j < 0 || j >= selectedCities.value.length) return
+  const arr = selectedCities.value
+  ;[arr[i], arr[j]] = [arr[j], arr[i]]
+}
+
+// ===== 结果状态 =====
+const plan = ref(null)
+const activeDayMap = ref({})
+const showAdvanced = ref(true) // 每城折叠详情
+const suppLoading = ref('')
+
+function rebuild() {
+  if (selectedCities.value.length === 0 || !startDate.value || !endDate.value) return
+  const p = buildFullPlan({
+    cities: selectedCities.value,
+    startDate: startDate.value,
+    endDate: endDate.value,
+    pace: pace.value,
+    interests: interests.value,
+    originCity: origin.value,
+  })
+  if (!p) { toast('请检查日期设置', 'warn'); return }
+  // 天数校验
+  if (p.totalDays < selectedCities.value.length + Math.max(0, selectedCities.value.length - 1)) {
+    toast(`天数太紧：${selectedCities.value.length} 城至少需要 ${selectedCities.value.length + Math.max(0, selectedCities.value.length - 1)} 天`, 'warn')
+  }
+  plan.value = p
+  p.cityPlans.forEach(cp => { if (!(cp.name in activeDayMap.value)) activeDayMap.value[cp.name] = 0 })
+}
+
+function generate() {
+  if (selectedCities.value.length === 0) { toast('请先选择目的地城市', 'warn'); return }
+  if (!startDate.value || !endDate.value) { toast('请选择往返日期', 'warn'); return }
+  loading.value = true
+  setTimeout(() => { rebuild(); loading.value = false }, 200)
+}
+
+// ===== 高德 POI 补充景点 =====
+async function doSupplement(cityName) {
+  if (suppLoading.value) return
+  suppLoading.value = cityName
+  try {
+    const added = await supplementAttractions(cityName)
+    if (added.length === 0) { toast('未找到更多景点，或已收录', 'warn'); return }
+    const cp = plan.value?.cityPlans.find(c => c.name === cityName)
+    if (cp) {
+      cp.data.attractions.push(...added)
+      rebuild()
+      toast(`已补充 ${added.length} 个景点（实时搜索）`)
+    }
+  } catch (e) { toast('补充失败', 'err') }
+  suppLoading.value = ''
+}
+
+// ===== 高德导航到景点 =====
+function openAmapNav(lng, lat, name) {
+  const url = `https://uri.amap.com/navigation?to=${lng},${lat},${encodeURIComponent(name)}&mode=bike&coordinate=gaode&callnative=1`
+  window.open(url, '_blank')
+}
+
+// ===== 导出 =====
+function copyGuide() {
+  if (!plan.value) return
+  const txt = buildTextGuide(plan.value)
+  navigator.clipboard?.writeText(txt).then(() => toast('攻略已复制，可粘贴到备忘录/发给朋友')).catch(() => {})
+}
+function downloadGuide() {
+  if (!plan.value) return
+  const txt = buildTextGuide(plan.value)
+  const blob = new Blob([txt], { type: 'text/markdown;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `旅行攻略_${plan.value.cities.join('-')}_${plan.value.totalDays}天.md`
+  a.click(); URL.revokeObjectURL(a.href)
+  toast('攻略已下载')
+}
+
+// 城市链展示
+const cityChain = computed(() => {
+  if (!plan.value) return []
+  return plan.value.cityPlans.map(cp => ({ name: cp.name, days: cp.days }))
+})
+
+// 监听输入变化自动重新生成（防抖）
+let rbTimer = null
+watch([selectedCities, startDate, endDate, pace, interests], () => {
+  clearTimeout(rbTimer)
+  rbTimer = setTimeout(() => { if (plan.value) rebuild() }, 400)
+}, { deep: true })
+</script>
+
+<template>
+<div>
+  <!-- ===== 输入区 ===== -->
+  <div class="card">
+    <h2>✈️ 旅行攻略生成器</h2>
+    <p class="tip">输入目的地与往返时间，一键生成结构化攻略</p>
+
+    <label class="lbl">🏠 出发地 <span class="hint">(可选，默认你所在城市)</span></label>
+    <input v-model="origin" placeholder="如：西安" class="inp" />
+
+    <label class="lbl">📍 目的地城市 <span class="hint">(按顺序 = 行程顺序)</span></label>
+    <div class="city-sel">
+      <select v-model="cityToAdd" class="inp" @change="onSelectCity">
+        <option value="">-- 选择要去的城市 --</option>
+        <option v-for="c in remaining" :key="c" :value="c">{{ c }} · {{ getCity(c)?.days }}天建议</option>
+      </select>
+    </div>
+    <div v-if="selectedCities.length" class="city-chips">
+      <div v-for="(c, i) in selectedCities" :key="c" class="city-chip">
+        <span class="cc-order">{{ i + 1 }}</span>
+        <span class="cc-name">{{ c }}</span>
+        <button class="cc-btn" :disabled="i === 0" @click="moveCity(i, -1)">↑</button>
+        <button class="cc-btn" :disabled="i === selectedCities.length - 1" @click="moveCity(i, 1)">↓</button>
+        <button class="cc-btn cc-del" @click="removeCity(i)">✕</button>
+      </div>
+    </div>
+    <div v-else class="empty-tip">还没选城市，从下拉选择或点下方热门推荐</div>
+    <div class="hot-cities">
+      <button v-for="c in ['成都','重庆','西安','杭州','青岛','三亚','张家界','丽江']" :key="c"
+        :class="['chip-sm', { on: selectedCities.includes(c) }]"
+        @click="toggleHot(c)">{{ c }}</button>
+    </div>
+
+    <label class="lbl">📅 往返日期</label>
+    <div class="date-row">
+      <input type="date" v-model="startDate" class="inp" />
+      <span class="date-sep">→</span>
+      <input type="date" v-model="endDate" class="inp" />
+    </div>
+    <p v-if="totalDays > 0" class="days-hint">
+      共 <strong>{{ totalDays }}</strong> 天
+      <template v-if="selectedCities.length > 1"> · {{ selectedCities.length }} 城 · 需 ≥ {{ selectedCities.length + selectedCities.length - 1 }} 天</template>
+    </p>
+
+    <label class="lbl">🏃 行程节奏</label>
+    <div class="chip-row">
+      <button v-for="(label, key) in PACE_LABEL" :key="key"
+        :class="['chip', { active: pace === key }]" @click="pace = key">
+        {{ key === 'relax' ? '🌿 ' : key === 'standard' ? '⚖️ ' : '🔥 ' }}{{ label }}
+      </button>
+    </div>
+
+    <label class="lbl">🎯 兴趣偏好 <span class="hint">(可多选)</span></label>
+    <div class="chip-row">
+      <button v-for="(label, key) in INTEREST_LABEL" :key="key"
+        :class="['chip', { active: interests.includes(key) }]"
+        @click="toggleInterest(key)">
+        {{ key === 'nature' ? '🏔 ' : key === 'culture' ? '🏛 ' : key === 'food' ? '🍜 ' : key === 'family' ? '👨‍👩‍👧 ' : '🏙 ' }}{{ label }}
+      </button>
+    </div>
+
+    <button class="btn btn-primary btn-gen" :disabled="loading" @click="generate">
+      {{ loading ? '生成中…' : '✨ 一键生成攻略' }}
+    </button>
+  </div>
+
+  <!-- ===== 结果区 ===== -->
+  <template v-if="plan">
+    <!-- 行程总览 -->
+    <div class="card">
+      <h2>📋 行程总览</h2>
+      <div class="chain">
+        <template v-for="(c, i) in cityChain" :key="c.name">
+          <span class="chain-city">{{ c.name }}<span class="chain-days">{{ c.days }}天</span></span>
+          <span v-if="i < cityChain.length - 1" class="chain-arrow">→</span>
+        </template>
+      </div>
+      <div class="plan-meta">
+        <span>{{ plan.startDate }} ~ {{ plan.endDate }}</span>
+        <span>共 {{ plan.totalDays }} 天 · {{ plan.paceLabel }}节奏</span>
+      </div>
+
+      <div v-if="plan.transports.length" class="transport-list">
+        <div v-for="(t, i) in plan.transports" :key="i" class="transport-item">
+          <span class="t-mode">{{ t.mode }}</span>
+          <span class="t-route">{{ t.from }} → {{ t.to }}</span>
+          <span class="t-time">约 {{ t.hours }} 小时{{ t.estimated ? '（估算）' : '' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 每城攻略 -->
+    <div v-for="cp in plan.cityPlans" :key="cp.name" class="card city-card">
+      <div class="city-head" @click="toggleCity(cp.name)">
+        <div>
+          <span class="city-name">{{ cp.name }}</span>
+          <span class="city-days">{{ cp.days }} 天</span>
+          <span class="city-range">{{ cp.dateRange.start.toLocaleDateString('zh-CN', {month:'numeric', day:'numeric'}) }}~{{ cp.dateRange.end.toLocaleDateString('zh-CN', {month:'numeric', day:'numeric'}) }}</span>
+        </div>
+        <div class="city-right">
+          <span class="city-weather" v-if="cp.weather">{{ cp.weather.low }}~{{ cp.weather.high }}°C {{ cp.weather.feel }}</span>
+          <span class="arrow" :class="{ open: showAdvanced === cp.name }">▾</span>
+        </div>
+      </div>
+      <p class="city-desc">{{ cp.data.desc }}</p>
+
+      <!-- 每日行程 -->
+      <ItineraryTimeline :city="cp" v-model:activeDay="activeDayMap[cp.name]" />
+
+      <button class="btn btn-sm btn-supp" :disabled="suppLoading === cp.name" @click="doSupplement(cp.name)">
+        {{ suppLoading === cp.name ? '搜索中…' : '🔍 补充更多景点（高德实时）' }}
+      </button>
+
+      <!-- 折叠：美食 / 贴士 / 全部景点 -->
+      <div v-if="showAdvanced === cp.name" class="city-more">
+        <div class="more-sec">
+          <div class="more-title">🍜 必吃美食</div>
+          <div class="food-grid">
+            <div v-for="(f, i) in cp.data.foods" :key="i" class="food-item">
+              <span class="food-name">{{ f.name }}</span>
+              <span class="food-price">{{ f.price }}</span>
+              <span class="food-desc">{{ f.desc }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="more-sec">
+          <div class="more-title">💡 实用贴士</div>
+          <ul class="tips-list">
+            <li v-for="(t, i) in cp.data.tips" :key="i">{{ t }}</li>
+          </ul>
+        </div>
+        <div class="more-sec">
+          <div class="more-title">🗺 全部景点 <span class="hint">(点击导航)</span></div>
+          <div class="all-attractions">
+            <div v-for="(a, i) in cp.data.attractions" :key="i" class="attr-row" @click="openAmapNav(a.coord.lng, a.coord.lat, a.name)">
+              <span class="attr-must">★{{ a.mustSee }}</span>
+              <span class="attr-name">{{ a.name }}<span v-if="a.poi" class="poi-badge">实时</span></span>
+              <span class="attr-ticket">{{ a.ticket }}</span>
+              <span class="attr-nav">🧭</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 预算 -->
+    <div class="card">
+      <h2>💰 预算参考（人均）</h2>
+      <div class="budget-items">
+        <div v-for="(it, i) in plan.budget.items" :key="i" class="budget-item">
+          <span class="b-label">{{ it.label }}</span>
+          <span class="b-value">{{ it.value }}</span>
+        </div>
+      </div>
+      <div class="budget-total">
+        合计 <strong>¥{{ plan.budget.total[0] }} ~ ¥{{ plan.budget.total[1] }}</strong>
+        <span class="hint">（经济~舒适区间）</span>
+      </div>
+    </div>
+
+    <!-- 导出 -->
+    <div class="card">
+      <h2>📤 攻略导出</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-secondary" style="flex:1" @click="copyGuide">📋 复制文本</button>
+        <button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGuide">📥 下载 .md</button>
+      </div>
+    </div>
+  </template>
+</div>
+</template>
+
+<style scoped>
+.tip { font-size: 11px; color: #a898b8; margin-bottom: 12px; }
+.lbl { display: block; font-size: 12px; font-weight: 700; color: #5e5468; margin: 12px 0 6px; }
+.hint { font-size: 10px; color: #a898b8; font-weight: 400; }
+.inp { font-size: 13px; }
+.date-row { display: flex; gap: 6px; align-items: center; }
+.date-sep { color: #d4c4dc; font-weight: 700; }
+.days-hint { font-size: 11px; color: #a898b8; margin-top: 6px; }
+.days-hint strong { color: #f08ca4; }
+.chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip {
+  border: 2px solid #e5dcec; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 600;
+  background: #fff; color: #8a7a98; cursor: pointer; transition: all .2s; font-family: inherit;
+}
+.chip.active { background: linear-gradient(135deg, #f08ca4, #e27790); color: #fff; border-color: #f08ca4; }
+.city-sel { position: relative; }
+.city-chips { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.city-chip {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: #faf7fc;
+  border: 1px solid #ece0ec; border-radius: 8px; font-size: 12px;
+}
+.cc-order { width: 18px; height: 18px; border-radius: 50%; background: #f08ca4; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.cc-name { flex: 1; font-weight: 700; color: #5e5468; }
+.cc-btn { border: none; background: #f3f0f7; border-radius: 5px; width: 24px; height: 24px; cursor: pointer; font-size: 11px; color: #8a7a98; }
+.cc-btn:disabled { opacity: .3; }
+.cc-del { background: #fcebeb; color: #e24b4a; }
+.empty-tip { font-size: 11px; color: #c4b5d0; padding: 8px 0; }
+.hot-cities { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.chip-sm {
+  padding: 3px 10px; border-radius: 10px; border: 1px solid #d4c4dc; background: #fff; color: #5e5468;
+  font-size: 10px; cursor: pointer; font-family: inherit;
+}
+.chip-sm.on { background: #f08ca4; color: #fff; border-color: #f08ca4; }
+.btn-gen { margin-top: 14px; }
+
+/* 结果区 */
+.chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.chain-city { background: linear-gradient(135deg, #f08ca4, #e27790); color: #fff; padding: 5px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.chain-days { background: rgba(255,255,255,0.25); border-radius: 6px; padding: 1px 6px; font-size: 10px; }
+.chain-arrow { color: #d4c4dc; font-weight: 700; }
+.plan-meta { display: flex; gap: 10px; font-size: 11px; color: #a898b8; flex-wrap: wrap; }
+.transport-list { margin-top: 8px; }
+.transport-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dashed #f2eaf4; font-size: 11px; }
+.transport-item:last-child { border-bottom: none; }
+.t-mode { background: #e1f5ee; color: #0f6e56; border-radius: 5px; padding: 1px 7px; font-weight: 700; font-size: 10px; }
+.t-route { font-weight: 700; color: #5e5468; flex: 1; }
+.t-time { color: #a898b8; }
+
+.city-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.city-name { font-size: 17px; font-weight: 800; color: #4a3f55; }
+.city-days { background: #fbeaf0; color: #993556; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 8px; margin-left: 6px; }
+.city-range { font-size: 11px; color: #a898b8; margin-left: 8px; }
+.city-right { display: flex; align-items: center; gap: 8px; }
+.city-weather { font-size: 11px; color: #f0a870; font-weight: 700; }
+.arrow { transition: transform .2s; color: #b0a3bc; }
+.arrow.open { transform: rotate(180deg); }
+.city-desc { font-size: 11px; color: #a898b8; margin: 4px 0 10px; }
+.btn-supp { margin-top: 8px; background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; }
+.city-more { margin-top: 10px; border-top: 1px dashed #ece0ec; padding-top: 10px; }
+.more-sec { margin-bottom: 12px; }
+.more-title { font-size: 12px; font-weight: 700; color: #5e5468; margin-bottom: 6px; }
+.food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.food-item { background: #fdfbff; border: 1px solid #f2eaf4; border-radius: 8px; padding: 6px 8px; display: flex; flex-direction: column; }
+.food-name { font-size: 12px; font-weight: 700; color: #5e5468; }
+.food-price { font-size: 10px; color: #f08ca4; font-weight: 700; }
+.food-desc { font-size: 10px; color: #a898b8; margin-top: 2px; }
+.tips-list { margin: 0; padding-left: 16px; font-size: 11px; color: #8a7a98; line-height: 1.8; }
+.all-attractions { display: flex; flex-direction: column; }
+.attr-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background .15s; font-size: 12px; }
+.attr-row:hover { background: #f8f4fb; }
+.attr-must { color: #f0a870; font-weight: 700; font-size: 11px; width: 28px; }
+.attr-name { flex: 1; font-weight: 600; color: #5e5468; display: flex; align-items: center; gap: 5px; }
+.attr-ticket { font-size: 10px; color: #a898b8; }
+.attr-nav { font-size: 13px; }
+.poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+
+.budget-items { display: flex; flex-direction: column; }
+.budget-item { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #f2eaf4; font-size: 12px; }
+.b-label { color: #8a7a98; }
+.b-value { font-weight: 700; color: #5e5468; }
+.budget-total { text-align: center; margin-top: 10px; font-size: 13px; color: #8a7a98; }
+.budget-total strong { color: #e27790; font-size: 16px; }
+</style>

@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 const router = useRouter(), route = useRoute()
 const tabs = [
   { key: 'explore', label: '🚴 路线探索' },
+  { key: 'travel', label: '✈️ 旅行攻略' },
   { key: 'preset', label: '📚 经典路线' },
 ]
 const toast = ref({ show: false, msg: '', type: '' }); let tt = null
