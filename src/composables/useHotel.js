@@ -253,8 +253,7 @@ export function formatPrice(h) {
   if (h.price != null) return `¥${Math.round(h.price)}`
   if (h.priceRange) return `¥${h.priceRange[0]}~${h.priceRange[1]}`
   return '价格未知'
-}
-export function formatRating(h) {
+}export function formatRating(h) {
   if (h.rating != null) return `${h.rating} 分`
   if (h.reputation) return `${h.reputation.label}（参考）`
   return '暂无评分'
@@ -264,3 +263,41 @@ export function formatDist(h) {
   return h.distance < 1000 ? `${h.distance}m` : `${(h.distance / 1000).toFixed(1)}km`
 }
 export function isGoodRated(h) { return h.rating != null && h.rating >= 4.0 }
+
+// ===== 酒店 → 景点出行估算 =====
+export const TRANSIT_LABEL = {
+  walk: '🚶 步行', bike: '🚴 骑行', transit: '🚇 公交/地铁', taxi: '🚕 打车',
+}
+const WALK_SPEED = 5, BIKE_SPEED = 15, TRANSIT_SPEED = 22, TAXI_SPEED = 30 // km/h
+const ROAD_FACTOR = 1.3 // 直线距离 → 道路距离修正
+
+function taxiFee(roadKm) {
+  // 起步 10 元含 3km，超出 2.2 元/km
+  const fee = 10 + Math.max(0, roadKm - 3) * 2.2
+  return `约¥${Math.round(fee / 5) * 5}`
+}
+
+/**
+ * 估算从酒店到各景点的出行方式/时间/费用（直线距离估算，实际以导航为准）
+ * @param {Object} hotel { coord }
+ * @param {Array} attractions [{name, coord}]
+ * @returns {Array} [{ attraction, km, mode, timeMin, fee }]
+ */
+export function estimateTransit(hotel, attractions = []) {
+  if (!hotel?.coord) return []
+  return attractions.map(a => {
+    const km = haversineKm(hotel.coord, a.coord)
+    const road = km * ROAD_FACTOR
+    let mode, timeMin, fee
+    if (km <= 1.5) {
+      mode = 'walk'; timeMin = Math.max(1, Math.round(km / WALK_SPEED * 60)); fee = '免费'
+    } else if (km <= 4) {
+      mode = 'bike'; timeMin = Math.round(km / BIKE_SPEED * 60); fee = '约¥2'
+    } else if (km <= 15) {
+      mode = 'transit'; timeMin = Math.round(road / TRANSIT_SPEED * 60); fee = '¥2~5'
+    } else {
+      mode = 'taxi'; timeMin = Math.round(road / TAXI_SPEED * 60); fee = taxiFee(road)
+    }
+    return { attraction: a.name, km: Math.round(km * 10) / 10, mode, timeMin, fee }
+  })
+}

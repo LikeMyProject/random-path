@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { CITY_LIST, getCity } from '../data/cities.js'
 import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
-import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS } from '../composables/useHotel.js'
+import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
@@ -162,6 +162,7 @@ const hotelCustomMin = ref({}), hotelCustomMax = ref({})
 const hotelAttraction = ref({})       // city -> 指定景点名（'' = 全部）
 const hotelState = ref({})            // city -> { loading, progress, list }
 const personas = ref([])              // 个性化参数（全局多选）
+const hotelExpand = ref({})           // city -> 展开出行估算的酒店索引
 
 function togglePersona(key) {
   const i = personas.value.indexOf(key)
@@ -207,6 +208,9 @@ async function doSearchHotel(cp) {
 function openHotelNav(h) {
   const url = `https://uri.amap.com/navigation?to=${h.coord.lng},${h.coord.lat},${encodeURIComponent(h.name)}&mode=car&coordinate=gaode&callnative=1`
   window.open(url, '_blank')
+}
+function toggleHotelExpand(city, i) {
+  hotelExpand.value[city] = hotelExpand.value[city] === i ? -1 : i
 }
 </script>
 
@@ -374,18 +378,21 @@ function openHotelNav(h) {
           <span class="spin">⏳</span> {{ hotelState[cp.name]?.progress }}
         </div>
         <div v-else-if="hotelState[cp.name]?.list?.length" class="hotel-results">
-          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · 按推荐度排序</div>
+          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · 按推荐度排序 · 点击查看出行估算</div>
           <div
             v-for="(h, i) in hotelState[cp.name].list"
             :key="i"
             class="hotel-item"
-            @click="openHotelNav(h)"
+            :class="{ open: hotelExpand[cp.name] === i }"
+            @click="toggleHotelExpand(cp.name, i)"
           >
             <div class="h-row1">
               <span v-if="h.pct != null" class="h-match" :class="matchCls(h.pct)">{{ h.pct }}% 匹配</span>
               <span class="h-name">{{ h.name }}</span>
               <span v-if="isGoodRated(h)" class="h-badge good">好评</span>
               <span v-if="h.priceInferred" class="h-badge ref">参考价</span>
+              <span class="h-nav" title="高德导航" @click.stop="openHotelNav(h)">🧭</span>
+              <span class="h-arrow" :class="{ open: hotelExpand[cp.name] === i }">▾</span>
             </div>
             <div class="h-row2">
               <span class="h-price">{{ formatPrice(h) }}/晚</span>
@@ -395,6 +402,19 @@ function openHotelNav(h) {
             <div v-if="h.tags?.length" class="h-tags">
               <span v-for="t in h.tags" :key="t" class="h-tag">{{ t }}</span>
               <span v-if="nearestMall(h)" class="h-mall">🏬 近{{ nearestMall(h).name }} {{ nearestMall(h).km.toFixed(1) }}km</span>
+            </div>
+
+            <!-- 出行估算面板 -->
+            <div v-if="hotelExpand[cp.name] === i" class="transit-panel">
+              <div class="transit-title">🚗 从本酒店到各景点 <span class="hint">（直线距离估算）</span></div>
+              <div v-for="t in estimateTransit(h, cp.data.attractions)" :key="t.attraction" class="transit-row">
+                <span class="tr-attr">{{ t.attraction }}</span>
+                <span class="tr-dist">{{ t.km }}km</span>
+                <span class="tr-mode" :class="'m-' + t.mode">{{ TRANSIT_LABEL[t.mode] }}</span>
+                <span class="tr-time">{{ t.timeMin }}min</span>
+                <span class="tr-fee">{{ t.fee }}</span>
+              </div>
+              <div class="transit-note">💡 估算参考：步行 5km/h · 骑行 15km/h · 公交地铁 22km/h · 打车 30km/h，实际以导航为准</div>
             </div>
           </div>
         </div>
@@ -590,5 +610,27 @@ function openHotelNav(h) {
 .h-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; align-items: center; }
 .h-tag { font-size: 9px; background: #f3f0f7; color: #7c6fd8; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
 .h-mall { font-size: 9px; color: #a898b8; margin-left: auto; }
+.h-nav { font-size: 13px; cursor: pointer; padding: 0 2px; }
+.h-arrow { font-size: 10px; color: #b0a3bc; transition: transform .2s; }
+.h-arrow.open { transform: rotate(180deg); }
+
+/* 出行估算面板 */
+.transit-panel { margin-top: 8px; border-top: 1px dashed #e0e0f0; padding-top: 8px; }
+.transit-title { font-size: 11px; font-weight: 700; color: #5e5468; margin-bottom: 6px; }
+.transit-row {
+  display: flex; align-items: center; gap: 6px; padding: 4px 0;
+  border-bottom: 1px dashed #f0eef7; font-size: 11px;
+}
+.transit-row:last-child { border-bottom: none; }
+.tr-attr { flex: 1; color: #5e5468; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-dist { color: #a898b8; font-size: 10px; width: 42px; text-align: right; }
+.tr-mode { font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px; width: 76px; text-align: center; }
+.tr-mode.m-walk { background: #e1f5ee; color: #0f6e56; }
+.tr-mode.m-bike { background: #e6f1fb; color: #185fa5; }
+.tr-mode.m-transit { background: #faeeda; color: #854f0b; }
+.tr-mode.m-taxi { background: #fbeaf0; color: #993556; }
+.tr-time { color: #8a7a98; width: 42px; text-align: right; font-size: 10px; }
+.tr-fee { font-weight: 700; color: #e27790; width: 56px; text-align: right; font-size: 11px; }
+.transit-note { margin-top: 6px; font-size: 9px; color: #b0a3bc; line-height: 1.5; }
 .hotel-empty { text-align: center; color: #a898b8; font-size: 11px; padding: 14px 8px; }
 </style>
