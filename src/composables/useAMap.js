@@ -102,36 +102,68 @@ export async function searchRestaurantsForCity(cityName, cityCoord, needed = 40)
 }
 
 // ============================================================
-// 城市本地小众地点搜索：菜市场/老街/夜市/老字号/文创园等
+// 城市本地小众地点搜索：本地人才知道的小地标、隐藏景点、老城角落
 // ============================================================
 const LOCAL_SPOT_QUERIES = [
-  { kw: '菜市场', cat: 'market', label: '市井烟火' },
-  { kw: '农贸市场', cat: 'market', label: '市井烟火' },
-  { kw: '老街', cat: 'oldstreet', label: '老街古巷' },
-  { kw: '古街', cat: 'oldstreet', label: '老街古巷' },
-  { kw: '历史街区', cat: 'oldstreet', label: '老街古巷' },
-  { kw: '胡同', cat: 'oldstreet', label: '老街古巷' },
-  { kw: '夜市', cat: 'nightmarket', label: '夜市灯火' },
+  // 小众景点 & 秘境
+  { kw: '小众景点', cat: 'hidden', label: '小众秘境' },
+  { kw: '秘境', cat: 'hidden', label: '小众秘境' },
+  { kw: '冷门景点', cat: 'hidden', label: '小众秘境' },
+  { kw: '人少景美', cat: 'hidden', label: '小众秘境' },
+  // 打卡拍照
+  { kw: '打卡', cat: 'photo', label: '拍照打卡' },
+  { kw: '网红', cat: 'photo', label: '拍照打卡' },
+  { kw: '拍照', cat: 'photo', label: '拍照打卡' },
+  // 老城 & 巷子
+  { kw: '老城区', cat: 'oldtown', label: '老城韵味' },
+  { kw: '老巷子', cat: 'oldtown', label: '老城韵味' },
+  { kw: '胡同', cat: 'oldtown', label: '老城韵味' },
+  { kw: '老街', cat: 'oldstreet', label: '老街漫步' },
+  { kw: '古街', cat: 'oldstreet', label: '老街漫步' },
+  { kw: '历史街区', cat: 'oldstreet', label: '老街漫步' },
+  // 观景点
+  { kw: '观景台', cat: 'viewpoint', label: '观景好去处' },
+  { kw: '瞭望台', cat: 'viewpoint', label: '观景好去处' },
+  { kw: '观景点', cat: 'viewpoint', label: '观景好去处' },
+  // 艺术文化
+  { kw: '艺术区', cat: 'art', label: '文艺空间' },
+  { kw: '文创园', cat: 'art', label: '文艺空间' },
+  { kw: '创意园', cat: 'art', label: '文艺空间' },
+  { kw: '涂鸦', cat: 'art', label: '文艺空间' },
+  { kw: '壁画', cat: 'art', label: '文艺空间' },
+  { kw: '小众博物馆', cat: 'museum', label: '小众博物馆' },
+  { kw: '民俗博物馆', cat: 'museum', label: '小众博物馆' },
+  { kw: '美术馆', cat: 'gallery', label: '艺术空间' },
+  { kw: '画廊', cat: 'gallery', label: '艺术空间' },
+  // 本地生活
+  { kw: '老茶馆', cat: 'localife', label: '本地生活' },
+  { kw: '茶馆', cat: 'localife', label: '本地生活' },
+  { kw: '独立书店', cat: 'bookstore', label: '书香角落' },
+  { kw: '旧书店', cat: 'bookstore', label: '书香角落' },
+  { kw: '创意市集', cat: 'market', label: '创意市集' },
+  // 历史 & 古建
+  { kw: '老建筑', cat: 'heritage', label: '历史建筑' },
+  { kw: '历史建筑', cat: 'heritage', label: '历史建筑' },
+  { kw: '古镇', cat: 'ancient', label: '古镇古村' },
+  { kw: '古村', cat: 'ancient', label: '古镇古村' },
   { kw: '老字号', cat: 'heritage', label: '百年老店' },
-  { kw: '步行街', cat: 'pedestrian', label: '逛街好去处' },
-  { kw: '文创园', cat: 'creative', label: '文艺创意' },
-  { kw: '创意园', cat: 'creative', label: '文艺创意' },
-  { kw: '书店', cat: 'bookstore', label: '书香角落' },
-  { kw: '美术馆', cat: 'art', label: '艺术空间' },
-  { kw: '画廊', cat: 'art', label: '艺术空间' },
+  // 公园 & 休闲
+  { kw: '社区公园', cat: 'park', label: '社区公园' },
+  { kw: '街心花园', cat: 'park', label: '社区公园' },
+  { kw: '滨江步道', cat: 'waterfront', label: '滨江步道' },
+  { kw: '湖边', cat: 'waterfront', label: '滨水休闲' },
+  // 寺庙
   { kw: '寺庙', cat: 'temple', label: '禅意时光' },
   { kw: '道观', cat: 'temple', label: '禅意时光' },
-  { kw: '大学', cat: 'campus', label: '学府漫步' },
-  { kw: '文化广场', cat: 'plaza', label: '城市客厅' },
-  { kw: '手工坊', cat: 'craft', label: '手作体验' },
-  { kw: '特色小镇', cat: 'town', label: '小镇风情' },
+  // 夜市
+  { kw: '夜市', cat: 'nightmarket', label: '夜市烟火' },
 ]
 
-export async function searchLocalSpotsForCity(cityName, cityCoord, needed = 30) {
+export async function searchLocalSpotsForCity(cityName, cityCoord, needed = 40) {
   const results = []
   const seen = new Set()
   // 过滤掉明显的噪声 POI
-  const NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|洗车|维修|批发市场$/
+  const NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|洗车|维修|批发市场$|菜市场|农贸市场|商业广场$|购物广场$/
   for (const { kw, cat, label } of LOCAL_SPOT_QUERIES) {
     if (results.length >= needed) break
     try {
@@ -139,7 +171,7 @@ export async function searchLocalSpotsForCity(cityName, cityCoord, needed = 30) 
         `&keywords=${encodeURIComponent(kw)}` +
         `&city=${encodeURIComponent(cityName)}` +
         `&city_limit=true` +
-        `&offset=20` +
+        `&offset=25` +
         `&show_fields=tag,address`
       const d = await fetchJSON(url)
       if (d.status === '1' && d.pois) {

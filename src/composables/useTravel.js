@@ -181,6 +181,9 @@ function assignPeriods(dayAttractions, pace, dayRestaurants = null) {
   if (!hasLunch && dayRestaurants?.lunch) withMeals.splice(Math.min(1, withMeals.length), 0, { period: 'lunch', meal: dayRestaurants.lunch })
   if (!hasDinner && dayRestaurants?.dinner) withMeals.push({ period: 'dinner', meal: dayRestaurants.dinner })
 
+  // 按时段顺序排序，确保 早餐→上午→午餐→下午→晚餐→晚上→自由
+  withMeals.sort((a, b) => (PERIOD_ORDER[a.period] ?? 3) - (PERIOD_ORDER[b.period] ?? 3))
+
   return withMeals.map(s => ({ ...s, periodLabel: PERIOD_LABELS[s.period] }))
 }
 
@@ -409,28 +412,23 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
   for (let i = 0; i < plan.cityPlans.length; i++) {
     const cp = plan.cityPlans[i]
     onProgress?.({ city: cp.name, done: i, total: plan.cityPlans.length })
-    const needed = cp.days + 5  // 每天1个 + 缓冲
+    const needed = cp.days * 2 + 5  // 每天最多2个 + 缓冲
     const spots = await searchLocalSpotsForCity(cp.name, cp.data.coord, needed)
     cp.localSpots = spots
 
     const used = new Set()
     let idx = 0
 
-    cp.daily.forEach((d) => {
-      // 挑1个未用过的本地地点
-      let spot = null
+    function pickSpot() {
       while (idx < spots.length) {
         const s = spots[idx++]
         const key = s.name + '|' + s.address
-        if (!used.has(key)) { used.add(key); spot = s; break }
+        if (!used.has(key)) { used.add(key); return s }
       }
-      if (!spot) return
+      return null
+    }
 
-      // 夜市→晚上时段，其他→下午时段
-      const isNight = spot.category === 'nightmarket'
-      const period = isNight ? 'evening' : 'afternoon'
-
-      // 按时段顺序插入：找到第一个比目标时段更晚的位置，插在它前面
+    function insertLocalSlot(d, period, spot) {
       const newOrder = PERIOD_ORDER[period] ?? 3
       let insertPos = d.slots.length
       for (let si = 0; si < d.slots.length; si++) {
@@ -440,13 +438,55 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
           break
         }
       }
-
       d.slots.splice(insertPos, 0, {
         period,
         periodLabel: PERIOD_LABELS[period],
         local: true,
         spot,
       })
+    }
+
+    cp.daily.forEach((d) => {
+      // 统计已有时段
+      const hasPeriod = (p) => d.slots.some(s => s.period === p && !s.meal)
+      const hasAfternoon = hasPeriod('afternoon')
+      const hasEvening = hasPeriod('evening')
+      const attractionCount = d.slots.filter(s => !s.meal && !s.local).length
+
+      // 每天至少分配1个本地地点
+      // 如果当天景点少（≤1）且没有下午内容，优先分配下午
+      // 如果没有晚上内容且有夜市类地点，分配晚上
+      const spot1 = pickSpot()
+      if (spot1) {
+        const isNight1 = spot1.category === 'nightmarket'
+        // 如果没有下午内容，优先填下午；夜市且没有晚上内容则填晚上
+        if (!hasAfternoon && !isNight1) {
+          insertLocalSlot(d, 'afternoon', spot1)
+        } else if (!hasEvening && isNight1) {
+          insertLocalSlot(d, 'evening', spot1)
+        } else {
+          insertLocalSlot(d, isNight1 ? 'evening' : 'afternoon', spot1)
+        }
+      }
+
+      // 如果当天景点很少（≤1），再分配一个填补另一个空时段
+      if (attractionCount <= 1) {
+        const spot2 = pickSpot()
+        if (spot2) {
+          const isNight2 = spot2.category === 'nightmarket'
+          const filledAfternoon = d.slots.some(s => s.period === 'afternoon' && s.local)
+          const filledEvening = d.slots.some(s => s.period === 'evening' && s.local)
+          if (!filledAfternoon && !isNight2) {
+            insertLocalSlot(d, 'afternoon', spot2)
+          } else if (!filledEvening && isNight2) {
+            insertLocalSlot(d, 'evening', spot2)
+          } else if (!filledAfternoon) {
+            insertLocalSlot(d, 'afternoon', spot2)
+          } else if (!filledEvening) {
+            insertLocalSlot(d, 'evening', spot2)
+          }
+        }
+      }
     })
   }
   onProgress?.({ city: '', done: plan.cityPlans.length, total: plan.cityPlans.length })
