@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
 import { buildFullPlan, buildTextGuide, supplementAttractions, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
@@ -26,6 +26,49 @@ function defaultDates() {
 function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const def = defaultDates()
 startDate.value = def.s; endDate.value = def.e
+
+// ===== 最后一次搜索缓存（打开自动恢复）=====
+const SEARCH_KEY = 'radompath:travel:lastSearch'
+function saveLastSearch() {
+  try {
+    localStorage.setItem(SEARCH_KEY, JSON.stringify({
+      origin: origin.value,
+      cities: selectedCities.value,
+      startDate: startDate.value,
+      endDate: endDate.value,
+      pace: pace.value,
+      interests: interests.value,
+    }))
+  } catch (e) {}
+}
+function loadLastSearch() {
+  try {
+    const raw = localStorage.getItem(SEARCH_KEY)
+    if (!raw) return false
+    const d = JSON.parse(raw)
+    if (!Array.isArray(d.cities) || !d.startDate || !d.endDate) return false
+    origin.value = d.origin || ''
+    selectedCities.value = d.cities.filter(c => CITY_LIST.includes(c))
+    startDate.value = d.startDate
+    endDate.value = d.endDate
+    pace.value = d.pace || 'standard'
+    interests.value = Array.isArray(d.interests) ? d.interests : []
+    return selectedCities.value.length > 0
+  } catch (e) { return false }
+}
+// 打开页面时恢复上次搜索，若有有效输入则自动生成攻略
+const restored = loadLastSearch()
+onMounted(() => {
+  if (restored && selectedCities.value.length) {
+    setTimeout(() => { if (!plan.value) rebuild() }, 150)
+  }
+})
+// 输入变化防抖保存
+let saveTimer = null
+watch([selectedCities, startDate, endDate, pace, interests], () => {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(saveLastSearch, 500)
+}, { deep: true })
 
 const remaining = computed(() => CITY_LIST.filter(c => !selectedCities.value.includes(c)))
 const remainingGroups = computed(() => CITY_GROUPS
