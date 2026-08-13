@@ -148,7 +148,7 @@ async function doSupplement(cityName) {
     cp.attractions = orderAttractions([...cp.attractions, ...added])
     toast(`已补充 ${added.length} 个地点（景点/美食/购物，高德实时）`)
   } catch (e) { toast('补充失败，请重试', 'err') }
-  suppLoading.value = ''
+  finally { suppLoading.value = '' }
 }
 
 // ===== 点击景点 → 加载附近特色美食（懒加载 + 缓存）=====
