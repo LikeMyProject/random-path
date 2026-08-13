@@ -474,17 +474,18 @@ async function collectCat(cat, pool, target, cityName) {
   if (cat === 'shop') {
     const brands = pool.filter(c => !c.amapType)
     const typed = pool.filter(c => c.amapType)
-    const brandLists = await runLimited(brands, 4, c =>
+    // 品牌词限并发 8 抓取（免费 Key 100QPS 足够，4 并发时单请求延迟把整轮拖到 10s+），
+    // 每家保底 1 条；类型码 3 个独立请求并行兜底补本地商场，不再串行等待。
+    const brandLists = await runLimited(brands, 8, c =>
       fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType))
     for (const list of brandLists) {
       let added = 0
       for (const it of list) { if (added >= 1) break; if (add(it)) added++ }
     }
-    for (const c of typed) {
-      if (count() >= target) break
-      const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
+    const typedLists = await Promise.all(typed.map(c =>
+      fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)))
+    for (const list of typedLists) {
       for (const it of list) { if (count() >= target) break; add(it) }
-      await new Promise(r => setTimeout(r, 150))
     }
     return local
   }
