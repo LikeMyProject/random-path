@@ -419,11 +419,15 @@ export async function supplementAttractions(cityName, existing = null) {
 // 景点扩充：从高分实时补充景点，让清单更丰富（不再只有内置寥寥数个）。
 // cats：关键词池（主类 SPOT_CATS 用于生成时自动补充；SPOT_EXT 用于手动「补充更多」）。
 // rad：坐标去重半径(km)，cap：补充上限。手动补充用更宽松的半径，避免把同区域不同类别的景点误删。
-export async function enrichAttractions(cityName, existing = null, { cats, cap = 26, rad = 1.5 } = {}) {
+export async function enrichAttractions(cityName, existing = null, { cats, cap = 26, rad = 1.5, targets } = {}) {
   const c = getCity(cityName)
   if (!c) return []
   try {
-    const added = await searchSpotsForCity(cityName, c?.coord, 30, cats)
+    // 每个分类独立配额：景点最多 cap 个，美食/购物各补 14 个，避免被总量封顶饿死
+    const added = await searchSpotsForCity(cityName, c?.coord, {
+      targets: targets || { classic: 8, sight: cap, food: 14, shop: 14 },
+      cats,
+    })
     if (!added.length) return []
     const base = (existing && existing.length) ? existing : c.attractions
     const refPts = base.filter(a => a.coord).map(a => a.coord)

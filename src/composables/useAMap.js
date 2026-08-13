@@ -365,22 +365,47 @@ async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = tr
   } catch (e) { return [] }
 }
 
-export async function searchSpotsForCity(cityName, cityCoord, needed = 30, cats = [...SPOT_CLASSIC, ...SPOT_CATS, ...SPOT_FOOD, ...SPOT_SHOP]) {
+// 分类分组：经典/景点/美食/购物 各自独立配额，避免被「总量封顶」饿死
+const SPOT_GROUPS = {
+  classic: SPOT_CLASSIC,
+  sight: SPOT_CATS,
+  food: SPOT_FOOD,
+  shop: SPOT_SHOP,
+}
+// 把任意关键词数组按 cat 归组（用于手动补充：SPOT_EXT 归 sight，FOOD/SHOP 各自归位）
+function groupCatsByType(cats) {
+  const g = {}
+  for (const c of cats) {
+    const cat = c.cat || 'sight'
+    ;(g[cat] = g[cat] || []).push(c)
+  }
+  return g
+}
+
+// 每个分类独立配额检索：classic/sight 景点为主，food/shop 也各给足量名额，
+// 不再用单一总量上限（否则 classic+sight 一轮填满后 food/shop 永远搜不到）。
+export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
+  const { targets = { classic: 8, sight: 18, food: 14, shop: 14 }, cats = null } = opts
+  const groups = cats ? groupCatsByType(cats) : SPOT_GROUPS
   const out = []
   const seen = new Set()
-  // 分批并行（每批 5 个关键词），兼顾速度与不触发高德限流
-  const batches = []
-  for (let i = 0; i < cats.length; i += 5) batches.push(cats.slice(i, i + 5))
-  for (const batch of batches) {
-    if (out.length >= needed) break
-    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat)))
-    for (const list of res) {
-      for (const it of list) {
-        if (out.length >= needed) break
-        const key = it.name + '|' + it.address
-        if (seen.has(key)) continue
-        seen.add(key)
-        out.push(it)
+  for (const [cat, pool] of Object.entries(groups)) {
+    const target = targets[cat] ?? 8
+    if (target <= 0) continue
+    // 分批并行（每批 5 个关键词），兼顾速度与不触发高德限流
+    const batches = []
+    for (let i = 0; i < pool.length; i += 5) batches.push(pool.slice(i, i + 5))
+    for (const batch of batches) {
+      if (out.filter(o => o.category === cat).length >= target) break
+      const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat)))
+      for (const list of res) {
+        for (const it of list) {
+          if (out.filter(o => o.category === cat).length >= target) break
+          const key = it.name + '|' + it.address
+          if (seen.has(key)) continue
+          seen.add(key)
+          out.push(it)
+        }
       }
     }
   }
