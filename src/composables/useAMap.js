@@ -261,9 +261,11 @@ export const SPOT_CATS = [
   { kw: '海滩', label: '沙滩海滨', type: 'nature', mustSee: 3 },
   { kw: '沙滩', label: '沙滩海滨', type: 'nature', mustSee: 3 },
   { kw: '海岛', label: '海岛', type: 'nature', mustSee: 3 },
-  { kw: '小众景点', label: '小众秘境', type: 'urban', mustSee: 2 },
-  { kw: '打卡', label: '网红打卡', type: 'urban', mustSee: 2 },
-  { kw: '网红', label: '网红打卡', type: 'urban', mustSee: 2 },
+  { kw: '名胜', label: '名胜古迹', type: 'culture', mustSee: 3 },
+  { kw: '古迹', label: '名胜古迹', type: 'culture', mustSee: 3 },
+  { kw: '纪念馆', label: '纪念馆', type: 'culture', mustSee: 3 },
+  { kw: '文创园', label: '文创园', type: 'urban', mustSee: 2 },
+  { kw: '地标', label: '地标', type: 'culture', mustSee: 3 },
   { kw: '景点', label: '景区', type: 'culture', mustSee: 3 },
   { kw: '公园', label: '公园', type: 'nature', mustSee: 2 },
   { kw: '观景台', label: '观景', type: 'nature', mustSee: 2 },
@@ -278,7 +280,6 @@ export const SPOT_EXT = [
   { kw: '博物馆', label: '博物馆', type: 'culture', mustSee: 3 },
   { kw: '美术馆', label: '美术馆', type: 'culture', mustSee: 2 },
   { kw: '步行街', label: '步行街', type: 'urban', mustSee: 2 },
-  { kw: '美食街', label: '美食街', type: 'urban', mustSee: 2 },
   { kw: '老街', label: '老街', type: 'urban', mustSee: 2 },
   { kw: '渔村', label: '渔村', type: 'nature', mustSee: 2 },
   { kw: '灯塔', label: '灯塔', type: 'nature', mustSee: 1 },
@@ -303,7 +304,7 @@ export const SPOT_CLASSIC = [
   { kw: '温泉', label: '温泉', type: 'nature', mustSee: 2, cityLimit: false },
 ]
 
-const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$/
+const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$|健身|训练馆|健身房|游泳馆|瑜伽|球馆|台球|网吧|KTV|酒吧|洗浴|按摩|美甲|美容|理发|洗车|烤肉|火锅|餐厅|饭店|餐饮|小吃|咖啡|奶茶|烘焙|烧烤|串串|面馆|饭馆|超市|便利店|药店|银行|营业厅|医院|学院|工厂|工业园|产业园|4S店|俱乐部|雪具店|体验店|专卖店|旗舰店/
 
 async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true) {
   try {
