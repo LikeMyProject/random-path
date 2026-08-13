@@ -73,6 +73,47 @@ export function allocateDays(cityNames, totalDays, pace = 'standard') {
   return { perCity: per, transitDays, playableDays: playable }
 }
 
+// 最佳季节 -> 对应月份，用于判断用户所选月份是否为该城最佳出行时间
+const SEASON_MONTHS = { '春': [3, 4, 5], '夏': [6, 7, 8], '秋': [9, 10, 11], '冬': [12, 1, 2] }
+function seasonFit(bestSeason, month) {
+  const s = (bestSeason || '').trim()
+  if (!s || s.includes('全年')) return 'best'
+  for (const k of ['春', '夏', '秋', '冬']) {
+    if (s.includes(k) && SEASON_MONTHS[k].includes(month)) return 'best'
+  }
+  return 'off'
+}
+
+// 城市推荐天数 + 时间理由：根据景点数量/类型与最佳季节，给出「建议几天 + 为什么」
+// month 可选（1-12）：传入时会结合用户所选月份提示是否正值最佳季节
+export function cityDayAdvice(cityName, month = null) {
+  const c = getCity(cityName)
+  if (!c) return { days: 2, reason: '暂无数据', bestSeason: '', seasonFit: 'best' }
+  const days = c.days || 2
+  const attrs = c.attractions || []
+  const mustGo = attrs.filter(a => (a.mustSee || 0) >= 4).length
+  const nature = attrs.filter(a => a.type === 'nature').length
+  // 行程节奏说明（为什么是这几天）
+  let rhythm
+  if (days <= 1) rhythm = '核心地标集中，1 天即可打卡完毕'
+  else if (days === 2) rhythm = `必去 ${mustGo} 处 + 自然 ${nature} 处，2 天刚好：1 天市区人文、1 天近郊休闲`
+  else if (days === 3) rhythm = `必去 ${mustGo} 处分散在人文与自然，${days} 天可从容逛完市区并留 1 天周边游`
+  else rhythm = `必去景点多达 ${mustGo} 处，${days} 天才不赶：前 ${days - 1} 天市区人文+都市，末 1 天近郊自然`
+  // 季节（时间理由）
+  const fit = month ? seasonFit(c.bestSeason, month) : 'best'
+  let seasonNote = ''
+  if (c.bestSeason) {
+    if (month) {
+      seasonNote = fit === 'best'
+        ? `；你选的 ${month} 月正值最佳季节「${c.bestSeason}」，天气与景色都最宜出行`
+        : `；注意：你选的 ${month} 月并非最佳季节「${c.bestSeason}」，可能偏冷/偏热或游客较少`
+    } else {
+      seasonNote = `；最佳季节「${c.bestSeason}」`
+    }
+  }
+  return { days, reason: rhythm + seasonNote, bestSeason: c.bestSeason || '', seasonFit: fit }
+}
+
 // ============================================================
 // 2. 景点地理聚类：贪心种子 + 最近中心分配，再平衡
 // ============================================================

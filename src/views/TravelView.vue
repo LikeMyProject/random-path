@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildFullPlan, buildTextGuide, supplementAttractions, searchAndAssignFoods, searchAndAssignLocalSpots, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import { buildFullPlan, buildTextGuide, supplementAttractions, searchAndAssignFoods, searchAndAssignLocalSpots, cityDayAdvice, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
 import ItineraryTimeline from '../components/ItineraryTimeline.vue'
@@ -99,6 +99,18 @@ const remaining = computed(() => CITY_LIST.filter(c => !selectedCities.value.inc
 const remainingGroups = computed(() => CITY_GROUPS
   .map(g => ({ ...g, cities: g.cities.filter(c => !selectedCities.value.includes(c)) }))
   .filter(g => g.cities.length > 0))
+// 用户所选出发月份（用于结合最佳季节给出时间理由）
+const travelMonth = computed(() => {
+  if (!startDate.value) return null
+  return new Date(startDate.value).getMonth() + 1
+})
+// 城市推荐天数 + 时间理由：已选城市优先；未选时展示热门城市建议
+const cityAdviceList = computed(() => {
+  const list = selectedCities.value.length
+    ? selectedCities.value
+    : ['成都', '重庆', '西安', '杭州', '青岛', '三亚', '张家界', '丽江']
+  return list.filter(c => getCity(c)).map(c => ({ name: c, ...cityDayAdvice(c, travelMonth.value) }))
+})
 const cityToAdd = ref('')
 function onSelectCity() {
   if (!cityToAdd.value) return
@@ -443,6 +455,18 @@ async function doShareGuide() {
         @click="toggleHot(c)">{{ c }}</button>
     </div>
 
+    <div class="city-advice" v-if="cityAdviceList.length">
+      <div class="ca-title">🗓 城市推荐天数 <span class="hint">（含时间理由）</span></div>
+      <div v-for="a in cityAdviceList" :key="a.name" class="ca-card" :class="{ off: a.seasonFit === 'off' }">
+        <div class="ca-head">
+          <span class="ca-name">{{ a.name }}</span>
+          <span class="ca-days">推荐 {{ a.days }} 天</span>
+          <span v-if="a.bestSeason" class="ca-season" :class="a.seasonFit === 'best' ? 'good' : 'warn'">{{ a.bestSeason }}</span>
+        </div>
+        <div class="ca-reason">{{ a.reason }}</div>
+      </div>
+    </div>
+
     <label class="lbl">📅 往返日期</label>
     <div class="date-row">
       <input type="date" v-model="startDate" class="inp" />
@@ -776,6 +800,18 @@ async function doShareGuide() {
 }
 .chip-sm:hover { background: var(--accent-soft); color: var(--accent); }
 .chip-sm.on { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+.city-advice { margin-top: 12px; background: #faf8fc; border: 1px solid #efe9f4; border-radius: 12px; padding: 10px 12px; }
+.ca-title { font-size: 12px; font-weight: 700; color: #5e5468; margin-bottom: 8px; }
+.ca-card { background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; border-left: 3px solid var(--accent); }
+.ca-card:last-child { margin-bottom: 0; }
+.ca-card.off { border-left-color: #e0a83c; }
+.ca-head { display: flex; align-items: center; gap: 8px; }
+.ca-name { font-weight: 700; color: #3a3145; font-size: 13px; }
+.ca-days { background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; border-radius: 8px; padding: 2px 8px; }
+.ca-season { font-size: 10px; font-weight: 700; border-radius: 8px; padding: 2px 8px; }
+.ca-season.good { background: #e6f6ec; color: #2e9e5b; }
+.ca-season.warn { background: #fdf0db; color: #c8881f; }
+.ca-reason { font-size: 11px; color: #8074a0; margin-top: 5px; line-height: 1.5; }
 .btn-gen { margin-top: 16px; }
 
 /* 结果区 */
