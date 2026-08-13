@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildSpotPlan, buildTextGuide, enrichAttractions, cityDayAdvice, orderAttractions, INTEREST_LABEL } from '../composables/useTravel.js'
-import { SPOT_EXT } from '../composables/useAMap.js'
+import { buildSpotPlan, buildTextGuide, enrichAttractions, cityDayAdvice, orderAttractions, INTEREST_LABEL, groupByCategory, CAT_META } from '../composables/useTravel.js'
+import { SPOT_EXT, SPOT_FOOD, SPOT_SHOP } from '../composables/useAMap.js'
 import { searchFoodNear } from '../composables/useAMap.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
@@ -132,20 +132,21 @@ async function enrichPlan(p) {
       }
     } catch (e) {}
   }
-  if (total > 0) toast(`已联网补充 ${total} 个景点（动物园/植物园/主题乐园等经典景点）`)
+  if (total > 0) toast(`已联网补充 ${total} 个地点（景点/美食/购物，含商场·夜市等）`)
 }
 
-// ===== 手动「补充更多景点」：用与主类不同的扩展关键词池（夜市/古镇/博物馆/老街…），保证真能加新东西 =====
+// ===== 手动「补充更多地点」：同时补充 景点(扩展) / 美食 / 购物 三类，保证真能加新东西 =====
+const SUPPLEMENT_CATS = [...SPOT_EXT, ...SPOT_FOOD, ...SPOT_SHOP]
 async function doSupplement(cityName) {
   if (suppLoading.value) return
   const cp = plan.value?.cityPlans.find(c => c.name === cityName)
   if (!cp) return
   suppLoading.value = cityName
   try {
-    const added = await enrichAttractions(cityName, cp.attractions, { cats: SPOT_EXT, cap: 30, rad: 1.2 })
-    if (added.length === 0) { toast('该市已收录常见景点，暂无更多补充', 'warn'); return }
+    const added = await enrichAttractions(cityName, cp.attractions, { cats: SUPPLEMENT_CATS, cap: 30, rad: 1.2 })
+    if (added.length === 0) { toast('该市已收录常见地点，暂无更多补充', 'warn'); return }
     cp.attractions = orderAttractions([...cp.attractions, ...added])
-    toast(`已补充 ${added.length} 个景点（夜市/古镇/博物馆…实时搜索）`)
+    toast(`已补充 ${added.length} 个地点（景点/美食/购物，高德实时）`)
   } catch (e) { toast('补充失败，请重试', 'err') }
   suppLoading.value = ''
 }
@@ -365,7 +366,7 @@ async function doShareGuide() {
       <div class="city-head" @click="toggleCity(cp.name)">
         <div>
           <span class="city-name">{{ cp.name }}</span>
-          <span class="city-count">{{ cp.attractions.length }} 个景点</span>
+          <span class="city-count">{{ cp.attractions.length }} 个地点</span>
         </div>
         <div class="city-right">
           <span class="city-weather" v-if="cp.weather">{{ cp.weather.low }}~{{ cp.weather.high }}°C {{ cp.weather.feel }}</span>
@@ -374,44 +375,52 @@ async function doShareGuide() {
       </div>
       <p class="city-desc">{{ cp.data.desc }}</p>
 
-      <!-- 景点清单（点击展开附近特色美食） -->
-      <div class="attr-list">
-        <div v-for="(a, i) in cp.attractions" :key="a.name" class="attr-item">
-          <div class="attr-row" @click="toggleAttractionFood(cp, a)">
-            <span class="attr-idx">{{ i + 1 }}</span>
-            <span class="attr-must">★{{ a.mustSee }}</span>
-            <span class="attr-name">{{ a.name }}<span v-if="a.tag" class="poi-badge tag">{{ a.tag }}</span><span v-else-if="a.poi" class="poi-badge">实时</span></span>
-            <span class="attr-ticket">{{ a.ticket }}</span>
-            <span class="attr-fold" :class="{ open: attrFood(cp,a)?.open }">▾</span>
-            <span class="attr-nav" title="高德导航" @click.stop="openAmapNav(a.coord.lng, a.coord.lat, a.name)">🧭</span>
-          </div>
+      <!-- 地点清单（按 景点/美食/购物 分类显示，点击展开附近特色美食） -->
+      <div v-for="grp in groupByCategory(cp.attractions)" :key="grp.key" class="cat-sec">
+        <div class="cat-head" :class="'cat-' + grp.key">
+          <span class="cat-icon">{{ grp.icon }}</span>
+          <span class="cat-name">{{ grp.label }}</span>
+          <span class="cat-count">{{ grp.items.length }}</span>
+        </div>
+        <div class="attr-list">
+          <div v-for="(a, i) in grp.items" :key="a.name" class="attr-item" :class="'cat-' + (a.category || 'sight')">
+            <div class="attr-row" @click="toggleAttractionFood(cp, a)">
+              <span class="attr-idx">{{ i + 1 }}</span>
+              <span class="attr-must" v-if="a.category !== 'food' && a.category !== 'shop'">★{{ a.mustSee }}</span>
+              <span class="attr-cat-icon" v-else :title="CAT_META[a.category]?.label">{{ CAT_META[a.category]?.icon }}</span>
+              <span class="attr-name">{{ a.name }}<span v-if="a.tag" class="poi-badge tag">{{ a.tag }}</span><span v-else-if="a.poi" class="poi-badge">实时</span></span>
+              <span class="attr-ticket">{{ a.ticket }}</span>
+              <span class="attr-fold" :class="{ open: attrFood(cp,a)?.open }">▾</span>
+              <span class="attr-nav" title="高德导航" @click.stop="openAmapNav(a.coord.lng, a.coord.lat, a.name)">🧭</span>
+            </div>
 
-          <!-- 附近特色美食（点击后懒加载） -->
-          <div v-if="attrFood(cp, a)?.open" class="attr-food">
-            <div v-if="attrFood(cp, a).loading" class="food-loading-bar">
-              <span class="spin">⏳</span> 正在搜索「{{ a.name }}」附近特色美食…
-            </div>
-            <div v-else-if="attrFood(cp, a).list.length" class="food-grid">
-              <div v-for="(r, j) in attrFood(cp, a).list" :key="j" class="food-item restaurant-item">
-                <div class="rest-header">
-                  <span class="food-name">🍜 {{ r.name }}</span>
-                  <span v-if="r.rating" class="rest-rating">⭐ {{ r.rating }}</span>
-                </div>
-                <div class="rest-meta">
-                  <span v-if="r.price" class="food-price">{{ r.price }}</span>
-                  <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
-                </div>
-                <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
-                <div v-if="r.distM != null" class="food-dist">🚶 {{ formatFoodDist(r) }}</div>
+            <!-- 附近特色美食（点击后懒加载） -->
+            <div v-if="attrFood(cp, a)?.open" class="attr-food">
+              <div v-if="attrFood(cp, a).loading" class="food-loading-bar">
+                <span class="spin">⏳</span> 正在搜索「{{ a.name }}」附近特色美食…
               </div>
+              <div v-else-if="attrFood(cp, a).list.length" class="food-grid">
+                <div v-for="(r, j) in attrFood(cp, a).list" :key="j" class="food-item restaurant-item">
+                  <div class="rest-header">
+                    <span class="food-name">🍜 {{ r.name }}</span>
+                    <span v-if="r.rating" class="rest-rating">⭐ {{ r.rating }}</span>
+                  </div>
+                  <div class="rest-meta">
+                    <span v-if="r.price" class="food-price">{{ r.price }}</span>
+                    <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
+                  </div>
+                  <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
+                  <div v-if="r.distM != null" class="food-dist">🚶 {{ formatFoodDist(r) }}</div>
+                </div>
+              </div>
+              <div v-else class="food-empty">附近暂未搜索到特色美食，换个点试试</div>
             </div>
-            <div v-else class="food-empty">附近暂未搜索到特色美食，换个点试试</div>
           </div>
         </div>
       </div>
 
       <button class="btn btn-sm btn-supp" :disabled="suppLoading === cp.name" @click="doSupplement(cp.name)">
-        {{ suppLoading === cp.name ? '搜索中…' : '🔍 补充更多景点（高德实时）' }}
+        {{ suppLoading === cp.name ? '搜索中…' : '🔍 补充更多地点（景点/美食/购物）' }}
       </button>
 
       <!-- 酒店搜索 -->
@@ -638,6 +647,23 @@ async function doShareGuide() {
 
 /* 景点清单 */
 .attr-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+/* 分类区块（景点 / 美食 / 购物） */
+.cat-sec { margin-top: 4px; }
+.cat-head { display: flex; align-items: center; gap: 6px; margin: 12px 2px 7px; padding-bottom: 4px; border-bottom: 1px dashed rgba(0,0,0,.06); }
+.cat-icon { font-size: 15px; line-height: 1; }
+.cat-name { font-size: 14px; font-weight: 800; letter-spacing: -.2px; }
+.cat-count { font-size: 10px; background: #f0edf5; color: #7a6c8a; border-radius: 8px; padding: 2px 8px; font-weight: 700; }
+.cat-sight .cat-name { color: var(--accent); }
+.cat-food .cat-name { color: #e0890a; }
+.cat-shop .cat-name { color: #4f6bed; }
+.cat-sight .cat-count { background: var(--accent-soft); color: var(--accent); }
+.cat-food .cat-count { background: #fdf0db; color: #c8881f; }
+.cat-shop .cat-count { background: #e8edfd; color: #4f6bed; }
+.attr-cat-icon { flex-shrink: 0; font-size: 13px; width: 24px; text-align: center; }
+.attr-item.cat-food { border-left: 3px solid #f59e0b; }
+.attr-item.cat-shop { border-left: 3px solid #3b82f6; }
+.attr-item.cat-sight { border-left: 3px solid var(--accent); }
 .attr-item { background: #f7f5fa; border: none; border-radius: 12px; overflow: hidden; }
 .attr-row {
   display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; transition: background .15s; font-size: 12px;

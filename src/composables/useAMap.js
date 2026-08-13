@@ -275,7 +275,6 @@ export const SPOT_CATS = [
   { kw: '森林公园', label: '森林公园', type: 'nature', mustSee: 2 },
   { kw: '生态公园', label: '生态公园', type: 'nature', mustSee: 2 },
   { kw: '观景台', label: '观景', type: 'nature', mustSee: 2 },
-  { kw: '夜市', label: '夜市', type: 'urban', mustSee: 2 },
   { kw: '主题乐园', label: '主题乐园', type: 'family', mustSee: 3 },
 ]
 
@@ -312,9 +311,35 @@ export const SPOT_CLASSIC = [
   { kw: '温泉', label: '温泉', type: 'nature', mustSee: 2, cityLimit: false },
 ]
 
+// 美食分类池：夜市 / 美食街 / 小吃街 / 回民街 等「吃的地方」，单独归类（cat: 'food'），
+// 与景点分开显示。注意：不进 SPOT_CATS（那是景点清单），避免夜市混进"逛的景点"。
+// 区别 noise：美食搜索要保留 小吃/美食/夜市 等词，只用 NOISE_POI 挡掉酒吧/鸡尾酒等噪声。
+export const SPOT_FOOD = [
+  { kw: '夜市', label: '夜市', type: 'food', mustSee: 3, cat: 'food' },
+  { kw: '美食街', label: '美食街', type: 'food', mustSee: 3, cat: 'food' },
+  { kw: '小吃街', label: '小吃街', type: 'food', mustSee: 3, cat: 'food' },
+  { kw: '美食城', label: '美食城', type: 'food', mustSee: 2, cat: 'food' },
+  { kw: '回民街', label: '回民街', type: 'food', mustSee: 3, cat: 'food' },
+  { kw: '夜市街', label: '夜市', type: 'food', mustSee: 2, cat: 'food' },
+]
+
+// 购物分类池：商场 / 购物中心 / 奥特莱斯 / 百货 等，单独归类（cat: 'shop'），与景点分开显示。
+export const SPOT_SHOP = [
+  { kw: '商场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '购物中心', label: '购物中心', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '奥特莱斯', label: '奥特莱斯', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '百货', label: '百货', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '商业街', label: '商业街', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '购物街区', label: '购物街区', type: 'shop', mustSee: 2, cat: 'shop' },
+]
+
+// 美食/购物类 POI 噪声过滤：只挡结构性噪声 + 酒吧/鸡尾酒（避免夜市混入酒吧），
+// 保留 小吃/美食/夜市/商场/购物中心 等关键词，否则这些词会被景点噪声正则误杀。
+const NOISE_POI = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|洗车|维修|菜市场|农贸市场|酒店$|宾馆$|公寓$|客房$|度假村$|售票处|游客中心|服务中心|咨询处|内广场|入口$|东门$|西门$|南门$|北门$|正门$|健身|训练馆|健身房|游泳馆|瑜伽|球馆|台球|网吧|KTV|酒吧|洗浴|按摩|美甲|美容|理发|超市|便利店|药店|医院|诊所|学院|学校|中学|小学|工厂|工业园|产业园|4S店|俱乐部|鸡尾酒|夜店|酒馆|餐吧|精酿|livehouse|微醺|小酒馆|体验店|专卖店|旗舰店/
+
 const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$|健身|训练馆|健身房|游泳馆|瑜伽|球馆|台球|网吧|KTV|酒吧|洗浴|按摩|美甲|美容|理发|洗车|烤肉|火锅|餐厅|饭店|餐饮|小吃|咖啡|奶茶|烘焙|烧烤|串串|面馆|饭馆|超市|便利店|药店|银行|营业厅|医院|学院|工厂|工业园|产业园|4S店|俱乐部|雪具店|体验店|专卖店|旗舰店|鸡尾酒|夜店|酒馆|餐吧|精酿|livehouse|微醺|小酒馆/
 
-async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true) {
+async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true, category = 'sight') {
   try {
     const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
       `&keywords=${encodeURIComponent(kw)}` +
@@ -324,22 +349,23 @@ async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = tr
       `&show_fields=tag,address`
     const d = await fetchJSON(url)
     if (d.status !== '1' || !d.pois) return []
+    const noise = category === 'sight' ? SPOT_NOISE_RE : NOISE_POI
     return d.pois.map(p => {
       const loc = (p.location || '').split(',')
       const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
       if (!lng || !lat) return null
       const name = p.name || ''
-      if (SPOT_NOISE_RE.test(name)) return null
+      if (noise.test(name)) return null
       return {
         name, address: p.address || '', tag: label, coord: { lng, lat },
-        ticket: '—', duration: '2-3h', mustSee, type,
-        desc: `${label}·实时搜索`, live: true, poi: true,
+        ticket: '—', duration: '2-3h', mustSee, type: category === 'sight' ? type : (type || 'urban'),
+        category, desc: `${label}·实时搜索`, live: true, poi: true,
       }
     }).filter(Boolean)
   } catch (e) { return [] }
 }
 
-export async function searchSpotsForCity(cityName, cityCoord, needed = 30, cats = [...SPOT_CLASSIC, ...SPOT_CATS]) {
+export async function searchSpotsForCity(cityName, cityCoord, needed = 30, cats = [...SPOT_CLASSIC, ...SPOT_CATS, ...SPOT_FOOD, ...SPOT_SHOP]) {
   const out = []
   const seen = new Set()
   // 分批并行（每批 5 个关键词），兼顾速度与不触发高德限流
@@ -347,7 +373,7 @@ export async function searchSpotsForCity(cityName, cityCoord, needed = 30, cats 
   for (let i = 0; i < cats.length; i += 5) batches.push(cats.slice(i, i + 5))
   for (const batch of batches) {
     if (out.length >= needed) break
-    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit)))
+    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat)))
     for (const list of res) {
       for (const it of list) {
         if (out.length >= needed) break

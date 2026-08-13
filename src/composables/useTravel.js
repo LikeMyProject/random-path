@@ -9,7 +9,7 @@
 //   6. buildTextGuide      导出文本攻略（markdown）
 // ============================================================
 import { CITIES, getCity, getTransport } from '../data/cities.js'
-import { searchPOIsByText, searchRestaurantsForCity, searchLocalSpotsForCity, searchSpotsForCity, SPOT_EXT } from './useAMap.js'
+import { searchPOIsByText, searchRestaurantsForCity, searchLocalSpotsForCity, searchSpotsForCity, SPOT_EXT, SPOT_FOOD, SPOT_SHOP } from './useAMap.js'
 
 const PACE_ATTRACTIONS = { relax: 2, standard: 3, compact: 4 }
 export { PACE_ATTRACTIONS }
@@ -521,7 +521,10 @@ export function buildSpotPlan({ cities = [], interests = [], originCity = '' } =
   const month = new Date().getMonth() + 1
   const cityPlans = cities.map(name => {
     const c = getCity(name)
-    let attrs = [...(c?.attractions || [])]
+    let attrs = [...(c?.attractions || [])].map(a => ({
+      ...a,
+      category: a.category || (a.type === 'food' ? 'food' : 'sight'),
+    }))
     // 兴趣过滤（仅当能筛出结果时生效）
     if (interests.length) {
       const matched = attrs.filter(a => interests.includes(a.type))
@@ -700,16 +703,19 @@ export function buildTextGuide(plan) {
     lines.push(`## 🏙 ${cp.name}`)
     lines.push(`> ${cp.data?.desc || ''}`)
     lines.push('')
-    lines.push('### 📍 景点清单（按推荐顺序）')
-    cp.attractions.forEach((a, i) => {
-      const parts = [`${i + 1}. **${a.name}**`]
-      if (a.ticket) parts.push(a.ticket)
-      if (a.duration) parts.push(`建议${a.duration}`)
-      if (a.desc) parts.push('— ' + a.desc)
-      lines.push('- ' + parts.join('｜'))
+    const groups = groupByCategory(cp.attractions)
+    groups.forEach(g => {
+      lines.push(`### ${g.icon} ${g.label}清单（按推荐顺序）`)
+      g.items.forEach((a, i) => {
+        const parts = [`${i + 1}. **${a.name}**`]
+        if (a.ticket) parts.push(a.ticket)
+        if (a.duration) parts.push(`建议${a.duration}`)
+        if (a.desc) parts.push('— ' + a.desc)
+        lines.push('- ' + parts.join('｜'))
+      })
+      lines.push('')
     })
-    lines.push('')
-    lines.push('💡 点击任意景点可查看附近特色美食（实时搜索）')
+    lines.push('💡 点击任意地点可查看附近特色美食（实时搜索）')
     lines.push('')
   })
 
@@ -735,6 +741,27 @@ export function buildTextGuide(plan) {
     (cp.data?.tips || []).forEach(t => lines.push(`- 【${cp.name}】${t}`))
   })
   return lines.join('\n')
+}
+
+// ============================================================
+// 9. 地点分类（景点 / 美食 / 购物）：把扁平清单按顶层 category 分组展示
+// ============================================================
+export const CAT_META = {
+  sight: { label: '景点', icon: '🏞', color: '#7c3aed' },
+  food: { label: '美食', icon: '🍜', color: '#f59e0b' },
+  shop: { label: '购物', icon: '🛍', color: '#3b82f6' },
+}
+const CAT_ORDER = ['sight', 'food', 'shop']
+
+export function groupByCategory(list) {
+  const g = {}
+  for (const a of (list || [])) {
+    const cat = a.category || (a.type === 'food' ? 'food' : 'sight')
+    ;(g[cat] ||= []).push(a)
+  }
+  return CAT_ORDER.filter(c => g[c]?.length).map(c => ({
+    key: c, ...CAT_META[c], items: orderAttractions(g[c]),
+  }))
 }
 
 export { PACE_LABEL, INTEREST_LABEL }

@@ -6,6 +6,7 @@
 // ============================================================
 import { shareImage } from './useShareCard.js'
 import { estimateTransit, TRANSIT_LABEL } from './useHotel.js'
+import { groupByCategory, CAT_META } from './useTravel.js'
 
 const W = 750, M = 0, CW = 750
 const FONT = '"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif'
@@ -161,24 +162,31 @@ export function generateGuideImage(plan, hotel) {
     })
   }
 
-  // ===== 景点清单（无天数：每城一节，按顺序列出景点）=====
+  // ===== 景点清单（无天数：每城一节，按 景点/美食/购物 分类列出）=====
   plan.cityPlans.forEach(cp => {
-    const n = cp.attractions.length
-    const listH = n * 40
+    const groups = groupByCategory(cp.attractions)
+    let listH = 0
+    groups.forEach(g => { listH += 30; listH += g.items.length * 40 })
     add(72 + listH, (ctx, y) => {
       y += 16
       // 城市标题栏（紫色条）
       ctx.fillStyle = C.purple
       roundRect(ctx, X, y, CW - M * 2, 44, 10); ctx.fill()
       ctx.fillStyle = '#ffffff'; ctx.font = `bold 20px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
-      ctx.fillText(`🏙 ${cp.name}（${n} 个景点）`, X + 16, y + 22)
+      ctx.fillText(`🏙 ${cp.name}（${cp.attractions.length} 个地点）`, X + 16, y + 22)
       ctx.textAlign = 'right'
       ctx.font = `14px ${FONT}`
       if (cp.weather) ctx.fillText(`${cp.weather.low}~${cp.weather.high}°C`, X + CW - M * 2 - 16, y + 22)
       y += 60
 
-      // 景点行
-      cp.attractions.forEach((a, i) => {
+      // 分类区块（景点 / 美食 / 购物）
+      groups.forEach(g => {
+        // 分类小标题
+        ctx.fillStyle = CAT_META[g.key].color
+        ctx.font = 'bold 16px ' + FONT; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+        ctx.fillText(CAT_META[g.key].icon + ' ' + CAT_META[g.key].label, X + 4, y + 14)
+        y += 30
+        g.items.forEach((a, i) => {
         ctx.fillStyle = C.card
         roundRect(ctx, X, y, CW - M * 2, 34, 8); ctx.fill()
         ctx.strokeStyle = C.line; ctx.lineWidth = 1
@@ -188,7 +196,7 @@ export function generateGuideImage(plan, hotel) {
         ctx.fillText(`${i + 1}`, X + 14, y + 17)
         // 名称 + 必看星
         ctx.fillStyle = C.ink; ctx.font = `bold 16px ${FONT}`
-        const must = (a.mustSee || 0) >= 4 ? ' ★'.repeat(Math.min(3, a.mustSee || 0)) : ''
+        const must = (a.mustSee || 0) >= 4 && g.key === 'sight' ? ' ★'.repeat(Math.min(3, a.mustSee || 0)) : ''
         ctx.fillText(truncate(a.name + must, 18), X + 38, y + 17)
         // 右侧：门票 / 时长
         const right = [a.ticket, a.duration].filter(Boolean).join(' · ')
@@ -197,6 +205,8 @@ export function generateGuideImage(plan, hotel) {
           ctx.fillText(truncate(right, 14), X + CW - M * 2 - 14, y + 17)
         }
         y += 40
+        })
+        y += 6
       })
     })
   })
