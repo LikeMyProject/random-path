@@ -188,6 +188,48 @@ export async function searchLocalSpotsForCity(cityName, cityCoord, needed = 40) 
   return results
 }
 
+// ============================================================
+// 景点周边特色美食搜索：按坐标地理偏置（location + radius），用于「点击景点显示附近吃的」
+// ============================================================
+export async function searchFoodNear(coord, { radius = 2500, limit = 8 } = {}) {
+  if (!coord || !coord.lng || !coord.lat) return []
+  const results = []
+  const seen = new Set()
+  // 特色吃：本地老字号 / 小吃 / 正餐混合，保证「特色」优先
+  const kws = ['特色美食', '老字号', '小吃', '本地菜', '美食', '餐厅', '面馆', '火锅', '烧烤', '甜品', '奶茶']
+  for (const kw of kws) {
+    if (results.length >= limit) break
+    try {
+      const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
+        `&keywords=${encodeURIComponent(kw)}` +
+        `&location=${coord.lng},${coord.lat}` +
+        `&radius=${radius}` +
+        `&types=050000` +
+        `&offset=25` +
+        `&show_fields=rating,price,tag,address`
+      const d = await fetchJSON(url)
+      if (d.status === '1' && d.pois) {
+        for (const p of d.pois) {
+          const loc = (p.location || '').split(',')
+          const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
+          if (!lng || !lat) continue
+          const key = p.name + '|' + (p.address || '')
+          if (seen.has(key)) continue
+          seen.add(key)
+          results.push({
+            name: p.name || '', address: p.address || '', rating: p.rating || '',
+            price: p.price ? `¥${p.price}/人` : '', tag: p.tag || '',
+            coord: { lng, lat },
+          })
+          if (results.length >= limit) break
+        }
+      }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 150))
+  }
+  return results
+}
+
 export async function searchPOIsByText(keywords, city = '', limit = 5) {
   try {
     let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}&keywords=${encodeURIComponent(keywords)}&offset=${limit}`

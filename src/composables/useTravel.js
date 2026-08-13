@@ -214,6 +214,28 @@ function daySpanKm(attractions) {
   return Math.max(...pts.map(p => haversineKm(p, cl)))
 }
 
+// 景点排序：必看优先 + 就近成链。从最高 mustSee 出发，贪心选最近的下一个，
+// 让列出的景点「按顺序、相邻就近」，既保证必去靠前，又天然顺路，不东一个西一个。
+export function orderAttractions(attractions) {
+  const withCoord = [...attractions].filter(a => a.coord)
+  const noCoord = [...attractions].filter(a => !a.coord)
+  if (withCoord.length === 0) return [...attractions]
+  const score = a => (a.mustSee || 0)
+  const start = withCoord.reduce((b, a) => (score(a) > score(b) ? a : b), withCoord[0])
+  const remaining = withCoord.filter(a => a !== start)
+  const ordered = [start]
+  while (remaining.length) {
+    const last = ordered[ordered.length - 1]
+    let bi = 0, bd = Infinity
+    for (let i = 0; i < remaining.length; i++) {
+      const d = haversineKm(last.coord, remaining[i].coord)
+      if (d < bd) { bd = d; bi = i }
+    }
+    ordered.push(remaining.splice(bi, 1)[0])
+  }
+  return [...ordered, ...noCoord]
+}
+
 // ============================================================
 // 3. 时段分配：每天景点+餐食 → 上午/午餐/下午/晚餐/晚上
 // ============================================================
@@ -463,6 +485,34 @@ export function buildFullPlan({ cities = [], startDate, endDate, pace = 'standar
 }
 
 // ============================================================
+// 8. 无天数「景点清单」引擎：去掉 D1/D2 与每日行程，仅列景点（按必看+就近排序）
+//    用于替代一直出问题的天数规划；美食改由「点击景点搜周边」实现
+// ============================================================
+export function buildSpotPlan({ cities = [], interests = [], originCity = '' } = {}) {
+  if (cities.length === 0) return null
+  const month = new Date().getMonth() + 1
+  const cityPlans = cities.map(name => {
+    const c = getCity(name)
+    let attrs = [...(c?.attractions || [])]
+    // 兴趣过滤（仅当能筛出结果时生效）
+    if (interests.length) {
+      const matched = attrs.filter(a => interests.includes(a.type))
+      if (matched.length >= 1) attrs = matched
+    }
+    attrs = orderAttractions(attrs)
+    const w = weatherAdvice(name, month)
+    return {
+      name, data: c, attractions: attrs,
+      weather: { ...w },
+    }
+  })
+  // 预算按各城建议天数粗略估算（无具体行程日期）
+  const perCity = cityPlans.map(cp => getCity(cp.name)?.days || 2)
+  const budget = estimateBudget(cities, perCity, [])
+  return { cities, cityPlans, budget, interests, paceLabel: '自由行' }
+}
+
+// ============================================================
 // 7.5 异步搜索真实餐厅并分配到每日行程（早中晚不重复）
 // ============================================================
 function shuffle(arr) {
@@ -616,56 +666,22 @@ export async function searchAndAssignLocalSpots(plan, onProgress = null) {
 export function buildTextGuide(plan) {
   if (!plan) return ''
   const lines = []
-  lines.push(`# ${plan.cities.join(' → ')} · ${plan.totalDays}天${plan.transitDays > 0 ? `（含${plan.transitDays}天转换）` : ''}旅行攻略`)
-  lines.push(`行程日期：${plan.startDate} ~ ${plan.endDate} · 节奏：${plan.paceLabel}`)
+  lines.push(`# ${plan.cities.join(' → ')} · 自由行攻略`)
   lines.push('')
-
-  // 总览
-  lines.push('## 📅 行程总览')
   plan.cityPlans.forEach(cp => {
-    const r = cp.dateRange
-    lines.push(`- **${cp.name}**：${cp.days}天（${fmtShort(r.start)}~${fmtShort(r.end)}）${cp.data.desc}`)
-  })
-  lines.push('')
-
-  // 交通
-  if (plan.transports.length) {
-    lines.push('## 🚄 城市间交通')
-    plan.transports.forEach(t => lines.push(`- ${t.from} → ${t.to}：${t.mode}约${t.hours}小时${t.estimated ? '（估算）' : ''}（${fmtShort(t.date)}）`))
+    lines.push(`## 🏙 ${cp.name}`)
+    lines.push(`> ${cp.data?.desc || ''}`)
     lines.push('')
-  }
-
-  // 每日行程
-  plan.cityPlans.forEach(cp => {
-    lines.push(`## 🏙 ${cp.name}（${cp.days}天）`)
-    lines.push(`> ${cp.data.desc}`)
-    cp.daily.forEach(d => {
-      lines.push(`\n### ${d.dateLabel}`)
-      if (d.slots.length === 0) { lines.push('- 自由活动 / 机动时间'); return }
-      d.slots.forEach(s => {
-        if (s.meal) {
-          const m = s.meal
-          const parts = [`**${s.periodLabel}** 🍽 ${m.name}`]
-          if (m.price) parts.push(m.price)
-          if (m.rating) parts.push(`${m.rating}分`)
-          if (m.tag) parts.push(m.tag)
-          if (m.address) parts.push(`📍 ${m.address}`)
-          lines.push(`- ${parts.join('｜')}`)
-          return
-        }
-        if (s.local) {
-          const sp = s.spot
-          const parts = [`**${s.periodLabel}** 🏮 ${sp.name}`]
-          parts.push(sp.label)
-          if (sp.tag) parts.push(sp.tag)
-          if (sp.address) parts.push(`📍 ${sp.address}`)
-          lines.push(`- ${parts.join('｜')}`)
-          return
-        }
-        const a = s.attraction
-        lines.push(`- **${s.periodLabel}** ${a.name}｜${a.ticket}｜建议${a.duration}${a.desc ? ' — ' + a.desc : ''}`)
-      })
+    lines.push('### 📍 景点清单（按推荐顺序）')
+    cp.attractions.forEach((a, i) => {
+      const parts = [`${i + 1}. **${a.name}**`]
+      if (a.ticket) parts.push(a.ticket)
+      if (a.duration) parts.push(`建议${a.duration}`)
+      if (a.desc) parts.push('— ' + a.desc)
+      lines.push('- ' + parts.join('｜'))
     })
+    lines.push('')
+    lines.push('💡 点击任意景点可查看附近特色美食（实时搜索）')
     lines.push('')
   })
 
@@ -677,57 +693,18 @@ export function buildTextGuide(plan) {
   })
   lines.push('')
 
-  // 美食（从每日行程中提取真实餐厅）
-  lines.push('## 🍽 餐厅推荐（实时搜索）')
-  plan.cityPlans.forEach(cp => {
-    lines.push(`\n### ${cp.name}`)
-    const seen = new Set()
-    cp.daily.forEach(d => {
-      d.slots.forEach(s => {
-        if (s.meal && !seen.has(s.meal.name)) {
-          seen.add(s.meal.name)
-          const m = s.meal
-          const parts = [m.name]
-          if (m.price) parts.push(m.price)
-          if (m.rating) parts.push(`${m.rating}分`)
-          if (m.address) parts.push(`📍 ${m.address}`)
-          lines.push(`- ${parts.join('｜')}`)
-        }
-      })
-    })
-  })
-  lines.push('')
-
-  // 本地推荐（从每日行程中提取不重复的本地地点）
-  lines.push('## 🏮 本地人去的地方（实时搜索）')
-  plan.cityPlans.forEach(cp => {
-    lines.push(`\n### ${cp.name}`)
-    const seen = new Set()
-    cp.daily.forEach(d => {
-      d.slots.forEach(s => {
-        if (s.local && !seen.has(s.spot.name)) {
-          seen.add(s.spot.name)
-          const sp = s.spot
-          const parts = [`🏮 ${sp.name}`, sp.label]
-          if (sp.tag) parts.push(sp.tag)
-          if (sp.address) parts.push(`📍 ${sp.address}`)
-          lines.push(`- ${parts.join('｜')}`)
-        }
-      })
-    })
-  })
-  lines.push('')
-
   // 预算
   lines.push('## 💰 预算参考（人均）')
-  plan.budget.items.forEach(it => lines.push(`- ${it.label}：${it.value}`))
-  lines.push(`- **合计：¥${plan.budget.total[0]} ~ ¥${plan.budget.total[1]}**`)
+  if (plan.budget?.items) {
+    plan.budget.items.forEach(it => lines.push(`- ${it.label}：${it.value}`))
+    lines.push(`- **合计：¥${plan.budget.total[0]} ~ ¥${plan.budget.total[1]}**`)
+  }
   lines.push('')
 
   // 贴士
   lines.push('## 💡 实用贴士')
   plan.cityPlans.forEach(cp => {
-    cp.data.tips.forEach(t => lines.push(`- 【${cp.name}】${t}`))
+    (cp.data?.tips || []).forEach(t => lines.push(`- 【${cp.name}】${t}`))
   })
   return lines.join('\n')
 }

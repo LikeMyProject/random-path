@@ -1,44 +1,24 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildFullPlan, buildTextGuide, supplementAttractions, searchAndAssignFoods, searchAndAssignLocalSpots, cityDayAdvice, PACE_ATTRACTIONS, PACE_LABEL, INTEREST_LABEL } from '../composables/useTravel.js'
+import { buildSpotPlan, buildTextGuide, supplementAttractions, cityDayAdvice, orderAttractions, INTEREST_LABEL } from '../composables/useTravel.js'
+import { searchFoodNear } from '../composables/useAMap.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
-import ItineraryTimeline from '../components/ItineraryTimeline.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
 
 // ===== 输入状态 =====
-const origin = ref('')                     // 出发地（可选）
-const selectedCities = ref([])             // 目的地城市（按顺序）
-const startDate = ref(''), endDate = ref('')
-const pace = ref('standard')
+const selectedCities = ref([])              // 目的地城市（按顺序）
 const interests = ref([])
 const loading = ref(false)
-const foodLoading = ref(false)
-const foodProgress = ref('')
-
-// 默认日期：下周一开始，4 天
-function defaultDates() {
-  const t = new Date()
-  const s = new Date(t); s.setDate(s.getDate() + 7)
-  const e = new Date(s); e.setDate(e.getDate() + 3)
-  return { s: fmt(s), e: fmt(e) }
-}
-function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
-const def = defaultDates()
-startDate.value = def.s; endDate.value = def.e
 
 // ===== 最后一次搜索缓存（打开自动恢复）=====
 const SEARCH_KEY = 'radompath:travel:lastSearch'
 function saveLastSearch() {
   try {
     localStorage.setItem(SEARCH_KEY, JSON.stringify({
-      origin: origin.value,
       cities: selectedCities.value,
-      startDate: startDate.value,
-      endDate: endDate.value,
-      pace: pace.value,
       interests: interests.value,
     }))
   } catch (e) {}
@@ -48,49 +28,22 @@ function loadLastSearch() {
     const raw = localStorage.getItem(SEARCH_KEY)
     if (!raw) return false
     const d = JSON.parse(raw)
-    if (!Array.isArray(d.cities) || !d.startDate || !d.endDate) return false
-    origin.value = d.origin || ''
+    if (!Array.isArray(d.cities)) return false
     selectedCities.value = d.cities.filter(c => CITY_LIST.includes(c))
-    startDate.value = d.startDate
-    endDate.value = d.endDate
-    pace.value = d.pace || 'standard'
     interests.value = Array.isArray(d.interests) ? d.interests : []
     return selectedCities.value.length > 0
   } catch (e) { return false }
 }
-// 打开页面时恢复上次搜索，若有有效输入则自动生成攻略
+// 打开页面时恢复上次搜索，若有有效输入则自动生成
 const restored = loadLastSearch()
 onMounted(() => {
   if (restored && selectedCities.value.length) {
-    setTimeout(() => {
-      if (!plan.value) {
-        rebuild()
-        // 自动搜索餐厅和本地地点
-        if (plan.value) {
-          foodLoading.value = true
-          searchAndAssignFoods(plan.value, ({ city, done, total }) => {
-            if (city) foodProgress.value = `正在搜索 ${city} 的餐厅…（${done + 1}/${total}）`
-            else foodProgress.value = ''
-          }).then(() => {
-            plan.value = { ...plan.value }
-            return searchAndAssignLocalSpots(plan.value, ({ city, done, total }) => {
-              if (city) foodProgress.value = `正在搜索 ${city} 的本地好去处…（${done + 1}/${total}）`
-              else foodProgress.value = ''
-            })
-          }).then(() => {
-            plan.value = { ...plan.value }
-          }).catch(() => {}).finally(() => {
-            foodLoading.value = false
-            foodProgress.value = ''
-          })
-        }
-      }
-    }, 150)
+    setTimeout(() => { if (!plan.value) generate() }, 150)
   }
 })
 // 输入变化防抖保存
 let saveTimer = null
-watch([selectedCities, startDate, endDate, pace, interests], () => {
+watch([selectedCities, interests], () => {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(saveLastSearch, 500)
 }, { deep: true })
@@ -99,17 +52,13 @@ const remaining = computed(() => CITY_LIST.filter(c => !selectedCities.value.inc
 const remainingGroups = computed(() => CITY_GROUPS
   .map(g => ({ ...g, cities: g.cities.filter(c => !selectedCities.value.includes(c)) }))
   .filter(g => g.cities.length > 0))
-// 用户所选出发月份（用于结合最佳季节给出时间理由）
-const travelMonth = computed(() => {
-  if (!startDate.value) return null
-  return new Date(startDate.value).getMonth() + 1
-})
-// 城市推荐天数 + 时间理由：已选城市优先；未选时展示热门城市建议
+
+// 城市推荐天数 + 时间理由（无具体日期，仅按最佳季节给建议）
 const cityAdviceList = computed(() => {
   const list = selectedCities.value.length
     ? selectedCities.value
     : ['成都', '重庆', '西安', '杭州', '青岛', '三亚', '张家界', '丽江']
-  return list.filter(c => getCity(c)).map(c => ({ name: c, ...cityDayAdvice(c, travelMonth.value) }))
+  return list.filter(c => getCity(c)).map(c => ({ name: c, ...cityDayAdvice(c, null) }))
 })
 const cityToAdd = ref('')
 function onSelectCity() {
@@ -130,12 +79,6 @@ function toggleInterest(k) {
 function toggleCity(name) {
   showAdvanced.value = showAdvanced.value === name ? '' : name
 }
-const totalDays = computed(() => {
-  if (!startDate.value || !endDate.value) return 0
-  const a = new Date(startDate.value), b = new Date(endDate.value)
-  if (b < a) return 0
-  return Math.round((b - a) / 86400000) + 1
-})
 
 function addCity() {
   if (remaining.value.length === 0) return
@@ -151,106 +94,59 @@ function moveCity(i, dir) {
 
 // ===== 结果状态 =====
 const plan = ref(null)
-const activeDayMap = ref({})
-const showAdvanced = ref(true) // 每城折叠详情
+const showAdvanced = ref('')   // 每城折叠酒店/补充
 const suppLoading = ref('')
 
-function rebuild() {
-  if (selectedCities.value.length === 0 || !startDate.value || !endDate.value) return
-  const p = buildFullPlan({
-    cities: selectedCities.value,
-    startDate: startDate.value,
-    endDate: endDate.value,
-    pace: pace.value,
-    interests: interests.value,
-    originCity: origin.value,
-  })
-  if (!p) { toast('请检查日期设置', 'warn'); return }
-  // 天数校验
-  if (p.totalDays < selectedCities.value.length + Math.max(0, selectedCities.value.length - 1)) {
-    toast(`天数太紧：${selectedCities.value.length} 城至少需要 ${selectedCities.value.length + Math.max(0, selectedCities.value.length - 1)} 天`, 'warn')
-  }
-  plan.value = p
-  p.cityPlans.forEach(cp => { if (!(cp.name in activeDayMap.value)) activeDayMap.value[cp.name] = 0 })
-}
-
-async function generate() {
+function generate() {
   if (selectedCities.value.length === 0) { toast('请先选择目的地城市', 'warn'); return }
-  if (!startDate.value || !endDate.value) { toast('请选择往返日期', 'warn'); return }
   loading.value = true
   try {
-    // 预生成，检查各城景点是否满足 天数×每日景点数
-    const p = buildFullPlan({
-      cities: selectedCities.value,
-      startDate: startDate.value,
-      endDate: endDate.value,
-      pace: pace.value,
-      interests: interests.value,
-      originCity: origin.value,
-    })
-    if (p) {
-      const perDay = PACE_ATTRACTIONS[pace.value] || 3
-      const needSup = p.cityPlans.some(cp => cp.data.attractions.length < cp.days * perDay)
-      if (needSup) {
-        toast('景点不足，正在用高德实时补充…', 'warn')
-        for (const cp of p.cityPlans) {
-          const need = cp.days * perDay
-          let miss = need - cp.data.attractions.length
-          let round = 0
-          while (miss > 0 && round < 2) {
-            const added = await supplementAttractions(cp.name, cp.data.attractions)
-            if (added.length === 0) break
-            cp.data.attractions.push(...added)
-            miss = need - cp.data.attractions.length
-            round++
-          }
-        }
-      }
-    }
-  } catch (e) { /* 补充失败不阻断 */ }
-  rebuild()
-  loading.value = false
-
-  // 异步搜索真实餐厅并分配到每日行程
-  if (plan.value) {
-    foodLoading.value = true
-    try {
-      await searchAndAssignFoods(plan.value, ({ city, done, total }) => {
-        if (city) foodProgress.value = `正在搜索 ${city} 的餐厅…（${done + 1}/${total}）`
-        else foodProgress.value = ''
-      })
-      plan.value = { ...plan.value }
-      toast('餐厅搜索完成，正在搜索本地好去处…')
-      // 搜索本地小众地点
-      await searchAndAssignLocalSpots(plan.value, ({ city, done, total }) => {
-        if (city) foodProgress.value = `正在搜索 ${city} 的本地好去处…（${done + 1}/${total}）`
-        else foodProgress.value = ''
-      })
-      plan.value = { ...plan.value }
-      toast('餐厅和本地好去处搜索完成，已为每日行程分配早中晚餐和本地推荐')
-    } catch (e) {
-      toast('部分搜索失败，行程仍可使用', 'warn')
-    }
-    foodLoading.value = false
-    foodProgress.value = ''
+    const p = buildSpotPlan({ cities: selectedCities.value, interests: interests.value })
+    if (!p) { toast('生成失败，请重试', 'err'); return }
+    plan.value = p
+  } catch (e) {
+    toast('生成失败: ' + (e?.message || e), 'err')
+  } finally {
+    loading.value = false
   }
 }
 
 // ===== 高德 POI 补充景点 =====
 async function doSupplement(cityName) {
   if (suppLoading.value) return
+  const cp = plan.value?.cityPlans.find(c => c.name === cityName)
+  if (!cp) return
   suppLoading.value = cityName
   try {
-    const added = await supplementAttractions(cityName, cp.data.attractions)
+    const added = await supplementAttractions(cityName, cp.attractions)
     if (added.length === 0) { toast('未找到更多景点，或已收录', 'warn'); return }
-    const cp = plan.value?.cityPlans.find(c => c.name === cityName)
-    if (cp) {
-      cp.data.attractions.push(...added)
-      rebuild()
-      toast(`已补充 ${added.length} 个景点（实时搜索）`)
-    }
+    cp.attractions.push(...added)
+    cp.attractions = orderAttractions(cp.attractions)
+    toast(`已补充 ${added.length} 个景点（实时搜索）`)
   } catch (e) { toast('补充失败', 'err') }
   suppLoading.value = ''
+}
+
+// ===== 点击景点 → 加载附近特色美食（懒加载 + 缓存）=====
+const foodMap = ref({})   // key: '城市|景点名' -> { loading, list, open }
+function foodKey(cp, a) { return cp.name + '|' + a.name }
+function setFood(key, patch) {
+  foodMap.value = { ...foodMap.value, [key]: { ...(foodMap.value[key] || {}), ...patch } }
+}
+async function toggleAttractionFood(cp, a) {
+  const key = foodKey(cp, a)
+  const cur = foodMap.value[key]
+  if (cur) {
+    setFood(key, { open: !cur.open })
+    return
+  }
+  setFood(key, { loading: true, list: [], open: true })
+  try {
+    const list = await searchFoodNear(a.coord, { radius: 2500, limit: 8 })
+    setFood(key, { loading: false, list })
+  } catch (e) {
+    setFood(key, { loading: false, list: [] })
+  }
 }
 
 // ===== 高德导航到景点 =====
@@ -271,56 +167,13 @@ function downloadGuide() {
   const blob = new Blob([txt], { type: 'text/markdown;charset=utf-8' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `旅行攻略_${plan.value.cities.join('-')}_${plan.value.totalDays}天.md`
+  a.download = `旅行攻略_${plan.value.cities.join('-')}.md`
   a.click(); URL.revokeObjectURL(a.href)
   toast('攻略已下载')
 }
 
-// 城市链展示
-const cityChain = computed(() => {
-  if (!plan.value) return []
-  return plan.value.cityPlans.map(cp => ({ name: cp.name, days: cp.days }))
-})
-
-// 从每日行程中提取不重复的餐厅列表
-function cityRestaurants(cp) {
-  const seen = new Set()
-  const list = []
-  cp.daily?.forEach(d => {
-    d.slots?.forEach(s => {
-      if (s.meal && !seen.has(s.meal.name)) {
-        seen.add(s.meal.name)
-        list.push(s.meal)
-      }
-    })
-  })
-  return list
-}
-
-const MEAL_TYPE_LABELS = { breakfast: '🌅 早餐', lunch: '☀️ 午餐', dinner: '🌙 晚餐', snack: '🍮 小吃' }
-function mealTypeLabel(t) { return MEAL_TYPE_LABELS[t] || t }
-
-// 从每日行程中提取不重复的本地地点列表
-function cityLocalSpots(cp) {
-  const seen = new Set()
-  const list = []
-  cp.daily?.forEach(d => {
-    d.slots?.forEach(s => {
-      if (s.local && !seen.has(s.spot.name)) {
-        seen.add(s.spot.name)
-        list.push(s.spot)
-      }
-    })
-  })
-  return list
-}
-
-// 监听输入变化自动重新生成（防抖）
-let rbTimer = null
-watch([selectedCities, startDate, endDate, pace, interests], () => {
-  clearTimeout(rbTimer)
-  rbTimer = setTimeout(() => { if (plan.value) rebuild() }, 400)
-}, { deep: true })
+// 从美食列表中取某景点附近店（供模板读取）
+function attrFood(cp, a) { return foodMap.value[foodKey(cp, a)] || null }
 
 // ===== 酒店搜索 =====
 const HOTEL_PRESETS = [
@@ -358,7 +211,7 @@ async function doSearchHotel(cp) {
   const range = hotelRange(cp.name)
   if (!range) { toast('请选择或输入价位范围', 'warn'); return }
   hotelState.value[cp.name] = { loading: true, progress: '准备搜索…', list: [], searched: false }
-  let attrs = cp.data.attractions
+  let attrs = cp.attractions
   const pick = hotelAttraction.value[cp.name]
   if (pick) attrs = attrs.filter(a => a.name === pick)
   try {
@@ -372,7 +225,6 @@ async function doSearchHotel(cp) {
     )
     hotelState.value[cp.name].list = list
     hotelState.value[cp.name].searched = true
-    // 给每家酒店补城市标记（用于分享长图选择）
     list.forEach(h => { h.city = cp.name })
     if (list.length === 0) toast('没有符合价位的酒店，试试调整范围', 'warn')
     else toast(`找到 ${list.length} 家酒店`)
@@ -424,13 +276,10 @@ async function doShareGuide() {
 <div>
   <!-- ===== 输入区 ===== -->
   <div class="card">
-    <h2>✈️ 旅行攻略生成器</h2>
-    <p class="tip">输入目的地与往返时间，一键生成结构化攻略</p>
+    <h2>✈️ 旅行景点清单</h2>
+    <p class="tip">选城市即可生成按顺序的景点清单，点景点看附近特色美食（无天数规划）</p>
 
-    <label class="lbl">🏠 出发地 <span class="hint">(可选，默认你所在城市)</span></label>
-    <input v-model="origin" placeholder="如：西安" class="inp" />
-
-    <label class="lbl">📍 目的地城市 <span class="hint">(按顺序 = 行程顺序)</span></label>
+    <label class="lbl">📍 目的地城市 <span class="hint">(按顺序 = 推荐游览顺序)</span></label>
     <div class="city-sel">
       <select v-model="cityToAdd" class="inp" @change="onSelectCity">
         <option value="">-- 选择要去的城市（共 {{ remaining.length }} 城可选）--</option>
@@ -467,26 +316,7 @@ async function doShareGuide() {
       </div>
     </div>
 
-    <label class="lbl">📅 往返日期</label>
-    <div class="date-row">
-      <input type="date" v-model="startDate" class="inp" />
-      <span class="date-sep">→</span>
-      <input type="date" v-model="endDate" class="inp" />
-    </div>
-    <p v-if="totalDays > 0" class="days-hint">
-      共 <strong>{{ totalDays }}</strong> 天
-      <template v-if="selectedCities.length > 1"> · {{ selectedCities.length }} 城 · 需 ≥ {{ selectedCities.length + selectedCities.length - 1 }} 天</template>
-    </p>
-
-    <label class="lbl">🏃 行程节奏</label>
-    <div class="chip-row">
-      <button v-for="(label, key) in PACE_LABEL" :key="key"
-        :class="['chip', { active: pace === key }]" @click="pace = key">
-        {{ key === 'relax' ? '🌿 ' : key === 'standard' ? '⚖️ ' : '🔥 ' }}{{ label }}
-      </button>
-    </div>
-
-    <label class="lbl">🎯 兴趣偏好 <span class="hint">(可多选)</span></label>
+    <label class="lbl">🎯 兴趣偏好 <span class="hint">(可多选，用于筛选景点)</span></label>
     <div class="chip-row">
       <button v-for="(label, key) in INTEREST_LABEL" :key="key"
         :class="['chip', { active: interests.includes(key) }]"
@@ -495,46 +325,19 @@ async function doShareGuide() {
       </button>
     </div>
 
-    <button class="btn btn-primary btn-gen" :disabled="loading || foodLoading" @click="generate">
-      {{ loading ? '生成中…' : foodLoading ? '搜索餐厅中…' : '✨ 一键生成攻略' }}
+    <button class="btn btn-primary btn-gen" :disabled="loading" @click="generate">
+      {{ loading ? '生成中…' : '✨ 生成景点清单' }}
     </button>
-    <div v-if="foodLoading" class="food-loading-bar">
-      <span class="spin">⏳</span> {{ foodProgress || '正在搜索目的地真实餐厅…' }}
-    </div>
   </div>
 
   <!-- ===== 结果区 ===== -->
   <template v-if="plan">
-    <!-- 行程总览 -->
-    <div class="card">
-      <h2>📋 行程总览</h2>
-      <div class="chain">
-        <template v-for="(c, i) in cityChain" :key="c.name">
-          <span class="chain-city">{{ c.name }}<span class="chain-days">{{ c.days }}天</span></span>
-          <span v-if="i < cityChain.length - 1" class="chain-arrow">→</span>
-        </template>
-      </div>
-      <div class="plan-meta">
-        <span>{{ plan.startDate }} ~ {{ plan.endDate }}</span>
-        <span>共 {{ plan.totalDays }} 天 · {{ plan.paceLabel }}节奏</span>
-      </div>
-
-      <div v-if="plan.transports.length" class="transport-list">
-        <div v-for="(t, i) in plan.transports" :key="i" class="transport-item">
-          <span class="t-mode">{{ t.mode }}</span>
-          <span class="t-route">{{ t.from }} → {{ t.to }}</span>
-          <span class="t-time">约 {{ t.hours }} 小时{{ t.estimated ? '（估算）' : '' }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 每城攻略 -->
+    <!-- 每城景点清单 -->
     <div v-for="cp in plan.cityPlans" :key="cp.name" class="card city-card">
       <div class="city-head" @click="toggleCity(cp.name)">
         <div>
           <span class="city-name">{{ cp.name }}</span>
-          <span class="city-days">{{ cp.days }} 天</span>
-          <span class="city-range">{{ cp.dateRange.start.toLocaleDateString('zh-CN', {month:'numeric', day:'numeric'}) }}~{{ cp.dateRange.end.toLocaleDateString('zh-CN', {month:'numeric', day:'numeric'}) }}</span>
+          <span class="city-count">{{ cp.attractions.length }} 个景点</span>
         </div>
         <div class="city-right">
           <span class="city-weather" v-if="cp.weather">{{ cp.weather.low }}~{{ cp.weather.high }}°C {{ cp.weather.feel }}</span>
@@ -543,8 +346,40 @@ async function doShareGuide() {
       </div>
       <p class="city-desc">{{ cp.data.desc }}</p>
 
-      <!-- 每日行程 -->
-      <ItineraryTimeline :city="cp" v-model:activeDay="activeDayMap[cp.name]" />
+      <!-- 景点清单（点击展开附近特色美食） -->
+      <div class="attr-list">
+        <div v-for="(a, i) in cp.attractions" :key="a.name" class="attr-item">
+          <div class="attr-row" @click="toggleAttractionFood(cp, a)">
+            <span class="attr-idx">{{ i + 1 }}</span>
+            <span class="attr-must">★{{ a.mustSee }}</span>
+            <span class="attr-name">{{ a.name }}<span v-if="a.poi" class="poi-badge">实时</span></span>
+            <span class="attr-ticket">{{ a.ticket }}</span>
+            <span class="attr-fold" :class="{ open: attrFood(cp,a)?.open }">▾</span>
+            <span class="attr-nav" title="高德导航" @click.stop="openAmapNav(a.coord.lng, a.coord.lat, a.name)">🧭</span>
+          </div>
+
+          <!-- 附近特色美食（点击后懒加载） -->
+          <div v-if="attrFood(cp, a)?.open" class="attr-food">
+            <div v-if="attrFood(cp, a).loading" class="food-loading-bar">
+              <span class="spin">⏳</span> 正在搜索「{{ a.name }}」附近特色美食…
+            </div>
+            <div v-else-if="attrFood(cp, a).list.length" class="food-grid">
+              <div v-for="(r, j) in attrFood(cp, a).list" :key="j" class="food-item restaurant-item">
+                <div class="rest-header">
+                  <span class="food-name">🍜 {{ r.name }}</span>
+                  <span v-if="r.rating" class="rest-rating">⭐ {{ r.rating }}</span>
+                </div>
+                <div class="rest-meta">
+                  <span v-if="r.price" class="food-price">{{ r.price }}</span>
+                  <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
+                </div>
+                <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
+              </div>
+            </div>
+            <div v-else class="food-empty">附近暂未搜索到特色美食，换个点试试</div>
+          </div>
+        </div>
+      </div>
 
       <button class="btn btn-sm btn-supp" :disabled="suppLoading === cp.name" @click="doSupplement(cp.name)">
         {{ suppLoading === cp.name ? '搜索中…' : '🔍 补充更多景点（高德实时）' }}
@@ -555,7 +390,6 @@ async function doShareGuide() {
         🏨 按预算找附近酒店
       </button>
       <div v-if="hotelOpen === cp.name" class="hotel-panel">
-        <!-- 个性化参数（多选） -->
         <div class="persona-sec">
           <div class="persona-title">🎯 个性化偏好 <span class="hint">多选，按匹配度推荐</span></div>
           <div v-for="g in PERSONA_GROUPS" :key="g" class="persona-group">
@@ -590,7 +424,7 @@ async function doShareGuide() {
         <div class="hotel-attraction-sel">
           <select v-model="hotelAttraction[cp.name]" class="inp">
             <option value="">📍 全部热门景点周边</option>
-            <option v-for="a in cp.data.attractions" :key="a.name" :value="a.name">{{ a.name }}</option>
+            <option v-for="a in cp.attractions" :key="a.name" :value="a.name">{{ a.name }}</option>
           </select>
         </div>
         <button class="btn btn-sm btn-hotel-search" :disabled="hotelState[cp.name]?.loading" @click="doSearchHotel(cp)">
@@ -627,10 +461,9 @@ async function doShareGuide() {
               <span v-if="nearestMall(h)" class="h-mall">🏬 近{{ nearestMall(h).name }} {{ nearestMall(h).km.toFixed(1) }}km</span>
             </div>
 
-            <!-- 出行估算面板 -->
             <div v-if="hotelExpand[cp.name] === i" class="transit-panel">
               <div class="transit-title">🚗 从本酒店到各景点 <span class="hint">（直线距离估算）</span></div>
-              <div v-for="t in estimateTransit(h, cp.data.attractions)" :key="t.attraction" class="transit-row">
+              <div v-for="t in estimateTransit(h, cp.attractions)" :key="t.attraction" class="transit-row">
                 <span class="tr-attr">{{ t.attraction }}</span>
                 <span class="tr-dist">{{ t.km }}km</span>
                 <span class="tr-mode" :class="'m-' + t.mode">{{ TRANSIT_LABEL[t.mode] }}</span>
@@ -646,68 +479,19 @@ async function doShareGuide() {
         </div>
       </div>
 
-      <!-- 折叠：美食 / 贴士 / 全部景点 -->
+      <!-- 折叠：贴士 -->
       <div v-if="showAdvanced === cp.name" class="city-more">
-        <div class="more-sec">
-          <div class="more-title">🍽 餐厅推荐 <span class="hint">（实时搜索 · 每日不重复）</span></div>
-          <div v-if="cityRestaurants(cp).length" class="food-grid">
-            <div v-for="(r, i) in cityRestaurants(cp)" :key="i" class="food-item restaurant-item">
-              <div class="rest-header">
-                <span class="food-name">{{ r.name }}</span>
-                <span v-if="r.rating" class="rest-rating">⭐ {{ r.rating }}</span>
-              </div>
-              <div class="rest-meta">
-                <span v-if="r.price" class="food-price">{{ r.price }}</span>
-                <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
-                <span class="rest-meal-type">{{ mealTypeLabel(r.mealType) }}</span>
-              </div>
-              <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
-            </div>
-          </div>
-          <div v-else class="food-empty">
-            {{ foodLoading ? '正在搜索真实餐厅…' : '点击「一键生成攻略」搜索目的地餐厅' }}
-          </div>
-        </div>
-        <div class="more-sec">
-          <div class="more-title">🏮 本地人去的地方 <span class="hint">（实时搜索 · 菜市场/老街/夜市/老字号…）</span></div>
-          <div v-if="cityLocalSpots(cp).length" class="food-grid">
-            <div v-for="(s, i) in cityLocalSpots(cp)" :key="i" class="food-item local-spot-item">
-              <div class="rest-header">
-                <span class="food-name">🏮 {{ s.name }}</span>
-                <span class="local-cat-badge">{{ s.label }}</span>
-              </div>
-              <div class="rest-meta">
-                <span v-if="s.tag" class="rest-tag">{{ s.tag }}</span>
-              </div>
-              <div v-if="s.address" class="food-desc">📍 {{ s.address }}</div>
-            </div>
-          </div>
-          <div v-else class="food-empty">
-            {{ foodLoading ? '正在搜索本地好去处…' : '点击「一键生成攻略」搜索本地小众地点' }}
-          </div>
-        </div>
         <div class="more-sec">
           <div class="more-title">💡 实用贴士</div>
           <ul class="tips-list">
             <li v-for="(t, i) in cp.data.tips" :key="i">{{ t }}</li>
           </ul>
         </div>
-        <div class="more-sec">
-          <div class="more-title">🗺 全部景点 <span class="hint">(点击导航)</span></div>
-          <div class="all-attractions">
-            <div v-for="(a, i) in cp.data.attractions" :key="i" class="attr-row" @click="openAmapNav(a.coord.lng, a.coord.lat, a.name)">
-              <span class="attr-must">★{{ a.mustSee }}</span>
-              <span class="attr-name">{{ a.name }}<span v-if="a.poi" class="poi-badge">实时</span></span>
-              <span class="attr-ticket">{{ a.ticket }}</span>
-              <span class="attr-nav">🧭</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
     <!-- 预算 -->
-    <div class="card">
+    <div class="card" v-if="plan.budget">
       <h2>💰 预算参考（人均）</h2>
       <div class="budget-items">
         <div v-for="(it, i) in plan.budget.items" :key="i" class="budget-item">
@@ -767,10 +551,6 @@ async function doShareGuide() {
 .lbl { display: block; font-size: 11px; font-weight: 700; color: #7a6c8a; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .3px; }
 .hint { font-size: 10px; color: #b0a3bc; font-weight: 400; text-transform: none; letter-spacing: 0; }
 .inp { font-size: 13px; }
-.date-row { display: flex; gap: 6px; align-items: center; }
-.date-sep { color: #d4c4dc; font-weight: 700; }
-.days-hint { font-size: 12px; color: #7a6c8a; margin-top: 6px; padding: 6px 10px; background: var(--accent-soft); border-radius: 8px; display: inline-block; }
-.days-hint strong { color: var(--accent); }
 .chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .chip {
   border: none; background: #f0edf5; border-radius: 10px; padding: 7px 12px; font-size: 11px; font-weight: 600;
@@ -781,8 +561,7 @@ async function doShareGuide() {
 .city-chips { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .city-chip {
   display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: #f7f5fa;
-  border: none; border-radius: 12px; font-size: 12px;
-  transition: background .15s;
+  border: none; border-radius: 12px; font-size: 12px; transition: background .15s;
 }
 .city-chip:hover { background: var(--accent-soft); }
 .cc-order { width: 22px; height: 22px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -815,22 +594,9 @@ async function doShareGuide() {
 .btn-gen { margin-top: 16px; }
 
 /* 结果区 */
-.chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-.chain-city { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; box-shadow: 0 3px 10px rgba(var(--accent-rgb),.22); }
-.chain-days { background: rgba(255,255,255,0.25); border-radius: 8px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
-.chain-arrow { color: #d4c4dc; font-weight: 700; }
-.plan-meta { display: flex; gap: 10px; font-size: 11px; color: #a898b8; flex-wrap: wrap; margin-top: 6px; }
-.transport-list { margin-top: 8px; }
-.transport-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid rgba(0,0,0,.04); font-size: 11px; }
-.transport-item:last-child { border-bottom: none; }
-.t-mode { background: var(--accent-soft); color: var(--accent); border-radius: 6px; padding: 2px 8px; font-weight: 700; font-size: 10px; }
-.t-route { font-weight: 700; color: #4a3f55; flex: 1; }
-.t-time { color: #a898b8; }
-
 .city-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
 .city-name { font-size: 18px; font-weight: 800; color: #3a3045; letter-spacing: -.3px; }
-.city-days { background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; border-radius: 8px; padding: 3px 9px; margin-left: 6px; }
-.city-range { font-size: 11px; color: #a898b8; margin-left: 8px; }
+.city-count { background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; border-radius: 8px; padding: 3px 9px; margin-left: 6px; }
 .city-right { display: flex; align-items: center; gap: 8px; }
 .city-weather { font-size: 11px; color: #f0a870; font-weight: 700; }
 .arrow { transition: transform .2s; color: #b0a3bc; }
@@ -840,6 +606,25 @@ async function doShareGuide() {
 .city-more { margin-top: 10px; border-top: 1px solid rgba(0,0,0,.04); padding-top: 10px; }
 .more-sec { margin-bottom: 12px; }
 .more-title { font-size: 12px; font-weight: 700; color: #4a3f55; margin-bottom: 6px; }
+
+/* 景点清单 */
+.attr-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.attr-item { background: #f7f5fa; border: none; border-radius: 12px; overflow: hidden; }
+.attr-row {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; transition: background .15s; font-size: 12px;
+}
+.attr-row:hover { background: var(--accent-soft); }
+.attr-idx { width: 20px; height: 20px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.attr-must { color: #f0a870; font-weight: 800; font-size: 11px; width: 24px; flex-shrink: 0; }
+.attr-name { flex: 1; font-weight: 600; color: #4a3f55; display: flex; align-items: center; gap: 5px; }
+.attr-ticket { font-size: 10px; color: #a898b8; flex-shrink: 0; }
+.attr-fold { color: #b0a3bc; font-size: 11px; transition: transform .2s; flex-shrink: 0; }
+.attr-fold.open { transform: rotate(180deg); }
+.attr-nav { font-size: 13px; flex-shrink: 0; }
+.poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+
+/* 附近美食 */
+.attr-food { background: #fffdfa; border-top: 1px dashed #f0e2cf; padding: 10px 12px; }
 .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .food-item { background: #f7f5fa; border: none; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; }
 .restaurant-item { padding: 10px 12px; gap: 3px; }
@@ -847,25 +632,15 @@ async function doShareGuide() {
 .rest-rating { font-size: 10px; color: #f59e0b; font-weight: 700; flex-shrink: 0; }
 .rest-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .rest-tag { font-size: 9px; background: #f0edf5; color: #7c6fd8; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
-.rest-meal-type { font-size: 9px; background: #fff5f8; color: #c2415e; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
-.food-empty { font-size: 12px; color: #b0a3bc; padding: 16px 8px; text-align: center; }
-.local-spot-item { border-left: 3px solid #f59e0b; padding-left: 10px; }
-.local-cat-badge { font-size: 9px; background: #fef3c7; color: #92400e; border-radius: 6px; padding: 2px 7px; font-weight: 700; flex-shrink: 0; }
-.food-loading-bar { margin-top: 8px; padding: 8px 14px; background: var(--accent-soft); border-radius: 10px; font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+.food-empty { font-size: 12px; color: #b0a3bc; padding: 8px; text-align: center; }
+.food-loading-bar { padding: 8px 4px; color: var(--accent); font-size: 12px; display: flex; align-items: center; gap: 8px; }
 .food-loading-bar .spin { display: inline-block; animation: hspin 1s linear infinite; }
 @keyframes hspin { to { transform: rotate(360deg) } }
 .food-name { font-size: 12px; font-weight: 700; color: #4a3f55; }
 .food-price { font-size: 10px; color: var(--accent); font-weight: 700; }
 .food-desc { font-size: 10px; color: #a898b8; margin-top: 2px; }
+
 .tips-list { margin: 0; padding-left: 16px; font-size: 11px; color: #7a6c8a; line-height: 1.8; }
-.all-attractions { display: flex; flex-direction: column; }
-.attr-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; cursor: pointer; transition: background .15s; font-size: 12px; }
-.attr-row:hover { background: var(--accent-soft); }
-.attr-must { color: #f0a870; font-weight: 800; font-size: 11px; width: 28px; }
-.attr-name { flex: 1; font-weight: 600; color: #4a3f55; display: flex; align-items: center; gap: 5px; }
-.attr-ticket { font-size: 10px; color: #a898b8; }
-.attr-nav { font-size: 13px; }
-.poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
 
 .budget-items { display: flex; flex-direction: column; }
 .budget-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.04); font-size: 12px; }
@@ -893,13 +668,11 @@ async function doShareGuide() {
 .btn-hotel-search { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; width: 100%; box-shadow: 0 3px 10px rgba(99,102,241,.25); }
 .hotel-loading { text-align: center; color: #7c6fd8; font-size: 12px; padding: 16px 0; }
 .hotel-loading .spin { display: inline-block; animation: hspin 1s linear infinite; }
-@keyframes hspin { to { transform: rotate(360deg) } }
 .hotel-results { margin-top: 8px; }
 .hotel-count { font-size: 11px; color: #a898b8; margin-bottom: 6px; }
 .hotel-item {
   background: #fff; border: none; border-radius: 14px; padding: 10px 12px;
-  margin-bottom: 6px; cursor: pointer; transition: all .15s;
-  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  margin-bottom: 6px; cursor: pointer; transition: all .15s; box-shadow: 0 1px 4px rgba(0,0,0,.04);
 }
 .hotel-item:hover { box-shadow: 0 3px 12px rgba(99,102,241,.12); transform: translateY(-1px); }
 .h-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -925,14 +698,9 @@ async function doShareGuide() {
 .h-nav { font-size: 13px; cursor: pointer; padding: 0 2px; }
 .h-arrow { font-size: 10px; color: #b0a3bc; transition: transform .2s; }
 .h-arrow.open { transform: rotate(180deg); }
-
-/* 出行估算面板 */
 .transit-panel { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.04); padding-top: 8px; }
 .transit-title { font-size: 11px; font-weight: 700; color: #4a3f55; margin-bottom: 6px; }
-.transit-row {
-  display: flex; align-items: center; gap: 6px; padding: 5px 0;
-  border-bottom: 1px solid rgba(0,0,0,.03); font-size: 11px;
-}
+.transit-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,.03); font-size: 11px; }
 .transit-row:last-child { border-bottom: none; }
 .tr-attr { flex: 1; color: #4a3f55; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr-dist { color: #b0a3bc; font-size: 10px; width: 42px; text-align: right; }

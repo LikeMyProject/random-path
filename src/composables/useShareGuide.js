@@ -119,10 +119,10 @@ export function generateGuideImage(plan, hotel) {
     // 行程信息
     ctx.textBaseline = 'top'
     ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = `18px ${FONT}`
-    ctx.fillText(`${plan.startDate} ~ ${plan.endDate}  ·  共 ${plan.totalDays} 天  ·  ${plan.paceLabel}节奏`, X + 10, y + 184)
+    ctx.fillText(`自由行攻略 · ${plan.paceLabel}`, X + 10, y + 184)
   })
 
-  // ===== 行程总览卡片 =====
+  // ===== 行程总览卡片（无天数：列城市 + 景点数）=====
   add(76 + 38 * plan.cityPlans.length, (ctx, y) => {
     y += 16
     drawCardTitle(ctx, X, y, '🗺️ 行程总览', C.purple)
@@ -136,17 +136,15 @@ export function generateGuideImage(plan, hotel) {
       ctx.fillStyle = C.text; ctx.font = `bold 17px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
       ctx.fillText(`📍 ${cp.name}`, X + 14, y + 15)
       ctx.fillStyle = C.purple; ctx.font = `bold 14px ${FONT}`; ctx.textAlign = 'right'
-      const dateStr = `${fmtMD(cp.dateRange.start)}~${fmtMD(cp.dateRange.end)}`
-      const dateW = ctx.measureText(dateStr).width
-      ctx.fillText(dateStr, X + CW - M * 2 - 14 - dateW, y + 15)
-      ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`
-      ctx.fillText(`${cp.days} 天`, X + CW - M * 2 - 14, y + 15)
+      const txt = `${cp.attractions.length} 个景点`
+      const tw = ctx.measureText(txt).width
+      ctx.fillText(txt, X + CW - M * 2 - 14 - tw, y + 15)
       y += 38
     })
   })
 
-  // ===== 城市间交通 =====
-  if (plan.transports.length) {
+  // ===== 城市间交通（无天数模式无此项）=====
+  if (plan.transports?.length) {
     add(76 + 34 * plan.transports.length, (ctx, y) => {
       y += 16
       drawCardTitle(ctx, X, y, '🚄 城市间交通', C.blue)
@@ -163,58 +161,42 @@ export function generateGuideImage(plan, hotel) {
     })
   }
 
-  // ===== 每日行程（核心，每城一节）=====
+  // ===== 景点清单（无天数：每城一节，按顺序列出景点）=====
   plan.cityPlans.forEach(cp => {
-    // 城市节标题（只预留标题栏本身高度，不再包含每日行程）
-    add(72, (ctx, y) => {
+    const n = cp.attractions.length
+    const listH = n * 40
+    add(72 + listH, (ctx, y) => {
       y += 16
       // 城市标题栏（紫色条）
       ctx.fillStyle = C.purple
       roundRect(ctx, X, y, CW - M * 2, 44, 10); ctx.fill()
       ctx.fillStyle = '#ffffff'; ctx.font = `bold 20px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
-      ctx.fillText(`🏙 ${cp.name}（${cp.days} 天）`, X + 16, y + 22)
+      ctx.fillText(`🏙 ${cp.name}（${n} 个景点）`, X + 16, y + 22)
       ctx.textAlign = 'right'
       ctx.font = `14px ${FONT}`
-      ctx.fillText(`${fmtMD(cp.dateRange.start)} ~ ${fmtMD(cp.dateRange.end)}`, X + CW - M * 2 - 16, y + 22)
-    })
+      if (cp.weather) ctx.fillText(`${cp.weather.low}~${cp.weather.high}°C`, X + CW - M * 2 - 16, y + 22)
+      y += 60
 
-    // 每天一张卡片（高度按实际槽位动态计算）
-    cp.daily.forEach(d => {
-      // 计算每个槽位高度：有地址的餐食/本地地点=50px，普通=36px
-      const slotHeights = d.slots.map(s => {
-        if (s.meal && (s.meal.address || s.meal.tag)) return 50
-        if (s.local && s.spot.address) return 50
-        return 36
-      })
-      const totalSlotH = slotHeights.reduce((a, b) => a + b, 0)
-      const cardH = 52 + totalSlotH
-      add(62 + totalSlotH, (ctx, y) => {
-        const dayColor = C.orange
+      // 景点行
+      cp.attractions.forEach((a, i) => {
         ctx.fillStyle = C.card
-        roundRect(ctx, X, y, CW - M * 2, cardH, 14); ctx.fill()
+        roundRect(ctx, X, y, CW - M * 2, 34, 8); ctx.fill()
         ctx.strokeStyle = C.line; ctx.lineWidth = 1
-        roundRect(ctx, X, y, CW - M * 2, cardH, 14); ctx.stroke()
-        // 左侧色条
-        ctx.fillStyle = dayColor
-        roundRect(ctx, X, y, 5, cardH, 2); ctx.fill()
-        // 日期标题
-        const dayY = y + 14
-        ctx.fillStyle = dayColor; ctx.font = `bold 22px ${FONT}`; ctx.textBaseline = 'top'; ctx.textAlign = 'left'
-        ctx.fillText(`D${d.day}`, X + 22, dayY)
-        ctx.fillStyle = C.text; ctx.font = `bold 18px ${FONT}`
-        ctx.fillText(truncate(d.dateLabel || '', 16), X + 70, dayY + 2)
-        // 天气
-        const wt = cp.monthly[d.day - 1]
-        if (wt) {
-          ctx.fillStyle = C.sub; ctx.font = `14px ${FONT}`; ctx.textAlign = 'right'
-          ctx.fillText(`${wt.low}~${wt.high}°C · ${wt.feel}`, X + CW - M * 2 - 14, dayY + 4)
+        roundRect(ctx, X, y, CW - M * 2, 34, 8); ctx.stroke()
+        // 序号
+        ctx.fillStyle = C.purple; ctx.font = `bold 15px ${FONT}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'
+        ctx.fillText(`${i + 1}`, X + 14, y + 17)
+        // 名称 + 必看星
+        ctx.fillStyle = C.ink; ctx.font = `bold 16px ${FONT}`
+        const must = (a.mustSee || 0) >= 4 ? ' ★'.repeat(Math.min(3, a.mustSee || 0)) : ''
+        ctx.fillText(truncate(a.name + must, 18), X + 38, y + 17)
+        // 右侧：门票 / 时长
+        const right = [a.ticket, a.duration].filter(Boolean).join(' · ')
+        if (right) {
+          ctx.fillStyle = C.sub; ctx.font = `13px ${FONT}`; ctx.textAlign = 'right'
+          ctx.fillText(truncate(right, 14), X + CW - M * 2 - 14, y + 17)
         }
-        // 槽位（高度可变）
-        let sy = y + 52
-        d.slots.forEach((s, si) => {
-          drawSlot(ctx, X + 16, sy, CW - M * 2 - 32, s, dayColor)
-          sy += slotHeights[si]
-        })
+        y += 40
       })
     })
   })
@@ -278,12 +260,10 @@ export function generateGuideImage(plan, hotel) {
     if (cityCp) {
       const seen = new Set()
       const attrs = []
-      cityCp.daily.forEach(d => d.slots.forEach(s => {
-        if (!s.meal && !s.local && s.attraction?.coord && !seen.has(s.attraction.name)) {
-          seen.add(s.attraction.name); attrs.push({ name: s.attraction.name, coord: s.attraction.coord })
-        }
-      }))
-      if (attrs.length === 0) cityCp.data.attractions.forEach(a => {
+      cityCp.attractions.forEach(a => {
+        if (a.coord && !seen.has(a.name)) { seen.add(a.name); attrs.push({ name: a.name, coord: a.coord }) }
+      })
+      if (attrs.length === 0) (cityCp.data?.attractions || []).forEach(a => {
         if (a.coord && !seen.has(a.name)) { seen.add(a.name); attrs.push({ name: a.name, coord: a.coord }) }
       })
       hotelRoutes = estimateTransit(hotel, attrs).sort((x, y) => x.km - y.km).slice(0, 8)
