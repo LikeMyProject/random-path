@@ -37,6 +37,21 @@ async function fetchJSON(url, retries = 3) {
     finally { clearTimeout(t) }
   }
 }
+// 限制并发数的批量执行：避免品牌词全部串行过慢（补充更多时整轮卡在"搜索中"），
+// 也避免一次性全并发触发高德限流。limit 个 worker 循环取任务，结果按原序回填。
+async function runLimited(items, limit, fn) {
+  const out = new Array(items.length)
+  let i = 0
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++
+      try { out[idx] = await fn(items[idx]) } catch { out[idx] = [] }
+    }
+  }
+  const n = Math.max(1, Math.min(limit, items.length))
+  await Promise.all(Array.from({ length: n }, () => worker()))
+  return out
+}
 const gcCache = new Map()
 // 自动检测的当前城市，GPS 定位后设置
 let detectedCity = ''
@@ -447,15 +462,16 @@ export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
     if (cat === 'shop') {
       const brands = pool.filter(c => !c.amapType)
       const typed = pool.filter(c => c.amapType)
-      let n = 0
-      for (const c of brands) {
-        const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
+      // 并发抓取品牌词（限并发 4，避免串行 14 词×250ms 拖到 20s+ 让人以为卡死），
+      // 每家品牌保底 1 条（省出名额给本地商场）
+      const brandLists = await runLimited(brands, 4, c =>
+        fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType))
+      for (const list of brandLists) {
         let added = 0
         for (const it of list) {
-          if (added >= 1) break          // 每家品牌保底 1 条，省出名额给本地商场
-          if (add(it, cat)) { added++; n++ }
+          if (added >= 1) break
+          if (add(it, cat)) added++
         }
-        await new Promise(r => setTimeout(r, 250))  // 防限流
       }
       // 类型码分开检索（060100 商场 / 060800 购物中心 / 060700 商业街），补满到 target，
       // 专门捞品牌词覆盖不到的本地商场（赛格/熙地港等）
@@ -463,7 +479,7 @@ export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
         if (catCount(cat) >= target) break
         const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
         for (const it of list) { if (catCount(cat) >= target) break; add(it, cat) }
-        await new Promise(r => setTimeout(r, 200))
+        await new Promise(r => setTimeout(r, 150))
       }
       continue
     }

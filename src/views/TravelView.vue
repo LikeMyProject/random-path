@@ -137,17 +137,29 @@ async function enrichPlan(p) {
 
 // ===== 手动「补充更多地点」：同时补充 景点(扩展) / 美食 / 购物 三类，保证真能加新东西 =====
 const SUPPLEMENT_CATS = [...SPOT_EXT, ...SPOT_FOOD, ...SPOT_SHOP]
+// 总超时兜底：即使底层某次请求真挂起，按钮也必然复位，不会永久卡在"搜索中"
+function withTimeout(promise, ms) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(Object.assign(new Error('timeout'), { timeout: true })), ms)
+    promise.then(v => { clearTimeout(t); resolve(v) }, e => { clearTimeout(t); reject(e) })
+  })
+}
 async function doSupplement(cityName) {
   if (suppLoading.value) return
   const cp = plan.value?.cityPlans.find(c => c.name === cityName)
   if (!cp) return
   suppLoading.value = cityName
   try {
-    const added = await enrichAttractions(cityName, cp.attractions, { cats: SUPPLEMENT_CATS, cap: 30, rad: 1.2, targets: { sight: 30, food: 14, shop: 30 } })
+    const added = await withTimeout(
+      enrichAttractions(cityName, cp.attractions, { cats: SUPPLEMENT_CATS, cap: 30, rad: 1.2, targets: { sight: 30, food: 14, shop: 30 } }),
+      60000
+    )
     if (added.length === 0) { toast('该市已收录常见地点，暂无更多补充', 'warn'); return }
     cp.attractions = orderAttractions([...cp.attractions, ...added])
     toast(`已补充 ${added.length} 个地点（景点/美食/购物，高德实时）`)
-  } catch (e) { toast('补充失败，请重试', 'err') }
+  } catch (e) {
+    toast(e?.timeout ? '补充请求超时，请稍后重试' : '补充失败，请重试', 'err')
+  }
   finally { suppLoading.value = '' }
 }
 
