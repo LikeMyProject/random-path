@@ -225,6 +225,9 @@ function togglePersona(key) {
 }
 function personaGroup(group) { return PERSONA_OPTIONS.filter(p => p.group === group) }
 function matchCls(pct) { return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low' }
+function kindCls(k) {
+  return { 民宿: 'bnb', 客栈: 'inn', 青旅: 'hostel', 公寓: 'apt', 酒店: 'hotel', 旅馆: 'innn', 住宿: 'stay' }[k] || 'stay'
+}
 
 function toggleHotel(name) { hotelOpen.value = hotelOpen.value === name ? '' : name }
 function setHotelPreset(name, key) { hotelPreset.value[name] = key }
@@ -244,7 +247,7 @@ async function doSearchHotel(cp) {
   const pick = hotelAttraction.value[cp.name]
   if (pick) attrs = attrs.filter(a => a.name === pick)
   try {
-    const list = await searchHotelsForCity(
+    const raw = await searchHotelsForCity(
       attrs.map(a => ({ name: a.name, coord: a.coord })),
       {
         min: range.min, max: range.max,
@@ -252,11 +255,22 @@ async function doSearchHotel(cp) {
         onProgress: ({ done, total }) => { hotelState.value[cp.name].progress = `正在搜索 ${done}/${total} 个景点周边…` },
       }
     )
+    // 勾选了偏好时，只保留「100% 匹配」的住宿（命中全部所选条件）
+    let list = raw
+    if (personas.value.length) {
+      const full = raw.filter(h => h.pct === 100)
+      list = full
+      hotelState.value[cp.name].filteredByFull = raw.length > 0 && full.length === 0
+    }
     hotelState.value[cp.name].list = list
     hotelState.value[cp.name].searched = true
     list.forEach(h => { h.city = cp.name })
-    if (list.length === 0) toast('没有符合价位的酒店，试试调整范围', 'warn')
-    else toast(`找到 ${list.length} 家酒店`)
+    if (list.length === 0) {
+      if (personas.value.length && raw.length > 0) toast('没有完全符合全部偏好的住宿，可试试减少勾选', 'warn')
+      else toast('没有符合价位/范围的住宿，试试调整范围', 'warn')
+    } else {
+      toast(`找到 ${list.length} 家住宿（含酒店/民宿）`)
+    }
   } catch (e) { toast('酒店搜索失败: ' + e.message, 'err') }
   hotelState.value[cp.name].loading = false
 }
@@ -425,7 +439,7 @@ async function doShareGuide() {
 
       <!-- 酒店搜索 -->
       <button class="btn btn-sm btn-hotel" :class="{ on: hotelOpen === cp.name }" @click="toggleHotel(cp.name)">
-        🏨 按预算找附近酒店
+        🏨 按预算找附近住宿（酒店/民宿）
       </button>
       <div v-if="hotelOpen === cp.name" class="hotel-panel">
         <div class="persona-sec">
@@ -473,7 +487,7 @@ async function doShareGuide() {
           <span class="spin">⏳</span> {{ hotelState[cp.name]?.progress }}
         </div>
         <div v-else-if="hotelState[cp.name]?.list?.length" class="hotel-results">
-          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · 按推荐度排序 · 点击查看出行估算</div>
+          <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · {{ personas.length ? '仅显示 100% 匹配偏好' : '按评分/距离排序' }} · 点击查看出行估算</div>
           <div
             v-for="(h, i) in hotelState[cp.name].list"
             :key="i"
@@ -483,6 +497,7 @@ async function doShareGuide() {
           >
             <div class="h-row1">
               <span v-if="h.pct != null" class="h-match" :class="matchCls(h.pct)">{{ h.pct }}% 匹配</span>
+              <span class="h-kind" :class="kindCls(h.kind)">{{ h.kind }}</span>
               <span class="h-name">{{ h.name }}</span>
               <span v-if="isGoodRated(h)" class="h-badge good">好评</span>
               <span v-if="h.priceInferred" class="h-badge ref">参考价</span>
@@ -513,7 +528,9 @@ async function doShareGuide() {
           </div>
         </div>
         <div v-else class="hotel-empty">
-          {{ hotelState[cp.name]?.searched ? '没有符合该价位的酒店，试试放宽范围' : '设置价位范围后点击搜索，实时查找景点周边酒店' }}
+          <template v-if="hotelState[cp.name]?.filteredByFull">已勾选偏好，但附近没有完全符合全部条件的住宿（酒店/民宿）。</template>
+          <template v-else-if="hotelState[cp.name]?.searched">没有符合该价位/范围的住宿，试试放宽范围。</template>
+          <template v-else>设置价位范围后点击搜索，实时查找景点周边酒店与民宿。</template>
         </div>
       </div>
 
@@ -557,7 +574,7 @@ async function doShareGuide() {
     <div class="modal" v-if="shareModal" @click.self="shareModal = false">
       <div class="inner">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <h3>🏨 选择一家酒店入图</h3>
+          <h3>🏨 选择一家住宿入图</h3>
           <button class="btn btn-sm" style="background:transparent;color:#a898b8" @click="shareModal=false">✕</button>
         </div>
         <p style="font-size:11px;color:#a898b8;margin:4px 0 8px">长图将包含你选中的酒店信息（共 {{ allHotels.length }} 家可选）</p>
@@ -738,6 +755,14 @@ async function doShareGuide() {
 .h-match.high { background: #16a34a; }
 .h-match.mid { background: #f59e0b; }
 .h-match.low { background: #a898b8; }
+.h-kind { font-size: 10px; font-weight: 800; border-radius: 6px; padding: 2px 8px; flex-shrink: 0; border: 1px solid transparent; }
+.h-kind.hotel { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+.h-kind.bnb { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.h-kind.inn { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.h-kind.hostel { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.h-kind.apt { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
+.h-kind.innn { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+.h-kind.stay { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
 .h-badge { font-size: 9px; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
 .h-badge.good { background: #f0fdf4; color: #166534; }
 .h-badge.ref { background: #f0edf5; color: #7a6c8a; }

@@ -95,16 +95,40 @@ function inferReputation(poi) {
  * 搜索某坐标周边酒店，按价位过滤
  * @returns {Array} [{ id, name, coord, address, price, priceInferred, priceRange, rating, distance, type }]
  */
-export async function searchHotelsNear(lng, lat, { min = 0, max = Infinity, radius = SEARCH_RADIUS, limit = 15 } = {}) {
-  try {
-    const url = `https://restapi.amap.com/v5/place/around?key=${AMAP_KEY}&location=${lng},${lat}&types=${HOTEL_TYPES}&radius=${radius}&offset=${limit}&page=1&show_fields=rating,price,address`
-    const d = await fetchJSON(url)
-    if (d.status !== '1' || !d.pois?.length) return []
+// 住宿类型识别：酒店 / 民宿 / 客栈 / 青旅 / 公寓 / 旅馆 / 其他
+function classifyKind(name = '', type = '') {
+  const n = name + '|' + type
+  if (/民宿|农家院|乡村民宿|庭院民宿|民宿客栈/.test(n)) return '民宿'
+  if (/客栈|驿站|驿栈/.test(n)) return '客栈'
+  if (/青年旅舍|国际青年|旅舍|青旅|背包客/.test(n)) return '青旅'
+  if (/公寓|服务式公寓|行政公寓|短租公寓/.test(n)) return '公寓'
+  if (/酒店|宾馆|饭店|度假村|大酒店|商务酒店|连锁酒店|温德姆|豪生/.test(n)) return '酒店'
+  if (/旅馆|招待所|住宿|客居|旅店/.test(n)) return '旅馆'
+  return '住宿'
+}
 
-    return d.pois.map(p => {
-      if (isNoiseName(p.name)) return null
+export async function searchHotelsNear(lng, lat, { min = 0, max = Infinity, radius = SEARCH_RADIUS, limit = 15, keywords = null } = {}) {
+  try {
+    const base = `https://restapi.amap.com/v5/place/around?key=${AMAP_KEY}&location=${lng},${lat}&radius=${radius}&offset=${limit}&page=1&show_fields=rating,price,address`
+    const typeUrl = `${base}&types=${HOTEL_TYPES}`
+    const kwUrl = keywords ? `${base}&keywords=${encodeURIComponent(keywords)}` : null
+    // 类型检索（覆盖酒店/宾馆/旅馆/民宿等全部住宿）+ 关键词补充检索（确保民宿/客栈也能被搜到）
+    const [dType, dKw] = await Promise.all([
+      fetchJSON(typeUrl),
+      kwUrl ? fetchJSON(kwUrl) : Promise.resolve({ status: '0', pois: [] }),
+    ])
+    const pois = [...(dType.pois || []), ...(dKw.pois || [])]
+    if (!pois.length) return []
+
+    const seenId = new Set()
+    const out = []
+    for (const p of pois) {
+      if (isNoiseName(p.name)) continue
+      const id = p.id || `${p.name}|${p.location}`
+      if (seenId.has(id)) continue
+      seenId.add(id)
       const coord = parseCoord(p.location)
-      if (!coord) return null
+      if (!coord) continue
       const price = parsePrice(p.price)
       const rating = normalizeRating(p.rating)
       let pass = true
@@ -115,10 +139,11 @@ export async function searchHotelsNear(lng, lat, { min = 0, max = Infinity, radi
         const [lo, hi] = inferPriceRange(p)
         pass = hi >= min && lo <= max
       }
-      if (!pass) return null
-      return {
+      if (!pass) continue
+      out.push({
         id: p.id || null,
-        name: p.name || '未知酒店',
+        name: p.name || '未知住宿',
+        kind: classifyKind(p.name, p.type),
         coord,
         address: p.address || '',
         price,
@@ -128,8 +153,9 @@ export async function searchHotelsNear(lng, lat, { min = 0, max = Infinity, radi
         reputation: rating == null ? inferReputation(p) : null,
         distance: p.distance ? parseInt(p.distance) : null,
         type: p.type || '',
-      }
-    }).filter(Boolean)
+      })
+    }
+    return out
   } catch (e) { return [] }
 }
 
@@ -151,7 +177,7 @@ export async function searchHotelsForCity(attractions, { min, max, personas = []
   for (let i = 0; i < list.length; i++) {
     const a = list[i]
     const [hotels, env] = await Promise.all([
-      searchHotelsNear(a.coord.lng, a.coord.lat, { min, max }),
+      searchHotelsNear(a.coord.lng, a.coord.lat, { min, max, keywords: '民宿|客栈|青年旅舍|农家院' }),
       collectEnv(a.coord.lng, a.coord.lat, need),
     ])
     for (const h of hotels) {
