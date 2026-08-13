@@ -9,7 +9,7 @@
 //   6. buildTextGuide      导出文本攻略（markdown）
 // ============================================================
 import { CITIES, getCity, getTransport } from '../data/cities.js'
-import { searchPOIsByText, searchRestaurantsForCity, searchLocalSpotsForCity } from './useAMap.js'
+import { searchPOIsByText, searchRestaurantsForCity, searchLocalSpotsForCity, searchSpotsForCity } from './useAMap.js'
 
 const PACE_ATTRACTIONS = { relax: 2, standard: 3, compact: 4 }
 export { PACE_ATTRACTIONS }
@@ -413,6 +413,33 @@ export async function supplementAttractions(cityName, existing = null) {
       if (added.length >= 6) break
     }
     return added
+  } catch (e) { return [] }
+}
+
+// 景点扩充：从高分实时补充「沙滩/海岛/小众打卡/景区/公园/观景/主题乐园」等，
+// 让清单更丰富（不再只有内置 8 个）。与已有景点按坐标(<2km)或同名去重，上限 ~14。
+export async function enrichAttractions(cityName, existing = null) {
+  const c = getCity(cityName)
+  if (!c) return []
+  try {
+    const added = await searchSpotsForCity(cityName, c?.coord, 18)
+    if (!added.length) return []
+    const base = (existing && existing.length) ? existing : c.attractions
+    const refPts = base.filter(a => a.coord).map(a => a.coord)
+    const refNames = new Set(base.map(a => a.name))
+    const final = []
+    for (const p of added) {
+      if (!p.coord) continue
+      const nearRef = refPts.some(b => haversineKm(p.coord, b) < 2)
+      const sameName = refNames.has(p.name)
+      const nearFinal = final.some(a => haversineKm(p.coord, a.coord) < 2)
+      if (nearRef || sameName || nearFinal) continue
+      refPts.push(p.coord)
+      refNames.add(p.name)
+      final.push(p)
+      if (final.length >= 14) break
+    }
+    return final
   } catch (e) { return [] }
 }
 

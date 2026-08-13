@@ -188,46 +188,134 @@ export async function searchLocalSpotsForCity(cityName, cityCoord, needed = 40) 
   return results
 }
 
+// 直线距离（km）：高德坐标为标准 WGS-84 偏移坐标，直线估算足够用于「附近多少米」展示
+function haversineKm(a, b) {
+  const toRad = x => x * Math.PI / 180
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 6371 * 2 * Math.asin(Math.sqrt(h))
+}
+
 // ============================================================
-// 景点周边特色美食搜索：按坐标地理偏置（location + radius），用于「点击景点显示附近吃的」
+// 景点周边特色美食搜索：按坐标地理偏置（location + radius）
+// 优化：关键词分批【并行】请求（去掉原串行 sleep），结果按距离由近到远排序，
+//      并返回每个店距景点的直线距离 distKm/distM，用于「距此 Xm」展示
 // ============================================================
-export async function searchFoodNear(coord, { radius = 2500, limit = 8 } = {}) {
-  if (!coord || !coord.lng || !coord.lat) return []
-  const results = []
-  const seen = new Set()
-  // 特色吃：本地老字号 / 小吃 / 正餐混合，保证「特色」优先
-  const kws = ['特色美食', '老字号', '小吃', '本地菜', '美食', '餐厅', '面馆', '火锅', '烧烤', '甜品', '奶茶']
-  for (const kw of kws) {
-    if (results.length >= limit) break
-    try {
-      const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
-        `&keywords=${encodeURIComponent(kw)}` +
-        `&location=${coord.lng},${coord.lat}` +
-        `&radius=${radius}` +
-        `&types=050000` +
-        `&offset=25` +
-        `&show_fields=rating,price,tag,address`
-      const d = await fetchJSON(url)
-      if (d.status === '1' && d.pois) {
-        for (const p of d.pois) {
-          const loc = (p.location || '').split(',')
-          const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
-          if (!lng || !lat) continue
-          const key = p.name + '|' + (p.address || '')
-          if (seen.has(key)) continue
-          seen.add(key)
-          results.push({
-            name: p.name || '', address: p.address || '', rating: p.rating || '',
-            price: p.price ? `¥${p.price}/人` : '', tag: p.tag || '',
-            coord: { lng, lat },
-          })
-          if (results.length >= limit) break
-        }
+async function fetchFoodByKw(kw, coord, radius) {
+  try {
+    const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
+      `&keywords=${encodeURIComponent(kw)}` +
+      `&location=${coord.lng},${coord.lat}` +
+      `&radius=${radius}` +
+      `&types=050000` +
+      `&offset=25` +
+      `&show_fields=rating,price,tag,address`
+    const d = await fetchJSON(url)
+    if (d.status !== '1' || !d.pois) return []
+    return d.pois.map(p => {
+      const loc = (p.location || '').split(',')
+      const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
+      if (!lng || !lat) return null
+      return {
+        name: p.name || '', address: p.address || '', rating: p.rating || '',
+        price: p.price ? `¥${p.price}/人` : '', tag: p.tag || '',
+        coord: { lng, lat },
       }
-    } catch (e) {}
-    await new Promise(r => setTimeout(r, 150))
+    }).filter(Boolean)
+  } catch (e) { return [] }
+}
+
+export async function searchFoodNear(coord, { radius = 2500, limit = 10 } = {}) {
+  if (!coord || !coord.lng || !coord.lat) return []
+  // 关键词分批并行（每批内并行，批间串行，兼顾速度与不触发限流）
+  const kwGroups = [
+    ['特色美食', '老字号', '小吃', '本地菜'],
+    ['餐厅', '火锅', '烧烤', '奶茶', '甜品'],
+  ]
+  const seen = new Set()
+  const results = []
+  for (const group of kwGroups) {
+    if (results.length >= limit) break
+    const batch = await Promise.all(group.map(kw => fetchFoodByKw(kw, coord, radius)))
+    for (const pois of batch) {
+      for (const r of pois) {
+        if (results.length >= limit) break
+        const key = r.name + '|' + r.address
+        if (seen.has(key)) continue
+        seen.add(key)
+        const km = haversineKm(coord, r.coord)
+        results.push({ ...r, distKm: km, distM: Math.round(km * 1000) })
+      }
+    }
   }
-  return results
+  // 最近的店排前面，体验更自然
+  results.sort((a, b) => a.distKm - b.distKm)
+  return results.slice(0, limit)
+}
+
+// ============================================================
+// 城市景点扩充搜索：自动补充「沙滩/海岛/小众打卡/景区/公园/观景/主题乐园」等，
+// 让景点清单更丰富（不再只有内置 8 个），用于生成时自动 enrich
+// ============================================================
+const SPOT_CATS = [
+  { kw: '海滩', label: '沙滩海滨', type: 'nature', mustSee: 3 },
+  { kw: '沙滩', label: '沙滩海滨', type: 'nature', mustSee: 3 },
+  { kw: '海岛', label: '海岛', type: 'nature', mustSee: 3 },
+  { kw: '小众景点', label: '小众秘境', type: 'urban', mustSee: 2 },
+  { kw: '打卡', label: '网红打卡', type: 'urban', mustSee: 2 },
+  { kw: '网红', label: '网红打卡', type: 'urban', mustSee: 2 },
+  { kw: '景点', label: '景区', type: 'culture', mustSee: 3 },
+  { kw: '公园', label: '公园', type: 'nature', mustSee: 2 },
+  { kw: '观景台', label: '观景', type: 'nature', mustSee: 2 },
+  { kw: '主题乐园', label: '主题乐园', type: 'family', mustSee: 3 },
+]
+
+const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$/
+
+async function fetchSpotsByKw(kw, cityName, label, type, mustSee) {
+  try {
+    const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
+      `&keywords=${encodeURIComponent(kw)}` +
+      `&region=${encodeURIComponent(cityName)}` +
+      `&city_limit=true` +
+      `&offset=25` +
+      `&show_fields=tag,address`
+    const d = await fetchJSON(url)
+    if (d.status !== '1' || !d.pois) return []
+    return d.pois.map(p => {
+      const loc = (p.location || '').split(',')
+      const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
+      if (!lng || !lat) return null
+      const name = p.name || ''
+      if (SPOT_NOISE_RE.test(name)) return null
+      return {
+        name, address: p.address || '', tag: label, coord: { lng, lat },
+        ticket: '—', duration: '2-3h', mustSee, type,
+        desc: `${label}·实时搜索`, live: true, poi: true,
+      }
+    }).filter(Boolean)
+  } catch (e) { return [] }
+}
+
+export async function searchSpotsForCity(cityName, cityCoord, needed = 18) {
+  const out = []
+  const seen = new Set()
+  // 分两批并行（每批 5 个关键词），兼顾速度与不触发高德限流
+  const batches = [SPOT_CATS.slice(0, 5), SPOT_CATS.slice(5, 10)]
+  for (const batch of batches) {
+    if (out.length >= needed) break
+    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee)))
+    for (const list of res) {
+      for (const it of list) {
+        if (out.length >= needed) break
+        const key = it.name + '|' + it.address
+        if (seen.has(key)) continue
+        seen.add(key)
+        out.push(it)
+      }
+    }
+  }
+  return out
 }
 
 export async function searchPOIsByText(keywords, city = '', limit = 5) {

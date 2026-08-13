@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
-import { buildSpotPlan, buildTextGuide, supplementAttractions, cityDayAdvice, orderAttractions, INTEREST_LABEL } from '../composables/useTravel.js'
+import { buildSpotPlan, buildTextGuide, enrichAttractions, cityDayAdvice, orderAttractions, INTEREST_LABEL } from '../composables/useTravel.js'
 import { searchFoodNear } from '../composables/useAMap.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
@@ -104,11 +104,28 @@ function generate() {
     const p = buildSpotPlan({ cities: selectedCities.value, interests: interests.value })
     if (!p) { toast('生成失败，请重试', 'err'); return }
     plan.value = p
+    // 自动从高分补充更多景点（沙滩/小众打卡/景区），让清单更丰富
+    enrichPlan(p)
   } catch (e) {
     toast('生成失败: ' + (e?.message || e), 'err')
   } finally {
     loading.value = false
   }
+}
+
+// 生成后异步补充景点（不阻塞首屏渲染）
+async function enrichPlan(p) {
+  let total = 0
+  for (const cp of p.cityPlans) {
+    try {
+      const added = await enrichAttractions(cp.name, cp.attractions)
+      if (added.length) {
+        cp.attractions = orderAttractions([...cp.attractions, ...added])
+        total += added.length
+      }
+    } catch (e) {}
+  }
+  if (total > 0) toast(`已联网补充 ${total} 个景点（沙滩/小众打卡/景区）`)
 }
 
 // ===== 高德 POI 补充景点 =====
@@ -118,10 +135,9 @@ async function doSupplement(cityName) {
   if (!cp) return
   suppLoading.value = cityName
   try {
-    const added = await supplementAttractions(cityName, cp.attractions)
+    const added = await enrichAttractions(cityName, cp.attractions)
     if (added.length === 0) { toast('未找到更多景点，或已收录', 'warn'); return }
-    cp.attractions.push(...added)
-    cp.attractions = orderAttractions(cp.attractions)
+    cp.attractions = orderAttractions([...cp.attractions, ...added])
     toast(`已补充 ${added.length} 个景点（实时搜索）`)
   } catch (e) { toast('补充失败', 'err') }
   suppLoading.value = ''
@@ -174,6 +190,11 @@ function downloadGuide() {
 
 // 从美食列表中取某景点附近店（供模板读取）
 function attrFood(cp, a) { return foodMap.value[foodKey(cp, a)] || null }
+// 美食距当前景点的直线距离文案
+function formatFoodDist(r) {
+  if (r.distM == null) return ''
+  return r.distM < 1000 ? `距此约 ${r.distM}m` : `距此约 ${(r.distM / 1000).toFixed(1)}km`
+}
 
 // ===== 酒店搜索 =====
 const HOTEL_PRESETS = [
@@ -352,7 +373,7 @@ async function doShareGuide() {
           <div class="attr-row" @click="toggleAttractionFood(cp, a)">
             <span class="attr-idx">{{ i + 1 }}</span>
             <span class="attr-must">★{{ a.mustSee }}</span>
-            <span class="attr-name">{{ a.name }}<span v-if="a.poi" class="poi-badge">实时</span></span>
+            <span class="attr-name">{{ a.name }}<span v-if="a.tag" class="poi-badge tag">{{ a.tag }}</span><span v-else-if="a.poi" class="poi-badge">实时</span></span>
             <span class="attr-ticket">{{ a.ticket }}</span>
             <span class="attr-fold" :class="{ open: attrFood(cp,a)?.open }">▾</span>
             <span class="attr-nav" title="高德导航" @click.stop="openAmapNav(a.coord.lng, a.coord.lat, a.name)">🧭</span>
@@ -374,6 +395,7 @@ async function doShareGuide() {
                   <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
                 </div>
                 <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
+                <div v-if="r.distM != null" class="food-dist">🚶 {{ formatFoodDist(r) }}</div>
               </div>
             </div>
             <div v-else class="food-empty">附近暂未搜索到特色美食，换个点试试</div>
@@ -622,6 +644,7 @@ async function doShareGuide() {
 .attr-fold.open { transform: rotate(180deg); }
 .attr-nav { font-size: 13px; flex-shrink: 0; }
 .poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+.poi-badge.tag { background: #e9fbf2; color: #0f6e56; }
 
 /* 附近美食 */
 .attr-food { background: #fffdfa; border-top: 1px dashed #f0e2cf; padding: 10px 12px; }
@@ -639,6 +662,7 @@ async function doShareGuide() {
 .food-name { font-size: 12px; font-weight: 700; color: #4a3f55; }
 .food-price { font-size: 10px; color: var(--accent); font-weight: 700; }
 .food-desc { font-size: 10px; color: #a898b8; margin-top: 2px; }
+.food-dist { font-size: 10px; color: var(--accent); font-weight: 700; margin-top: 2px; }
 
 .tips-list { margin: 0; padding-left: 16px; font-size: 11px; color: #7a6c8a; line-height: 1.8; }
 
