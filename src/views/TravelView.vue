@@ -103,6 +103,7 @@ function moveCity(i, dir) {
 const plan = ref(null)
 const showAdvanced = ref('')   // 每城折叠酒店/补充
 const suppLoading = ref('')
+const suppDots = ref('')   // 补充中的动态省略号，避免静态"搜索中"像卡死
 
 function generate() {
   if (selectedCities.value.length === 0) { toast('请先选择目的地城市', 'warn'); return }
@@ -149,6 +150,8 @@ async function doSupplement(cityName) {
   const cp = plan.value?.cityPlans.find(c => c.name === cityName)
   if (!cp) return
   suppLoading.value = cityName
+  // 动态省略号动画，让"搜索中"明显在动，不再是死板的卡死感
+  const pulse = setInterval(() => { suppDots.value = suppDots.value.length >= 3 ? '' : suppDots.value + '.' }, 400)
   try {
     const added = await withTimeout(
       enrichAttractions(cityName, cp.attractions, { cats: SUPPLEMENT_CATS, cap: 30, rad: 1.2, targets: { sight: 30, food: 14, shop: 30 } }),
@@ -160,7 +163,7 @@ async function doSupplement(cityName) {
   } catch (e) {
     toast(e?.timeout ? '补充请求超时，请稍后重试' : '补充失败，请重试', 'err')
   }
-  finally { suppLoading.value = '' }
+  finally { clearInterval(pulse); suppDots.value = ''; suppLoading.value = '' }
 }
 
 // ===== 点击景点 → 加载附近特色美食（懒加载 + 缓存）=====
@@ -447,7 +450,7 @@ async function doShareGuide() {
       </div>
 
       <button class="btn btn-sm btn-supp" :disabled="suppLoading === cp.name" @click="doSupplement(cp.name)">
-        {{ suppLoading === cp.name ? '搜索中…' : '🔍 补充更多地点（景点/美食/购物）' }}
+        {{ suppLoading === cp.name ? '搜索中' + suppDots : '🔍 补充更多地点（景点/美食/购物）' }}
       </button>
 
       <!-- 酒店搜索 -->

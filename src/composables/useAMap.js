@@ -440,65 +440,66 @@ function groupCatsByType(cats) {
 export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
   const { targets = { classic: 8, sight: 18, food: 14, shop: 30 }, cats = null } = opts
   const groups = cats ? groupCatsByType(cats) : SPOT_GROUPS
-  const out = []
+  // 三类并行检索（不再串行等最慢那类），每类内部自行去重，结束后全局去重合并
+  const lists = await Promise.all(
+    Object.entries(groups).map(([cat, pool]) => collectCat(cat, pool, targets[cat] ?? 8, cityName))
+  )
   const seen = new Set()
-  const add = (it, cat) => {
-    const key = it.name + '|' + it.address
-    if (seen.has(key)) return false
-    seen.add(key)
-    out.push(it)
-    return true
-  }
-  const catCount = cat => out.filter(o => o.category === cat).length
-  for (const [cat, pool] of Object.entries(groups)) {
-    const target = targets[cat] ?? 8
-    if (target <= 0) continue
-
-    // —— 购物特殊逻辑：品牌关键词各自保底 1 条 + 类型码检索补满本地商场 ——
-    // 两个坑都要避：①「万象城」一个词返回 10+ 子 POI，若和普通词同批跑会被配额饿死后面的品牌
-    //   （大融城/MOMOPARK 因此搜不到）→ 故品牌词各自保底、且排前面优先跑；
-    //  ②品牌词只占 1 条/家，把名额留给类型码检索，否则赛格/熙地港等本地商场因配额满而无机会；
-    //  ③词间留 250ms 间隔，避免高德免费 Key QPS 限流把品牌词整批丢词。
-    if (cat === 'shop') {
-      const brands = pool.filter(c => !c.amapType)
-      const typed = pool.filter(c => c.amapType)
-      // 并发抓取品牌词（限并发 4，避免串行 14 词×250ms 拖到 20s+ 让人以为卡死），
-      // 每家品牌保底 1 条（省出名额给本地商场）
-      const brandLists = await runLimited(brands, 4, c =>
-        fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType))
-      for (const list of brandLists) {
-        let added = 0
-        for (const it of list) {
-          if (added >= 1) break
-          if (add(it, cat)) added++
-        }
-      }
-      // 类型码分开检索（060100 商场 / 060800 购物中心 / 060700 商业街），补满到 target，
-      // 专门捞品牌词覆盖不到的本地商场（赛格/熙地港等）
-      for (const c of typed) {
-        if (catCount(cat) >= target) break
-        const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
-        for (const it of list) { if (catCount(cat) >= target) break; add(it, cat) }
-        await new Promise(r => setTimeout(r, 150))
-      }
-      continue
-    }
-
-    // 其他分类：原逻辑（分批并行，每批 5 个关键词）
-    const batches = []
-    for (let i = 0; i < pool.length; i += 5) batches.push(pool.slice(i, i + 5))
-    for (const batch of batches) {
-      if (catCount(cat) >= target) break
-      const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)))
-      for (const list of res) {
-        for (const it of list) {
-          if (catCount(cat) >= target) break
-          add(it, cat)
-        }
-      }
+  const out = []
+  for (const list of lists) {
+    for (const it of list) {
+      const key = it.name + '|' + it.address
+      if (seen.has(key)) continue
+      seen.add(key); out.push(it)
     }
   }
   return out
+}
+// 单类收集：购物（品牌保底+类型码）与其他类（分批并行）各自独立，返回本类去重后的列表
+async function collectCat(cat, pool, target, cityName) {
+  if (target <= 0) return []
+  const local = []
+  const seen = new Set()
+  const add = it => {
+    const key = it.name + '|' + it.address
+    if (seen.has(key)) return false
+    seen.add(key); local.push(it); return true
+  }
+  const count = () => local.length
+
+  // —— 购物特殊逻辑：品牌关键词各自保底 1 条 + 类型码检索补满本地商场 ——
+  // ①「万象城」一个词返回 10+ 子 POI，会挤占配额饿死后面的品牌（大融城/MOMOPARK）→ 品牌词各自保底1条；
+  // ②品牌词只占 1 条/家，省出名额给类型码检索补本地商场（赛格/熙地港等）；
+  // ③品牌词限并发 4 抓取（避免串行 14 词×250ms 拖到 20s+ 让人以为卡死），类型码间留 150ms 防限流。
+  if (cat === 'shop') {
+    const brands = pool.filter(c => !c.amapType)
+    const typed = pool.filter(c => c.amapType)
+    const brandLists = await runLimited(brands, 4, c =>
+      fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType))
+    for (const list of brandLists) {
+      let added = 0
+      for (const it of list) { if (added >= 1) break; if (add(it)) added++ }
+    }
+    for (const c of typed) {
+      if (count() >= target) break
+      const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
+      for (const it of list) { if (count() >= target) break; add(it) }
+      await new Promise(r => setTimeout(r, 150))
+    }
+    return local
+  }
+
+  // 其他分类：分批并行（每批 5 个关键词）
+  const batches = []
+  for (let i = 0; i < pool.length; i += 5) batches.push(pool.slice(i, i + 5))
+  for (const batch of batches) {
+    if (count() >= target) break
+    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)))
+    for (const list of res) {
+      for (const it of list) { if (count() >= target) break; add(it) }
+    }
+  }
+  return local
 }
 
 export async function searchPOIsByText(keywords, city = '', limit = 5) {
