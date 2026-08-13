@@ -327,13 +327,18 @@ export async function supplementAttractions(cityName) {
   try {
     const pois = await searchPOIsByText(cityName + ' 旅游景点', '', 10)
     if (!pois || pois.length === 0) return []
-    const existing = new Set(c.attractions.map(a => a.name))
+    // 内置景点（有坐标）用于坐标去重：高德常返回「崂山风景区/栈桥景区」等同地异名 POI
+    const builtinPts = c.attractions.filter(a => a.coord).map(a => a.coord)
     const added = []
     for (const p of pois) {
-      if (existing.has(p.name) || added.some(a => a.name === p.name)) continue
       if (!p.lng || !p.lat) continue
+      const coord = { lng: p.lng, lat: p.lat }
+      // 与已有景点 < 2km 视为同一地点（同地异名），跳过，避免同一景点被排到不同天
+      const nearBuiltin = builtinPts.some(b => haversineKm(coord, b) < 2)
+      const nearAdded = added.some(a => haversineKm(coord, a.coord) < 2)
+      if (nearBuiltin || nearAdded) continue
       added.push({
-        name: p.name, coord: { lng: p.lng, lat: p.lat }, ticket: '—',
+        name: p.name, coord, ticket: '—',
         duration: '2-3h', mustSee: 2, type: 'urban',
         desc: '高德实时搜索补充', poi: true,
       })
