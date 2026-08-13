@@ -425,7 +425,7 @@ export async function enrichAttractions(cityName, existing = null, { cats, cap =
   try {
     // 每个分类独立配额：景点最多 cap 个，美食/购物各补 14 个，避免被总量封顶饿死
     const added = await searchSpotsForCity(cityName, c?.coord, {
-      targets: targets || { classic: 8, sight: cap, food: 14, shop: 14 },
+      targets: targets || { classic: 8, sight: cap, food: 14, shop: 20 },
       cats,
     })
     if (!added.length) return []

@@ -324,13 +324,33 @@ export const SPOT_FOOD = [
 ]
 
 // 购物分类池：商场 / 购物中心 / 奥特莱斯 / 百货 等，单独归类（cat: 'shop'），与景点分开显示。
+// 关键修复：泛关键词（商场/购物中心）只能匹配名字含"商场"的 POI，会漏掉大融城、万达广场、MOMOPARK 等
+// 名字里没"商场"二字的商场。所以前几条改用高德类型编码检索（amapType：060100 商场 / 060800 购物中心 /
+// 060700 商业街），能捞全市所有商场；再补一批全国连锁品牌关键词（万达/万象城/大悦城/龙湖天街/太古里/
+// 恒隆/大融城/MOMOPARK/荟聚/印象城/凯德/吾悦/爱琴海/万象汇）兜底，保证这些具体商场必出现。
 export const SPOT_SHOP = [
-  { kw: '商场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
-  { kw: '购物中心', label: '购物中心', type: 'shop', mustSee: 3, cat: 'shop' },
+  // —— 第一批：全国连锁品牌关键词（优先跑，保证具体大商场必出现，不被后面配额打断）——
+  { kw: '万达广场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '万象城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '大悦城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '龙湖天街', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '太古里', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '恒隆广场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '大融城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: 'MOMOPARK', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '荟聚', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '印象城', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '凯德广场', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '吾悦广场', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '爱琴海', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
+  { kw: '万象汇', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '奥特莱斯', label: '奥特莱斯', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '百货', label: '百货', type: 'shop', mustSee: 2, cat: 'shop' },
-  { kw: '商业街', label: '商业街', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '购物街区', label: '购物街区', type: 'shop', mustSee: 2, cat: 'shop' },
+  // —— 第二批：按高德类型编码捞全市所有商场/购物中心/商业街（兜底补全本地商场）——
+  { kw: '商场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop', amapType: '060100|060800' },
+  { kw: '购物中心', label: '购物中心', type: 'shop', mustSee: 3, cat: 'shop', amapType: '060800' },
+  { kw: '商业街', label: '商业街', type: 'shop', mustSee: 2, cat: 'shop', amapType: '060700' },
 ]
 
 // 美食/购物类 POI 噪声过滤：只挡结构性噪声 + 酒吧/鸡尾酒（避免夜市混入酒吧），
@@ -339,11 +359,17 @@ const NOISE_POI = /收费站|服务区|停车场|公交站|地铁站$|配送点|
 
 const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$|健身|训练馆|健身房|游泳馆|瑜伽|球馆|台球|网吧|KTV|酒吧|洗浴|按摩|美甲|美容|理发|洗车|烤肉|火锅|餐厅|饭店|餐饮|小吃|咖啡|奶茶|烘焙|烧烤|串串|面馆|饭馆|超市|便利店|药店|银行|营业厅|医院|学院|工厂|工业园|产业园|4S店|俱乐部|雪具店|体验店|专卖店|旗舰店|鸡尾酒|夜店|酒馆|餐吧|精酿|livehouse|微醺|小酒馆/
 
-async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true, category = 'sight') {
+async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true, category = 'sight', amapType = '') {
   try {
-    const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
-      `&keywords=${encodeURIComponent(kw)}` +
-      `&region=${encodeURIComponent(cityName)}` +
+    let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}`
+    if (amapType) {
+      // 按高德类型编码检索（商场 060100 / 购物中心 060800 / 商业街 060700），
+      // 能捞到全市所有商场，不受"名称里是否含'商场'二字"限制（大融城/万达广场/MOMOPARK 等都靠这个）
+      url += `&types=${encodeURIComponent(amapType)}`
+    } else {
+      url += `&keywords=${encodeURIComponent(kw)}`
+    }
+    url += `&region=${encodeURIComponent(cityName)}` +
       (cityLimit ? `&city_limit=true` : ``) +
       `&offset=25` +
       `&show_fields=tag,address`
@@ -385,7 +411,7 @@ function groupCatsByType(cats) {
 // 每个分类独立配额检索：classic/sight 景点为主，food/shop 也各给足量名额，
 // 不再用单一总量上限（否则 classic+sight 一轮填满后 food/shop 永远搜不到）。
 export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
-  const { targets = { classic: 8, sight: 18, food: 14, shop: 14 }, cats = null } = opts
+  const { targets = { classic: 8, sight: 18, food: 14, shop: 20 }, cats = null } = opts
   const groups = cats ? groupCatsByType(cats) : SPOT_GROUPS
   const out = []
   const seen = new Set()
@@ -397,7 +423,7 @@ export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
     for (let i = 0; i < pool.length; i += 5) batches.push(pool.slice(i, i + 5))
     for (const batch of batches) {
       if (out.filter(o => o.category === cat).length >= target) break
-      const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat)))
+      const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)))
       for (const list of res) {
         for (const it of list) {
           if (out.filter(o => o.category === cat).length >= target) break

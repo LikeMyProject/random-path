@@ -143,7 +143,7 @@ async function doSupplement(cityName) {
   if (!cp) return
   suppLoading.value = cityName
   try {
-    const added = await enrichAttractions(cityName, cp.attractions, { cats: SUPPLEMENT_CATS, cap: 30, rad: 1.2, targets: { sight: 30, food: 14, shop: 14 } })
+    const added = await enrichAttractions(cityName, cp.attractions, { cats: SUPPLEMENT_CATS, cap: 30, rad: 1.2, targets: { sight: 30, food: 14, shop: 20 } })
     if (added.length === 0) { toast('该市已收录常见地点，暂无更多补充', 'warn'); return }
     cp.attractions = orderAttractions([...cp.attractions, ...added])
     toast(`已补充 ${added.length} 个地点（景点/美食/购物，高德实时）`)
