@@ -15,11 +15,24 @@ export function loadAMapSDK() {
   })
   return sdkLoading
 }
-async function fetchJSON(url, retries = 2) {
+async function fetchJSON(url, retries = 3) {
   for (let r = 0; r <= retries; r++) {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), TIMEOUT)
-    try { const res = await fetch(url, { signal: ctrl.signal }); if (!res.ok) throw Error(`HTTP ${res.status}`); return await res.json() }
+    try {
+      const res = await fetch(url, { signal: ctrl.signal })
+      if (!res.ok) throw Error(`HTTP ${res.status}`)
+      const j = await res.json()
+      // 高德超频：HTTP 200 但业务码 status!=='1' 且 info 含 QPS/限流，退避重试
+      if (j.status !== '1') {
+        if (/OVER_QPS|QPS|RATE|LIMIT/i.test(j.info || '') && r < retries) {
+          await new Promise(r => setTimeout(r, 1500))
+          continue
+        }
+        return j
+      }
+      return j
+    }
     catch (e) { if (r === retries) throw e; await new Promise(r => setTimeout(r, 1200)) }
     finally { clearTimeout(t) }
   }
@@ -329,15 +342,14 @@ export const SPOT_FOOD = [
 // 060700 商业街），能捞全市所有商场；再补一批全国连锁品牌关键词（万达/万象城/大悦城/龙湖天街/太古里/
 // 恒隆/大融城/MOMOPARK/荟聚/印象城/凯德/吾悦/爱琴海/万象汇）兜底，保证这些具体商场必出现。
 export const SPOT_SHOP = [
-  // —— 第一批：全国连锁品牌关键词（优先跑，保证具体大商场必出现，不被后面配额打断）——
+  // —— 第一批：用户点名/全国性主力商场关键词（排前面优先跑，且 searchSpotsForCity 会各自保底 1 条，
+  //    避免被「万象城」等返回 10+ 子 POI 挤占配额而饿死；词间留间隔避免高德限流丢词）——
   { kw: '万达广场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: '大融城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
+  { kw: 'MOMOPARK', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
   { kw: '万象城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
   { kw: '大悦城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
   { kw: '龙湖天街', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
-  { kw: '太古里', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
-  { kw: '恒隆广场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
-  { kw: '大融城', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
-  { kw: 'MOMOPARK', label: '商场', type: 'shop', mustSee: 3, cat: 'shop' },
   { kw: '荟聚', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '印象城', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '凯德广场', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
@@ -345,10 +357,10 @@ export const SPOT_SHOP = [
   { kw: '爱琴海', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '万象汇', label: '商场', type: 'shop', mustSee: 2, cat: 'shop' },
   { kw: '奥特莱斯', label: '奥特莱斯', type: 'shop', mustSee: 2, cat: 'shop' },
-  { kw: '百货', label: '百货', type: 'shop', mustSee: 2, cat: 'shop' },
-  { kw: '购物街区', label: '购物街区', type: 'shop', mustSee: 2, cat: 'shop' },
-  // —— 第二批：按高德类型编码捞全市所有商场/购物中心/商业街（兜底补全本地商场）——
-  { kw: '商场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop', amapType: '060100|060800' },
+  // —— 第二批：按高德类型编码（分开搜，覆盖更全）捞全市商场/购物中心/商业街兜底补全 ——
+  // 注意：单一类型码组合(060100|060800)返回不全，且大融城/MOMOPARK 属 060100、万达属 060800，
+  // 故 060100 / 060800 / 060700 分开检索，保证各类商场都兜到。
+  { kw: '商场', label: '商场', type: 'shop', mustSee: 3, cat: 'shop', amapType: '060100' },
   { kw: '购物中心', label: '购物中心', type: 'shop', mustSee: 3, cat: 'shop', amapType: '060800' },
   { kw: '商业街', label: '商业街', type: 'shop', mustSee: 2, cat: 'shop', amapType: '060700' },
 ]
@@ -411,26 +423,61 @@ function groupCatsByType(cats) {
 // 每个分类独立配额检索：classic/sight 景点为主，food/shop 也各给足量名额，
 // 不再用单一总量上限（否则 classic+sight 一轮填满后 food/shop 永远搜不到）。
 export async function searchSpotsForCity(cityName, cityCoord, opts = {}) {
-  const { targets = { classic: 8, sight: 18, food: 14, shop: 20 }, cats = null } = opts
+  const { targets = { classic: 8, sight: 18, food: 14, shop: 30 }, cats = null } = opts
   const groups = cats ? groupCatsByType(cats) : SPOT_GROUPS
   const out = []
   const seen = new Set()
+  const add = (it, cat) => {
+    const key = it.name + '|' + it.address
+    if (seen.has(key)) return false
+    seen.add(key)
+    out.push(it)
+    return true
+  }
+  const catCount = cat => out.filter(o => o.category === cat).length
   for (const [cat, pool] of Object.entries(groups)) {
     const target = targets[cat] ?? 8
     if (target <= 0) continue
-    // 分批并行（每批 5 个关键词），兼顾速度与不触发高德限流
+
+    // —— 购物特殊逻辑：品牌关键词各自保底 1 条 + 类型码检索补满本地商场 ——
+    // 两个坑都要避：①「万象城」一个词返回 10+ 子 POI，若和普通词同批跑会被配额饿死后面的品牌
+    //   （大融城/MOMOPARK 因此搜不到）→ 故品牌词各自保底、且排前面优先跑；
+    //  ②品牌词只占 1 条/家，把名额留给类型码检索，否则赛格/熙地港等本地商场因配额满而无机会；
+    //  ③词间留 250ms 间隔，避免高德免费 Key QPS 限流把品牌词整批丢词。
+    if (cat === 'shop') {
+      const brands = pool.filter(c => !c.amapType)
+      const typed = pool.filter(c => c.amapType)
+      let n = 0
+      for (const c of brands) {
+        const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
+        let added = 0
+        for (const it of list) {
+          if (added >= 1) break          // 每家品牌保底 1 条，省出名额给本地商场
+          if (add(it, cat)) { added++; n++ }
+        }
+        await new Promise(r => setTimeout(r, 250))  // 防限流
+      }
+      // 类型码分开检索（060100 商场 / 060800 购物中心 / 060700 商业街），补满到 target，
+      // 专门捞品牌词覆盖不到的本地商场（赛格/熙地港等）
+      for (const c of typed) {
+        if (catCount(cat) >= target) break
+        const list = await fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)
+        for (const it of list) { if (catCount(cat) >= target) break; add(it, cat) }
+        await new Promise(r => setTimeout(r, 200))
+      }
+      continue
+    }
+
+    // 其他分类：原逻辑（分批并行，每批 5 个关键词）
     const batches = []
     for (let i = 0; i < pool.length; i += 5) batches.push(pool.slice(i, i + 5))
     for (const batch of batches) {
-      if (out.filter(o => o.category === cat).length >= target) break
+      if (catCount(cat) >= target) break
       const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit, c.cat || cat, c.amapType)))
       for (const list of res) {
         for (const it of list) {
-          if (out.filter(o => o.category === cat).length >= target) break
-          const key = it.name + '|' + it.address
-          if (seen.has(key)) continue
-          seen.add(key)
-          out.push(it)
+          if (catCount(cat) >= target) break
+          add(it, cat)
         }
       }
     }
