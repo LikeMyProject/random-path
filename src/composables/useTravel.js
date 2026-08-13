@@ -474,8 +474,9 @@ function shuffle(arr) {
 }
 
 // 餐厅就近分配：取「离当天任一景点最近」且 10km 窗口内的餐厅，距离越近优先级越高
-function pickMealRestaurant(pool, dayAttrCoords, used, maxKm = RESTAURANT_MAX_KM) {
-  const avail = pool.filter(r => !used.has(r.name + '|' + r.address))
+// used = 同一家店（名|地址）不可重复；usedBrand = 同一连锁品牌（仅店名）整趟行程不重复，避免早/晚或跨天老出现同一家
+function pickMealRestaurant(pool, dayAttrCoords, used, usedBrand, maxKm = RESTAURANT_MAX_KM) {
+  const avail = pool.filter(r => !used.has(r.name + '|' + r.address) && (!usedBrand || !usedBrand.has(r.name)))
   if (avail.length === 0) return null
   const withCoord = avail.filter(r => r.coord)
   const src = withCoord.length ? withCoord : avail
@@ -494,19 +495,24 @@ function pickMealRestaurant(pool, dayAttrCoords, used, maxKm = RESTAURANT_MAX_KM
   cand.sort((a, b) => a.md - b.md)
   const chosen = cand[0].r
   used.add(chosen.name + '|' + chosen.address) // 标记已用：避免早/午/晚或跨天重复同一家店
+  if (usedBrand) usedBrand.add(chosen.name)     // 同品牌整趟不重复
   return chosen
 }
 
 // 餐厅按「当天景点」就近分配：吃的店跟着逛的路线走，不顺路就换更近的
 function distributeRestaurants(restaurants, days, dayAttrCoords) {
-  const used = new Set()
+  const used = new Set()        // 同一家店精确去重
+  const usedBrand = new Set()   // 同一连锁品牌整趟去重
   const daily = []
   for (let d = 0; d < days; d++) {
     const coords = dayAttrCoords?.[d] || []
     const pickMeal = (meal) => {
       const pool = restaurants.filter(r => r.mealType === meal)
-      // 优先同餐次且离当天景点最近；无同餐次时退而求其次取最近（保证顺路优先）
-      return pickMealRestaurant(pool, coords, used) || pickMealRestaurant(restaurants, coords, used)
+      // 优先同餐次且离当天景点最近（同品牌不重复）；无同餐次时退而求其次取最近；
+      // 仍为空则放宽品牌限制（仅精确去重）保底，确保每餐都有店
+      return pickMealRestaurant(pool, coords, used, usedBrand)
+        || pickMealRestaurant(restaurants, coords, used, usedBrand)
+        || pickMealRestaurant(restaurants, coords, used, null)
     }
     daily.push({ breakfast: pickMeal('breakfast'), lunch: pickMeal('lunch'), dinner: pickMeal('dinner') })
   }

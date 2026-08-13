@@ -43,60 +43,51 @@ export async function detectCityFromGPS(lng, lat) {
 // ============================================================
 // 城市真实餐厅搜索：多关键词搜索 + 去重 + 餐次分类
 // ============================================================
-const FOOD_SEARCH_QUERIES = [
-  { kw: '早餐',   meal: 'breakfast' },
-  { kw: '包子',   meal: 'breakfast' },
-  { kw: '粥店',   meal: 'breakfast' },
-  { kw: '早茶',   meal: 'breakfast' },
-  { kw: '面馆',   meal: 'lunch' },
-  { kw: '米粉',   meal: 'lunch' },
-  { kw: '快餐',   meal: 'lunch' },
-  { kw: '饺子',   meal: 'lunch' },
-  { kw: '中餐',   meal: 'lunch' },
-  { kw: '美食',   meal: 'lunch' },
-  { kw: '火锅',   meal: 'dinner' },
-  { kw: '烧烤',   meal: 'dinner' },
-  { kw: '烤鱼',   meal: 'dinner' },
-  { kw: '川菜',   meal: 'dinner' },
-  { kw: '西餐',   meal: 'dinner' },
-  { kw: '日料',   meal: 'dinner' },
-  { kw: '小吃',   meal: 'snack' },
-  { kw: '甜品',   meal: 'snack' },
-  { kw: '奶茶',   meal: 'snack' },
-  { kw: '夜宵',   meal: 'snack' },
+const FOOD_GROUPS = [
+  { meal: 'breakfast', kws: ['早餐', '包子', '粥店', '早茶', '肠粉', '豆浆'] },
+  { meal: 'lunch', kws: ['面馆', '米粉', '快餐', '饺子', '中餐', '美食', '盖浇饭', '小炒'] },
+  { meal: 'dinner', kws: ['火锅', '烧烤', '烤鱼', '川菜', '西餐', '日料', '粤菜', '家常菜'] },
+  { meal: 'snack', kws: ['小吃', '甜品', '奶茶', '夜宵', '糕点'] },
 ]
 
 export async function searchRestaurantsForCity(cityName, cityCoord, needed = 40) {
   const results = []
   const seen = new Set()
-  for (const { kw, meal } of FOOD_SEARCH_QUERIES) {
+  // 每类餐次（早/午/晚）至少分到约 needed/3 家，避免短途搜索被「早餐」关键词占满导致午餐/晚餐为空
+  const target = Math.max(3, Math.ceil(needed / 3))
+  for (const g of FOOD_GROUPS) {
     if (results.length >= needed) break
-    try {
-      let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
-        `&keywords=${encodeURIComponent(kw)}` +
-        `&city=${encodeURIComponent(cityName)}` +
-        `&types=050000` +
-        `&offset=25` +
-        `&show_fields=rating,price,tag,address`
-      const d = await fetchJSON(url)
-      if (d.status === '1' && d.pois) {
-        for (const p of d.pois) {
-          const loc = (p.location || '').split(',')
-          const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
-          if (!lng || !lat) continue
-          const key = p.name + '|' + (p.address || '')
-          if (seen.has(key)) continue
-          seen.add(key)
-          results.push({
-            name: p.name || '', address: p.address || '', rating: p.rating || '',
-            price: p.price ? `¥${p.price}/人` : '', type: p.type || '', tag: p.tag || '',
-            mealType: meal, coord: { lng, lat },
-          })
-          if (results.length >= needed) break
+    let groupCount = 0
+    for (const kw of g.kws) {
+      if (groupCount >= target || results.length >= needed) break
+      try {
+        let url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
+          `&keywords=${encodeURIComponent(kw)}` +
+          `&city=${encodeURIComponent(cityName)}` +
+          `&types=050000` +
+          `&offset=25` +
+          `&show_fields=rating,price,tag,address`
+        const d = await fetchJSON(url)
+        if (d.status === '1' && d.pois) {
+          for (const p of d.pois) {
+            const loc = (p.location || '').split(',')
+            const lng = parseFloat(loc[0]), lat = parseFloat(loc[1])
+            if (!lng || !lat) continue
+            const key = p.name + '|' + (p.address || '')
+            if (seen.has(key)) continue
+            seen.add(key)
+            results.push({
+              name: p.name || '', address: p.address || '', rating: p.rating || '',
+              price: p.price ? `¥${p.price}/人` : '', type: p.type || '', tag: p.tag || '',
+              mealType: g.meal, coord: { lng, lat },
+            })
+            groupCount++
+            if (groupCount >= target || results.length >= needed) break
+          }
         }
-      }
-    } catch (e) {}
-    await new Promise(r => setTimeout(r, 200))
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 200))
+    }
   }
   return results
 }
