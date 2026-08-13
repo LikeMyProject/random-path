@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { CITY_LIST, CITY_GROUPS, getCity } from '../data/cities.js'
 import { buildSpotPlan, buildTextGuide, enrichAttractions, cityDayAdvice, orderAttractions, INTEREST_LABEL } from '../composables/useTravel.js'
+import { SPOT_EXT } from '../composables/useAMap.js'
 import { searchFoodNear } from '../composables/useAMap.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
@@ -43,9 +44,15 @@ onMounted(() => {
 })
 // 输入变化防抖保存
 let saveTimer = null
+let regenTimer = null
 watch([selectedCities, interests], () => {
   clearTimeout(saveTimer)
   saveTimer = setTimeout(saveLastSearch, 500)
+  // 切换城市/兴趣后，若已生成过攻略，自动重新生成 —— 避免「切换城市后清单没变、点补充没反应」
+  if (plan.value && selectedCities.value.length > 0) {
+    clearTimeout(regenTimer)
+    regenTimer = setTimeout(() => generate(), 350)
+  }
 }, { deep: true })
 
 const remaining = computed(() => CITY_LIST.filter(c => !selectedCities.value.includes(c)))
@@ -128,18 +135,18 @@ async function enrichPlan(p) {
   if (total > 0) toast(`已联网补充 ${total} 个景点（沙滩/小众打卡/景区）`)
 }
 
-// ===== 高德 POI 补充景点 =====
+// ===== 手动「补充更多景点」：用与主类不同的扩展关键词池（夜市/古镇/博物馆/老街…），保证真能加新东西 =====
 async function doSupplement(cityName) {
   if (suppLoading.value) return
   const cp = plan.value?.cityPlans.find(c => c.name === cityName)
   if (!cp) return
   suppLoading.value = cityName
   try {
-    const added = await enrichAttractions(cityName, cp.attractions)
-    if (added.length === 0) { toast('未找到更多景点，或已收录', 'warn'); return }
+    const added = await enrichAttractions(cityName, cp.attractions, { cats: SPOT_EXT, cap: 30, rad: 1.2 })
+    if (added.length === 0) { toast('该市已收录常见景点，暂无更多补充', 'warn'); return }
     cp.attractions = orderAttractions([...cp.attractions, ...added])
-    toast(`已补充 ${added.length} 个景点（实时搜索）`)
-  } catch (e) { toast('补充失败', 'err') }
+    toast(`已补充 ${added.length} 个景点（夜市/古镇/博物馆…实时搜索）`)
+  } catch (e) { toast('补充失败，请重试', 'err') }
   suppLoading.value = ''
 }
 

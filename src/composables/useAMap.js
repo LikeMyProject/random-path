@@ -257,7 +257,7 @@ export async function searchFoodNear(coord, { radius = 2500, limit = 10 } = {}) 
 // 城市景点扩充搜索：自动补充「沙滩/海岛/小众打卡/景区/公园/观景/主题乐园」等，
 // 让景点清单更丰富（不再只有内置 8 个），用于生成时自动 enrich
 // ============================================================
-const SPOT_CATS = [
+export const SPOT_CATS = [
   { kw: '海滩', label: '沙滩海滨', type: 'nature', mustSee: 3 },
   { kw: '沙滩', label: '沙滩海滨', type: 'nature', mustSee: 3 },
   { kw: '海岛', label: '海岛', type: 'nature', mustSee: 3 },
@@ -268,6 +268,25 @@ const SPOT_CATS = [
   { kw: '公园', label: '公园', type: 'nature', mustSee: 2 },
   { kw: '观景台', label: '观景', type: 'nature', mustSee: 2 },
   { kw: '主题乐园', label: '主题乐园', type: 'family', mustSee: 3 },
+]
+
+// 扩展关键词池：用于「手动点击补充更多景点」，与主类不同，能搜到夜市/古镇/博物馆/老街等
+// 不同类别的真实地点，避免和生成时自动补充的主类重复（否则去重后永远加不进新东西）
+export const SPOT_EXT = [
+  { kw: '夜市', label: '夜市', type: 'urban', mustSee: 2 },
+  { kw: '古镇', label: '古镇', type: 'culture', mustSee: 3 },
+  { kw: '博物馆', label: '博物馆', type: 'culture', mustSee: 3 },
+  { kw: '美术馆', label: '美术馆', type: 'culture', mustSee: 2 },
+  { kw: '步行街', label: '步行街', type: 'urban', mustSee: 2 },
+  { kw: '美食街', label: '美食街', type: 'urban', mustSee: 2 },
+  { kw: '老街', label: '老街', type: 'urban', mustSee: 2 },
+  { kw: '渔村', label: '渔村', type: 'nature', mustSee: 2 },
+  { kw: '灯塔', label: '灯塔', type: 'nature', mustSee: 1 },
+  { kw: '市集', label: '市集', type: 'urban', mustSee: 1 },
+  { kw: '书店', label: '书店', type: 'urban', mustSee: 1 },
+  { kw: '历史建筑', label: '历史建筑', type: 'culture', mustSee: 2 },
+  { kw: '天台', label: '观景', type: 'nature', mustSee: 1 },
+  { kw: '剧场', label: '剧场', type: 'family', mustSee: 1 },
 ]
 
 const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$/
@@ -297,11 +316,12 @@ async function fetchSpotsByKw(kw, cityName, label, type, mustSee) {
   } catch (e) { return [] }
 }
 
-export async function searchSpotsForCity(cityName, cityCoord, needed = 18) {
+export async function searchSpotsForCity(cityName, cityCoord, needed = 18, cats = SPOT_CATS) {
   const out = []
   const seen = new Set()
-  // 分两批并行（每批 5 个关键词），兼顾速度与不触发高德限流
-  const batches = [SPOT_CATS.slice(0, 5), SPOT_CATS.slice(5, 10)]
+  // 分批并行（每批 5 个关键词），兼顾速度与不触发高德限流
+  const batches = []
+  for (let i = 0; i < cats.length; i += 5) batches.push(cats.slice(i, i + 5))
   for (const batch of batches) {
     if (out.length >= needed) break
     const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee)))
