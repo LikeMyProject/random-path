@@ -224,6 +224,7 @@ function togglePersona(key) {
   else personas.value.push(key)
 }
 function personaGroup(group) { return PERSONA_OPTIONS.filter(p => p.group === group) }
+function personaLabel(key) { return PERSONA_OPTIONS.find(o => o.key === key)?.label || key }
 function matchCls(pct) { return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low' }
 function kindCls(k) {
   return { 民宿: 'bnb', 客栈: 'inn', 青旅: 'hostel', 公寓: 'apt', 酒店: 'hotel', 旅馆: 'innn', 住宿: 'stay' }[k] || 'stay'
@@ -480,8 +481,14 @@ async function doShareGuide() {
           </select>
         </div>
         <button class="btn btn-sm btn-hotel-search" :disabled="hotelState[cp.name]?.loading" @click="doSearchHotel(cp)">
-          {{ hotelState[cp.name]?.loading ? '搜索中…' : '🔍 搜索酒店' }}
+          {{ hotelState[cp.name]?.loading ? '搜索中…' : '🔍 搜索住宿' }}
         </button>
+
+        <div v-if="personas.length && hotelState[cp.name]?.searched" class="hotel-prefs">
+          <span class="pref-label">你的偏好：</span>
+          <span v-for="k in personas" :key="k" class="pref-chip">{{ personaLabel(k) }}</span>
+          <span class="pref-note">（列表均为 100% 匹配，每条标注命中原因）</span>
+        </div>
 
         <div v-if="hotelState[cp.name]?.loading" class="hotel-loading">
           <span class="spin">⏳</span> {{ hotelState[cp.name]?.progress }}
@@ -740,6 +747,10 @@ async function doShareGuide() {
 .hotel-custom .inp { flex: 1; }
 .hotel-attraction-sel { margin-top: 8px; }
 .btn-hotel-search { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; width: 100%; box-shadow: 0 3px 10px rgba(99,102,241,.25); }
+.hotel-prefs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; }
+.hotel-prefs .pref-label { color: #7c6fd8; font-weight: 700; }
+.hotel-prefs .pref-chip { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 999px; padding: 2px 8px; font-weight: 700; }
+.hotel-prefs .pref-note { color: #a898b8; }
 .hotel-loading { text-align: center; color: #7c6fd8; font-size: 12px; padding: 16px 0; }
 .hotel-loading .spin { display: inline-block; animation: hspin 1s linear infinite; }
 .hotel-results { margin-top: 8px; }

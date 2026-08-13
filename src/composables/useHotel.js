@@ -205,11 +205,18 @@ export async function searchHotelsForCity(attractions, { min, max, personas = []
 }
 
 // ===== 环境数据采集（按需，每景点一次）=====
+// 同时存 POI 列表（用于给匹配标签补充"具体是哪个"的细节）
 async function collectEnv(lng, lat, need) {
-  const env = { foodCount: 0, metroCount: 0, malls: [] }
+  const env = { foodCount: 0, foodList: [], metroCount: 0, metroList: [], malls: [] }
   const tasks = []
-  if (need.food) tasks.push(searchPOIs(lng, lat, '050000', 800, 8).then(list => { env.foodCount = list.length }).catch(() => {}))
-  if (need.metro) tasks.push(searchPOIs(lng, lat, '150500', 1200, 5).then(list => { env.metroCount = list.length }).catch(() => {}))
+  if (need.food) tasks.push(searchPOIs(lng, lat, '050000', 900, 10).then(list => {
+    env.foodCount = list.length
+    env.foodList = list.map(p => ({ name: p.name, coord: { lng: p.lng, lat: p.lat } }))
+  }).catch(() => {}))
+  if (need.metro) tasks.push(searchPOIs(lng, lat, '150500', 1400, 6).then(list => {
+    env.metroCount = list.length
+    env.metroList = list.map(p => ({ name: p.name, coord: { lng: p.lng, lat: p.lat } }))
+  }).catch(() => {}))
   if (need.mall) tasks.push(searchPOIs(lng, lat, '060100', 2000, 6).then(list => {
     env.malls = list
       .filter(p => !/食品|超市|便利店|商店|药店|杂货/.test(p.name))
@@ -242,6 +249,17 @@ function isLivelyEnv(env) {
   return (env?.foodCount ?? 0) >= 4 || (env?.malls?.length ?? 0) > 0
 }
 
+// 取某坐标最近的 POI（返回 { name, km }）
+function nearestOf(coord, list) {
+  if (!coord || !list?.length) return null
+  let best = null, bd = Infinity
+  for (const m of list) {
+    const d = haversineKm(coord, m.coord)
+    if (d < bd) { bd = d; best = m }
+  }
+  return best ? { name: best.name, km: bd } : null
+}
+
 /**
  * 推荐度评分：参数匹配率为主，评分为辅
  * @returns { score, pct, tags }
@@ -252,22 +270,42 @@ export function matchScore(h, personas, env) {
   const d = h.distance ?? Infinity
   const name = h.name || '', addr = h.address || ''
   const lively = isLivelyEnv(env)
+  const nearFood = nearestOf(h.coord, env?.foodList)
+  const nearMetro = nearestOf(h.coord, env?.metroList)
+  const nearMall = nearestMall(h)
+  const foodM = nearFood ? Math.round(nearFood.km * 1000) : null
+  const metroM = nearMetro ? Math.round(nearMetro.km * 1000) : null
   let hits = 0
   const tags = []
 
   // 出行
-  if (p.has('walk') && d <= 1000) { hits++; tags.push('步行友好') }
-  if (p.has('bike') && d <= 3000) { hits++; tags.push('骑行可达') }
+  if (p.has('walk') && d <= 1000) { hits++; tags.push(`步行友好·${formatDist(h)}到景点`) }
+  if (p.has('bike') && d <= 3000) { hits++; tags.push(`骑行可达·${formatDist(h)}`) }
   if (p.has('car') && /停车|车位/.test(name + addr)) { hits++; tags.push('可停车') }
-  if (p.has('metro') && ((env?.metroCount ?? 0) > 0 || /地铁/.test(addr))) { hits++; tags.push('近地铁') }
+  if (p.has('metro') && ((env?.metroCount ?? 0) > 0 || /地铁/.test(addr))) {
+    hits++; tags.push(nearMetro ? `近地铁·${nearMetro.name} ${metroM}m` : '近地铁')
+  }
   // 氛围
-  if (p.has('quiet') && !lively) { hits++; tags.push('安静区域') }
-  if (p.has('lively') && lively) { hits++; tags.push('热闹地段') }
+  if (p.has('quiet') && !lively) { hits++; tags.push('安静区域·周边餐饮少') }
+  if (p.has('lively') && lively) {
+    hits++
+    if (nearMall) tags.push(`热闹地段·近${nearMall.name} ${Math.round(nearMall.km * 1000)}m`)
+    else if ((env?.foodCount ?? 0) >= 4) tags.push(`热闹地段·周边餐饮${env.foodCount}家`)
+    else tags.push('热闹地段')
+  }
   // 场景
   if (p.has('family') && /亲子|家庭|度假|公寓|套房/.test(name)) { hits++; tags.push('亲子友好') }
-  if (p.has('food') && (env?.foodCount ?? 0) >= 4) { hits++; tags.push('美食聚集') }
+  if (p.has('food')) {
+    if ((env?.foodCount ?? 0) >= 4) {
+      hits++
+      tags.push(nearFood ? `近美食街·${nearFood.name} ${foodM}m` : `美食聚集·周边${env.foodCount}家`)
+    }
+  }
   if (p.has('parking') && /停车|车位/.test(name + addr)) { hits++; tags.push('免费停车') }
-  if (p.has('view') && /江景|海景|湖景|山景|观景|高空|天际|全景/.test(name)) { hits++; tags.push('景观房') }
+  if (p.has('view')) {
+    const vk = (name.match(/江景|海景|湖景|山景|观景|高空|天际|全景/) || [])[0]
+    if (vk) { hits++; tags.push(`景观房·${vk}`) }
+  }
 
   const pct = Math.round(hits / p.size * 100)
   const score = pct * 10 + (h.rating ?? 0) * 5 + (d <= 1500 ? 3 : 0)
