@@ -321,22 +321,27 @@ export function estimateBudget(cityNames, perCityDays, transports) {
 // ============================================================
 // 6. 高德 POI 补充景点
 // ============================================================
-export async function supplementAttractions(cityName) {
+export async function supplementAttractions(cityName, existing = null) {
   const c = getCity(cityName)
   if (!c) return []
   try {
     const pois = await searchPOIsByText(cityName + ' 旅游景点', '', 10)
     if (!pois || pois.length === 0) return []
-    // 内置景点（有坐标）用于坐标去重：高德常返回「崂山风景区/栈桥景区」等同地异名 POI
-    const builtinPts = c.attractions.filter(a => a.coord).map(a => a.coord)
+    // 与「当前已有景点（内置 + 已补充）」去重：同地异名(<2km)或同名视为同一景点，
+    // 避免同一景点被排到不同天。existing 由调用方传入（generate 循环第 2 轮会带上一轮已补充的列表）。
+    const base = (existing && existing.length) ? existing : c.attractions
+    const refPts = base.filter(a => a.coord).map(a => a.coord)
+    const refNames = new Set(base.map(a => a.name))
     const added = []
     for (const p of pois) {
       if (!p.lng || !p.lat) continue
       const coord = { lng: p.lng, lat: p.lat }
-      // 与已有景点 < 2km 视为同一地点（同地异名），跳过，避免同一景点被排到不同天
-      const nearBuiltin = builtinPts.some(b => haversineKm(coord, b) < 2)
+      const nearRef = refPts.some(b => haversineKm(coord, b) < 2)
+      const sameName = refNames.has(p.name)
       const nearAdded = added.some(a => haversineKm(coord, a.coord) < 2)
-      if (nearBuiltin || nearAdded) continue
+      if (nearRef || sameName || nearAdded) continue
+      refPts.push(coord)        // 本轮内也要纳入去重
+      refNames.add(p.name)
       added.push({
         name: p.name, coord, ticket: '—',
         duration: '2-3h', mustSee: 2, type: 'urban',
@@ -446,7 +451,9 @@ function pickMealRestaurant(pool, dayAttrCoords, used, maxKm = RESTAURANT_MAX_KM
   const inWin = scored.filter(s => s.md <= maxKm)
   const cand = inWin.length ? inWin : scored
   cand.sort((a, b) => a.md - b.md)
-  return cand[0].r
+  const chosen = cand[0].r
+  used.add(chosen.name + '|' + chosen.address) // 标记已用：避免早/午/晚或跨天重复同一家店
+  return chosen
 }
 
 // 餐厅按「当天景点」就近分配：吃的店跟着逛的路线走，不顺路就换更近的

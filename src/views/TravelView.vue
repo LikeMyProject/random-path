@@ -186,7 +186,7 @@ async function generate() {
           let miss = need - cp.data.attractions.length
           let round = 0
           while (miss > 0 && round < 2) {
-            const added = await supplementAttractions(cp.name)
+            const added = await supplementAttractions(cp.name, cp.data.attractions)
             if (added.length === 0) break
             cp.data.attractions.push(...added)
             miss = need - cp.data.attractions.length
@@ -229,7 +229,7 @@ async function doSupplement(cityName) {
   if (suppLoading.value) return
   suppLoading.value = cityName
   try {
-    const added = await supplementAttractions(cityName)
+    const added = await supplementAttractions(cityName, cp.data.attractions)
     if (added.length === 0) { toast('未找到更多景点，或已收录', 'warn'); return }
     const cp = plan.value?.cityPlans.find(c => c.name === cityName)
     if (cp) {
