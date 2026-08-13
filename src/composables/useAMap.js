@@ -268,14 +268,22 @@ export const SPOT_CATS = [
   { kw: '地标', label: '地标', type: 'culture', mustSee: 3 },
   { kw: '景点', label: '景区', type: 'culture', mustSee: 3 },
   { kw: '公园', label: '公园', type: 'nature', mustSee: 2 },
+  { kw: '湿地公园', label: '湿地公园', type: 'nature', mustSee: 3 },
+  { kw: '遗址公园', label: '遗址公园', type: 'culture', mustSee: 3 },
+  { kw: '湖', label: '湖泊', type: 'nature', mustSee: 3 },
+  { kw: '世博园', label: '园林', type: 'nature', mustSee: 3 },
+  { kw: '森林公园', label: '森林公园', type: 'nature', mustSee: 2 },
+  { kw: '生态公园', label: '生态公园', type: 'nature', mustSee: 2 },
   { kw: '观景台', label: '观景', type: 'nature', mustSee: 2 },
+  { kw: '夜市', label: '夜市', type: 'urban', mustSee: 2 },
   { kw: '主题乐园', label: '主题乐园', type: 'family', mustSee: 3 },
 ]
 
-// 扩展关键词池：用于「手动点击补充更多景点」，与主类不同，能搜到夜市/古镇/博物馆/老街等
-// 不同类别的真实地点，避免和生成时自动补充的主类重复（否则去重后永远加不进新东西）
+// 扩展关键词池：用于「手动点击补充更多景点」，与主类不同，能搜到古镇/博物馆/老街等
+// 不同类别的真实地点，避免和生成时自动补充的主类重复（否则去重后永远加不进新东西）。
+// 注意：不放「夜市」——夜市本质是吃的地方（酒吧/鸡尾酒馆常混入且名字不含"酒吧"二字躲过过滤），
+// 逛吃信息在「点景点看附近美食」弹窗里本就有，放景点清单会污染"逛的景点"。
 export const SPOT_EXT = [
-  { kw: '夜市', label: '夜市', type: 'urban', mustSee: 2 },
   { kw: '古镇', label: '古镇', type: 'culture', mustSee: 3 },
   { kw: '博物馆', label: '博物馆', type: 'culture', mustSee: 3 },
   { kw: '美术馆', label: '美术馆', type: 'culture', mustSee: 2 },
@@ -304,7 +312,7 @@ export const SPOT_CLASSIC = [
   { kw: '温泉', label: '温泉', type: 'nature', mustSee: 2, cityLimit: false },
 ]
 
-const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$|健身|训练馆|健身房|游泳馆|瑜伽|球馆|台球|网吧|KTV|酒吧|洗浴|按摩|美甲|美容|理发|洗车|烤肉|火锅|餐厅|饭店|餐饮|小吃|咖啡|奶茶|烘焙|烧烤|串串|面馆|饭馆|超市|便利店|药店|银行|营业厅|医院|学院|工厂|工业园|产业园|4S店|俱乐部|雪具店|体验店|专卖店|旗舰店/
+const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$|健身|训练馆|健身房|游泳馆|瑜伽|球馆|台球|网吧|KTV|酒吧|洗浴|按摩|美甲|美容|理发|洗车|烤肉|火锅|餐厅|饭店|餐饮|小吃|咖啡|奶茶|烘焙|烧烤|串串|面馆|饭馆|超市|便利店|药店|银行|营业厅|医院|学院|工厂|工业园|产业园|4S店|俱乐部|雪具店|体验店|专卖店|旗舰店|鸡尾酒|夜店|酒馆|餐吧|精酿|livehouse|微醺|小酒馆/
 
 async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true) {
   try {
