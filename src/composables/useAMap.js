@@ -289,14 +289,28 @@ export const SPOT_EXT = [
   { kw: '剧场', label: '剧场', type: 'family', mustSee: 1 },
 ]
 
-const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$/
+// 经典必看池：动物园/植物园/主题乐园/海洋馆等「城市名片级」景点。
+// 这些往往位于郊区甚至邻市行政边界外（如西安乐华城在泾阳、秦岭野生动物园在长安远郊），
+// 必须用 cityLimit=false 的「按城市名区域偏置」宽松检索才能抓到，避免被 city_limit 截断。
+// 同时按经典度优先排在 SPOT_CATS 之前，保证自动补充时优先进清单。
+export const SPOT_CLASSIC = [
+  { kw: '野生动物园', label: '动物园', type: 'family', mustSee: 4, cityLimit: false },
+  { kw: '植物园', label: '植物园', type: 'nature', mustSee: 3, cityLimit: false },
+  { kw: '海洋馆', label: '海洋馆', type: 'family', mustSee: 3, cityLimit: false },
+  { kw: '欢乐世界', label: '主题乐园', type: 'family', mustSee: 4, cityLimit: false },
+  { kw: '滑雪场', label: '滑雪', type: 'nature', mustSee: 2, cityLimit: false },
+  { kw: '影视城', label: '影视城', type: 'culture', mustSee: 3, cityLimit: false },
+  { kw: '温泉', label: '温泉', type: 'nature', mustSee: 2, cityLimit: false },
+]
 
-async function fetchSpotsByKw(kw, cityName, label, type, mustSee) {
+const SPOT_NOISE_RE = /收费站|服务区|停车场|公交站|地铁站$|配送点|快递|物流|驾校|汽修|菜市场|农贸市场|商业广场$|购物广场$|小区$|大厦$|酒店$|宾馆$|公寓$|售票处|游客中心|服务中心|咨询处|内广场|步行游览区|入口$|东门$|西门$|南门$|北门$|正门$/
+
+async function fetchSpotsByKw(kw, cityName, label, type, mustSee, cityLimit = true) {
   try {
     const url = `https://restapi.amap.com/v5/place/text?key=${AMAP_KEY}` +
       `&keywords=${encodeURIComponent(kw)}` +
       `&region=${encodeURIComponent(cityName)}` +
-      `&city_limit=true` +
+      (cityLimit ? `&city_limit=true` : ``) +
       `&offset=25` +
       `&show_fields=tag,address`
     const d = await fetchJSON(url)
@@ -316,7 +330,7 @@ async function fetchSpotsByKw(kw, cityName, label, type, mustSee) {
   } catch (e) { return [] }
 }
 
-export async function searchSpotsForCity(cityName, cityCoord, needed = 18, cats = SPOT_CATS) {
+export async function searchSpotsForCity(cityName, cityCoord, needed = 30, cats = [...SPOT_CLASSIC, ...SPOT_CATS]) {
   const out = []
   const seen = new Set()
   // 分批并行（每批 5 个关键词），兼顾速度与不触发高德限流
@@ -324,7 +338,7 @@ export async function searchSpotsForCity(cityName, cityCoord, needed = 18, cats 
   for (let i = 0; i < cats.length; i += 5) batches.push(cats.slice(i, i + 5))
   for (const batch of batches) {
     if (out.length >= needed) break
-    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee)))
+    const res = await Promise.all(batch.map(c => fetchSpotsByKw(c.kw, cityName, c.label, c.type, c.mustSee, c.cityLimit)))
     for (const list of res) {
       for (const it of list) {
         if (out.length >= needed) break
