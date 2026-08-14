@@ -596,7 +596,7 @@ function routeCacheKey(o, d) {
 export async function fetchBicyclingPaths(origin, destination) {
   const key = routeCacheKey(origin, destination)
   if (routeCache.has(key)) return routeCache.get(key)
-  const url = `https://restapi.amap.com/v5/direction/bicycling?origin=${origin.lng},${origin.lat}&destination=${destination.lng},${destination.lat}&key=${AMAP_KEY}&show_fields=polyline`
+  const url = `https://restapi.amap.com/v5/direction/bicycling?origin=${origin.lng},${origin.lat}&destination=${destination.lng},${destination.lat}&key=${AMAP_KEY}&show_fields=polyline&alternative=1`
   const d = await fetchJSON(url)
   if (d.status !== '1') throw Error(d.info || 'API error')
   const paths = d.route?.paths || []

@@ -476,6 +476,23 @@ export function openNavigation(home, work, waypoints) {
   window.open(buildNavUrl(home, work, waypoints), '_top')
 }
 
+// === 最优骑行路线：在高德返回的多条候选里，先剔除不适合骑行的路段（高速/高架/隧道/快速路），
+// 再选距离最短的一条 —— 满足「最优 / 最短 / 不随机 / 路况合理」 ===
+const BAD_ROAD_RE = /高速|高架|隧道|快速路|城市快速|匝道|立交桥/
+export async function fetchOptimalBikeRoute(o, d) {
+  const paths = await fetchBicyclingPaths(o, d)
+  if (!paths || paths.length === 0) return null
+  // 1) 过滤明显不适合骑行的路线（按步骤指引文本判断）
+  const reasonable = paths.filter(p => !(p.steps || []).some(s => BAD_ROAD_RE.test(s.instruction || '')))
+  const pool = reasonable.length ? reasonable : paths
+  // 2) 在剩下的路线里选最短距离（最短 = 最优）
+  let best = pool[0]
+  for (const p of pool) {
+    if ((p.distance || Infinity) < (best.distance || Infinity)) best = p
+  }
+  return best
+}
+
 export function buildGPX(route, home, work) {
   let trkpts = ''
   for (const seg of (route.segments || [])) {
