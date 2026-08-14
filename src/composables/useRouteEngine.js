@@ -114,15 +114,17 @@ export function generateLoopWaypoints(c, tk, lastDist, minD, maxD) {
 export function generateCompassLoop(start, targetDist, bearingDeg) {
   const dir = bearingDeg != null ? bearingDeg : Math.random() * 360
   const n = 3 + Math.floor(Math.random() * 4) // 3-6 个途经点
-  const farDist = targetDist * 0.38 // 最远点距起点
+  // 环周长≈5.3×最远半径，故半径取目标里程的 ~0.17 才能让实际总里程接近目标（实测比 0.63~1.4）
+  const farDist = targetDist * 0.17 // 最远点距起点
   const wps = []
-  // 往选定方向偏置，形成弧线环
+  const span = 250 // 弧线总跨度(度)
   for (let i = 0; i < n; i++) {
     const progress = (i + 1) / (n + 1)
-    // 角度从 dir-130° 弧线到 dir+130°，加随机抖动
-    const angle = (dir - 130 + (260 * progress) + (Math.random() - 0.5) * 35 + 360) % 360
-    const d = farDist * (0.55 + Math.random() * 0.9) * (1 - Math.abs(progress - 0.5) * 0.7)
-    wps.push(destinationPoint(start, Math.max(800, d), angle))
+    // 角度从 dir-span/2 弧线到 dir+span/2，加随机抖动
+    const angle = (dir - span / 2 + span * progress + (Math.random() - 0.5) * 30 + 360) % 360
+    // 半径更均匀，避免端点内收导致路线切回中心造成折返
+    const d = farDist * (0.9 + Math.random() * 0.15)
+    wps.push(destinationPoint(start, Math.max(700, d), angle))
   }
   wps.sort((a, b) => getBearing(start, a) - getBearing(start, b))
   return { waypoints: wps, sector: -1 }
@@ -141,85 +143,133 @@ export async function generateMultipleRoutes(home, work, opts, count = 3) {
   return results.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value)
 }
 
-function detourRatio(seg) {
-  const straight = haversine(seg.from, seg.to)
-  if (straight < 50) return 1
-  return seg.distance / straight
-}
-function polylineOverlap(segA, segB, thresholdMeters = 300) {
+// 折返检测（关键）：相邻两段必然在途经点处汇合，不能直接判“尾部碰头部”为折返。
+// 真正的问题是：离开途经点之后，路线又回到上一段、且回到的位置距该点超过 minBacktrack —— 即“冲过去再原路折返”。
+function polylineOverlap(segA, segB, minBacktrack = 350) {
   if (!segA.polyline || !segB.polyline) return false
   const ptsA = parsePolyline(segA.polyline), ptsB = parsePolyline(segB.polyline)
-  if (ptsA.length < 3 || ptsB.length < 3) return false
-  const tailA = ptsA.slice(-5), headB = ptsB.slice(0, 5)
-  let overlap = 0
-  for (const pa of tailA) { for (const pb of headB) { if (haversine(pa, pb) < thresholdMeters) { overlap++; break } } }
-  return overlap >= 3
+  if (ptsA.length < 4 || ptsB.length < 4) return false
+  const cumA = [0]; for (let i = 1; i < ptsA.length; i++) cumA.push(cumA[i - 1] + haversine(ptsA[i - 1], ptsA[i]))
+  const cumB = [0]; for (let i = 1; i < ptsB.length; i++) cumB.push(cumB[i - 1] + haversine(ptsB[i - 1], ptsB[i]))
+  const endA = cumA[cumA.length - 1]
+  // segB 离开公共端点(=A 末端)超过 150m 后，是否又接近 A 上“距末端>minBacktrack”的点
+  for (let j = 0; j < ptsB.length; j++) {
+    if (cumB[j] < 150) continue
+    for (let i = 0; i < ptsA.length; i++) {
+      if (endA - cumA[i] < minBacktrack) continue
+      if (haversine(ptsB[j], ptsA[i]) < 120) return true
+    }
+  }
+  return false
 }
 function checkBacktrack(segments) {
-  for (let i = 0; i < segments.length; i++) {
-    const ratio = detourRatio(segments[i])
-    if (ratio > 2.0) return { bad: true, reason: `第${i+1}段绕路比${ratio.toFixed(1)}` }
-  }
   for (let i = 0; i < segments.length - 1; i++) {
-    if (polylineOverlap(segments[i], segments[i+1], 200)) return { bad: true, reason: `第${i+1}→${i+2}段折返重叠` }
+    const overlap = polylineOverlap(segments[i], segments[i + 1])
+    if (overlap) return { bad: true, reason: `第${i + 1}→${i + 2}段折返重叠` }
+    const bt = maxBacktrackMeters(segments[i], segments[i + 1])
+    if (bt >= 350) return { bad: true, reason: `第${i + 1}→${i + 2}段原路折返${bt}m` }
   }
   return { bad: false, reason: '' }
+}
+function maxBacktrackMeters(segA, segB) {
+  const ptsA = parsePolyline(segA.polyline), ptsB = parsePolyline(segB.polyline)
+  if (ptsA.length < 4 || ptsB.length < 4) return 0
+  const cumA = [0]; for (let i = 1; i < ptsA.length; i++) cumA.push(cumA[i - 1] + haversine(ptsA[i - 1], ptsA[i]))
+  const cumB = [0]; for (let i = 1; i < ptsB.length; i++) cumB.push(cumB[i - 1] + haversine(ptsB[i - 1], ptsB[i]))
+  const endA = cumA[cumA.length - 1]
+  let maxB = 0
+  for (let j = 0; j < ptsB.length; j++) {
+    if (cumB[j] < 150) continue
+    for (let i = 0; i < ptsA.length; i++) {
+      const distBack = endA - cumA[i]
+      if (distBack < 0) continue
+      if (haversine(ptsB[j], ptsA[i]) < 120) { if (distBack > maxB) maxB = distBack; break }
+    }
+  }
+  return Math.round(maxB)
 }
 function findDeadEndWaypoints(segments) {
   const dead = []
   for (let i = 0; i < segments.length - 1; i++) {
-    const segIn = segments[i], segOut = segments[i+1]
-    const ratioIn = detourRatio(segIn), ratioOut = detourRatio(segOut)
-    const overlap = polylineOverlap(segIn, segOut, 200)
-    // 降低死胡同判定阈值：绕路比>1.6 或折返重叠即判定
-    if (ratioIn > 1.6 || ratioOut > 1.6 || overlap) dead.push({ waypointIndex: i })
+    const segIn = segments[i], segOut = segments[i + 1]
+    const overlap = polylineOverlap(segIn, segOut)
+    const bt = maxBacktrackMeters(segIn, segOut)
+    // 只判定真正的「原路折返」：几何重叠 / 回溯距离 >=350m。
+    // 不再依赖 detourRatio（弯曲主路天然 >1.5，会误杀正常途经点）。
+    if (overlap || bt >= 350) dead.push({ waypointIndex: i })
   }
   dead.sort((a, b) => b.waypointIndex - a.waypointIndex)
   return dead
 }
-function snapWaypointToMainRoad(segIn, segOut) {
-  if (!segIn?.polyline || !segOut?.polyline) return null
-  const ptsIn = parsePolyline(segIn.polyline), ptsOut = parsePolyline(segOut.polyline)
-  if (ptsIn.length < 5 || ptsOut.length < 5) { if (ptsIn.length >= 3) return ptsIn[Math.floor(ptsIn.length * 0.45)]; return null }
-  let di = 0
-  for (let i = ptsIn.length - 1; i >= 0; i--) {
-    let near = false
-    for (let j = 0; j < Math.min(ptsOut.length, 20); j++) { if (haversine(ptsIn[i], ptsOut[j]) < 50) { near = true; break } }
-    if (!near) { di = i; break }
+// 把引发「原路折返」的途经点吸回主路：取上一段起点 -> 下一段终点的最短骑行路线，
+// 把途经点吸附到该主路线中离原途经点最近的点。由于该点就落在 A->B 主路线上，
+// A->P->B 天然连续（前缀+后缀），不会专门跑过去再原路折返。
+async function snapWaypointToMainRoad(A, B, W) {
+  let mainSeg
+  try { mainSeg = await fetchBicyclingRoute(A, B) } catch (e) { return null }
+  const pts = parsePolyline(mainSeg.polyline)
+  if (pts.length < 2) return null
+  let best = null, bestD = Infinity
+  for (const p of pts) {
+    const d = haversine(p, W)
+    if (d < bestD) { bestD = d; best = p }
   }
-  const safeIdx = Math.max(0, di - Math.floor(ptsIn.length * 0.05))
-  return { lng: ptsIn[safeIdx].lng, lat: ptsIn[safeIdx].lat }
+  return best || null
 }
-
-function validateCoord(lng, lat) { return lng !== '' && lng != null && !isNaN(parseFloat(lng)) && lat !== '' && lat != null && !isNaN(parseFloat(lat)) && Math.abs(parseFloat(lat)) <= 90 && Math.abs(parseFloat(lng)) <= 180 }
-
+// 修复折返的核心策略：把导致「冲过去再原路折返」的途经点吸附回主路（路边点），
+// 而非删掉它。途经点因此变成「路线中路边的一个点」，彻底消除 out-and-back。
 async function tryFixDeadEnds(segments, waypoints, td, tt, home, work, maxDist, onTry, attempt, sector) {
-  const MAX_FIX = 3; let fs = [...segments], fw = [...waypoints], fd = td, ft = tt, fa = false
+  const MAX_FIX = 6
+  let fw = [...waypoints]
+  let fs = [...segments]
   for (let pass = 0; pass <= MAX_FIX; pass++) {
     const dead = findDeadEndWaypoints(fs)
-    if (dead.length === 0) { onTry?.(attempt + 1, fd, fa ? '已修复折返' : null); return { accepted: true, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } } }
-    if (pass === MAX_FIX) break
-    let fixed = 0
-    const affectedSegIndices = new Set()
-    for (const d of dead) {
-      const wi = d.waypointIndex; if (wi >= fw.length) continue
-      const snapped = snapWaypointToMainRoad(fs[wi], fs[wi+1])
-      if (snapped && validateCoord(snapped.lng, snapped.lat)) { fw[wi] = snapped; fixed++; affectedSegIndices.add(wi); affectedSegIndices.add(wi + 1) }
+    if (dead.length === 0) {
+      const fd = fs.reduce((s, x) => s + x.distance, 0)
+      const ft = fs.reduce((s, x) => s + x.duration, 0)
+      return { accepted: true, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
     }
-    if (fixed === 0) break
-    fa = true; onTry?.(attempt + 1, fd, `修正${fixed}个死胡同途经点…`)
+    const wi = dead[0].waypointIndex // findDeadEndWaypoints 已按降序，先处理最高序号
+    const A = wi === 0 ? home : fw[wi - 1]
+    const B = wi === fw.length - 1 ? work : fw[wi + 1]
+    const W = fw[wi]
+    const P = await snapWaypointToMainRoad(A, B, W)
+    if (!P) {
+      fw.splice(wi, 1) // 吸附失败降级为移除该途经点
+      onTry?.(attempt + 1, td, `途经点${wi} 吸附失败,降级移除`)
+    } else {
+      fw[wi] = P
+      onTry?.(attempt + 1, td, `途经点${wi} 吸附到主路`)
+    }
     const np = [home, ...fw, work]
     try {
-      // 只重查受影响的段，其他段保持不变
-      const sp = []; const indices = []
-      for (const i of affectedSegIndices) { sp.push(fetchBicyclingRoute(np[i], np[i+1])); indices.push(i) }
+      const sp = []
+      for (let i = 0; i < np.length - 1; i++) sp.push(fetchBicyclingRoute(np[i], np[i + 1]))
       const sr = await Promise.all(sp)
-      for (let j = 0; j < indices.length; j++) { const i = indices[j]; fs[i] = { ...sr[j], from: np[i], to: np[i+1], idx: i } }
-      fd = fs.reduce((s, seg) => s + seg.distance, 0); ft = fs.reduce((s, seg) => s + seg.duration, 0)
-    } catch(e) { onTry?.(attempt + 1, null, `修复重查失败: ${e.message}`); return null }
-    if (fd > maxDist) { onTry?.(attempt+1, fd, '修复后超范围'); return { accepted: false, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } } }
+      fs = sr.map((s, i) => ({ ...s, from: np[i], to: np[i + 1], idx: i }))
+      const fd = fs.reduce((s, x) => s + x.distance, 0)
+      if (fd > maxDist) {
+        const ft = fs.reduce((s, x) => s + x.duration, 0)
+        onTry?.(attempt + 1, fd, '吸附后超范围')
+        return { accepted: false, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
+      }
+      // 塌陷保护：吸附后总里程若跌破初始里程的一半，说明途经点被吸进了邻居弦线、环线坍缩。
+      // 拒绝该结果，让 tryGenerateRoute 用新随机种子重新生成，而不是发出一条过短的伪环线。
+      if (fd < td * 0.5) {
+        const ft = fs.reduce((s, x) => s + x.duration, 0)
+        onTry?.(attempt + 1, fd, '吸附后环线坍缩,拒绝')
+        return { accepted: false, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
+      }
+    } catch (e) {
+      const fd = fs.reduce((s, x) => s + x.distance, 0)
+      const ft = fs.reduce((s, x) => s + x.duration, 0)
+      onTry?.(attempt + 1, null, `重算失败: ${e.message}`)
+      return { accepted: false, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
+    }
   }
-  return { accepted: false, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
+  const fd = fs.reduce((s, x) => s + x.distance, 0)
+  const ft = fs.reduce((s, x) => s + x.duration, 0)
+  return { accepted: findDeadEndWaypoints(fs).length === 0, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
 }
 
 export async function queryElevations(points) {
