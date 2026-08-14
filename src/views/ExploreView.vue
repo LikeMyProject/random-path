@@ -15,7 +15,7 @@ const addresses = loadAddresses()
 const { suggestions, showSuggest, searchAddress, pickSuggestion, closeSuggest } = useSuggest()
 
 // === 场景模式 ===
-const scene = ref('random')
+const scene = ref('destination')
 const showAdvanced = ref(false)
 
 // === 骑到某处模式 ===
@@ -56,49 +56,32 @@ const direction = ref('random')
 const customDist = ref(null) // null = 用场景默认
 
 const DIST_RANGES = {
-  casual: { min: 10, max: 1000, default: 12 },
-  training: { min: 10, max: 1000, default: 30 },
-  random: { min: 10, max: 1000, default: 25 },
+  loop: { min: 5, max: 200, default: 20 },
 }
 
-// === 随便骑：真随机参数 ===
-const randomDist = ref(null)
-const randomDirKey = ref(null)
-const randomDirLabel = ref('🎲 随机')
-function rollRandom() {
-  randomDist.value = 10 + Math.floor(Math.random() * 991) // 10-1000km
-  const dirs = COMPASS.filter(c => c.key !== 'random')
-  const d = dirs[Math.floor(Math.random() * dirs.length)]
-  randomDirKey.value = d.key
-  randomDirLabel.value = d.label
-}
+// === 指定目的地：路线策略（最优 / 随机）===
+const routeStrategy = ref('optimal')  // 'optimal' | 'random'
 
 const distRange = computed(() => DIST_RANGES[scene.value] || null)
 
 watch(scene, (s) => {
-  if (s === 'random') { direction.value = 'random'; rollRandom() }
-  else if (s === 'casual') { direction.value = 'random' }
-  else if (s === 'training') { direction.value = 'random' }
-  else if (s === 'destination') {
+  if (s === 'destination') {
     destName.value = ''
     destCoord.value = null
     destEstimate.value = null
-  }
-  // 切换场景时重置自定义距离为该场景默认值（随便骑不用滑块）
-  if (s !== 'destination' && s !== 'random' && DIST_RANGES[s]) {
-    customDist.value = DIST_RANGES[s].default
+  } else if (s === 'loop') {
+    // 指定距离环线：距离用滑块默认值，方向随机
+    direction.value = 'random'
+    if (!customDist.value) customDist.value = DIST_RANGES[s]?.default || 20
   }
 })
 
 // 目标距离
 const targetDist = computed(() => {
   if (scene.value === 'destination') return 20000
-  if (scene.value === 'random') {
-    return (randomDist.value || 25) * 1000
-  }
+  // 指定距离环线：用滑块值，未设则用默认
   if (customDist.value) return customDist.value * 1000
-  const defaults = { casual: 12000, training: 30000 }
-  return defaults[scene.value] || 20000
+  return (DIST_RANGES.loop?.default || 20) * 1000
 })
 
 const estimatedTime = computed(() => {
@@ -131,9 +114,8 @@ onMounted(async () => {
   }
   if (addresses['公司']) to.value = { name: addresses['公司'].name, lng: addresses['公司'].lng, lat: addresses['公司'].lat }
 
-  // 初始化距离滑块默认值
+  // 初始化距离滑块默认值（环线场景用）
   customDist.value = DIST_RANGES[scene.value]?.default || null
-  if (scene.value === 'random') rollRandom()
 
   const last = loadLastRoute()
   if (last && (last.type === 'commute' || last.type === 'loop') && last.home) {
@@ -287,7 +269,7 @@ async function doGenerate(isRetry = false) {
   if (!isRetry) { resultShow.value = false; multiResults.value = [] }
   loading.value = true; progress.value = 0; loadingHint.value = '正在规划路线…'; tryInfo.value = ''
   const td = targetDist.value
-  const effDir = scene.value === 'random' ? randomDirKey.value : direction.value
+  const effDir = direction.value
   const dirDeg = COMPASS.find(c => c.key === effDir)?.deg ?? null
   const onTry = (a, d, e) => {
     progress.value = Math.round((a / MAX_RETRIES) * 100)
@@ -317,7 +299,7 @@ async function doGenerateMultiple() {
   const w = hasDest.value ? { name: to.value.name, lng: parseFloat(to.value.lng), lat: parseFloat(to.value.lat) } : h
   const isLoop = h.lng === w.lng && h.lat === w.lat
   const td = targetDist.value
-  const effDir = scene.value === 'random' ? randomDirKey.value : direction.value
+  const effDir = direction.value
   const dirDeg = COMPASS.find(c => c.key === effDir)?.deg ?? null
   loading.value = true; loadingHint.value = '正在同时生成 3 条路线…'
   try {
@@ -340,36 +322,56 @@ async function doGenerateDestination() {
   const d = destCoord.value
 
   resultShow.value = false; multiResults.value = []
-  loading.value = true; progress.value = 0; loadingHint.value = '正在规划最优路线…'; tryInfo.value = ''
+  loading.value = true; progress.value = 0; loadingHint.value = '正在规划路线…'; tryInfo.value = ''
 
   const isRound = tripType.value === 'round'
+  const isOptimal = routeStrategy.value === 'optimal'
   try {
-    // 去程：高德最优（最短、避开高速/高架/隧道）路线
-    const out = await fetchOptimalBikeRoute(h, d)
-    if (!out) { toast('规划失败，请重试', 'err'); loading.value = false; return }
+    // 去程：最优=高德最短路线（避让高速）；随机=随机途经点绕到目的地
+    let outSegs, outWps, outDist, outDur
+    if (isOptimal) {
+      const out = await fetchOptimalBikeRoute(h, d)
+      if (!out) { toast('规划失败，请重试', 'err'); loading.value = false; return }
+      outSegs = [{ ...out, from: h, to: d, idx: 0 }]
+      outWps = []; outDist = out.distance; outDur = out.duration
+    } else {
+      loadingHint.value = '正在生成随机路线…'
+      const r = await tryGenerateRoute(h, d, {
+        minDist: 6000, maxDist: 90000, directionDeg: null, sectorMode: 'mixed',
+        onTry: (a, dist, e) => { progress.value = Math.round((a / MAX_RETRIES) * (isRound ? 30 : 50)); loadingHint.value = e ? `尝试第 ${a} 条…` : `已生成 ${(dist/1000).toFixed(1)}km` },
+      })
+      if (!r) { toast('规划失败，请重试', 'err'); loading.value = false; return }
+      outSegs = r.segments; outWps = r.waypoints; outDist = r.totalDistance; outDur = r.totalDuration
+    }
 
     let segments, waypoints, totalDistance, totalDuration
     if (!isRound) {
-      // 单程：直接骑到目的地
-      segments = [{ ...out, from: h, to: d, idx: 0 }]
-      waypoints = []
-      totalDistance = out.distance
-      totalDuration = out.duration
+      segments = outSegs; waypoints = outWps; totalDistance = outDist; totalDuration = outDur
     } else {
-      // 往返：去程 + 返程（各自最优），合并
-      loadingHint.value = '正在规划返程路线…'
-      const back = await fetchOptimalBikeRoute(d, h)
-      if (!back) { toast('返程规划失败，请重试', 'err'); loading.value = false; return }
-      segments = [
-        { ...out, from: h, to: d, idx: 0 },
-        { ...back, from: d, to: h, idx: 1 },
-      ]
-      waypoints = [{ lng: d.lng, lat: d.lat, poiName: d.name || '🎯 目的地' }]
-      totalDistance = out.distance + back.distance
-      totalDuration = out.duration + back.duration
+      // 返程：与去程同策略
+      loadingHint.value = '正在规划返程…'
+      let backSegs, backWps, backDist, backDur
+      if (isOptimal) {
+        const back = await fetchOptimalBikeRoute(d, h)
+        if (!back) { toast('返程规划失败，请重试', 'err'); loading.value = false; return }
+        backSegs = [{ ...back, from: d, to: h, idx: outSegs.length }]
+        backWps = []; backDist = back.distance; backDur = back.duration
+      } else {
+        const r2 = await tryGenerateRoute(d, h, {
+          minDist: 6000, maxDist: 90000, directionDeg: null, sectorMode: 'mixed',
+          onTry: (a, dist, e) => { progress.value = 50 + Math.round((a / MAX_RETRIES) * 50); loadingHint.value = e ? `返程尝试第 ${a} 条…` : `返程 ${(dist/1000).toFixed(1)}km` },
+        })
+        if (!r2) { toast('返程规划失败，请重试', 'err'); loading.value = false; return }
+        backSegs = r2.segments; backWps = r2.waypoints; backDist = r2.totalDistance; backDur = r2.totalDuration
+      }
+      segments = [...outSegs, ...backSegs]
+      waypoints = [...outWps, { lng: d.lng, lat: d.lat, poiName: d.name || '🎯 目的地' }, ...backWps]
+      totalDistance = outDist + backDist
+      totalDuration = outDur + backDur
     }
+    segments.forEach((s, i) => { s.idx = i })
 
-    // 坡度分析（沿用现有逻辑，基于真实 polyline）
+    // 坡度分析
     loadingHint.value = '正在分析坡度…'
     let slopeProfile = null
     try { slopeProfile = await calcSlopeProfile(segments) } catch (e) { console.error('[doGenerateDestination] slope failed:', e) }
@@ -385,19 +387,19 @@ async function doGenerateDestination() {
       elevationProfile: slopeProfile?.elevationProfile ?? null,
       isRoundTrip: isRound,
       destName: d.name,
-      optimal: true,
+      optimal: isOptimal,
     }
 
     if (route.waypoints.length > 0) {
       loadingHint.value = '正在获取途经点地名…'
-      await Promise.all(route.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) }))
+      await Promise.all(route.waypoints.map(async (wp) => { if (!wp.poiName) wp.poiName = await nameWaypoint(wp.lng, wp.lat) }))
     }
 
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = route; resultShow.value = true; loading.value = false
 
     saveHistory({ type: isRound ? 'roundtrip' : 'oneway', home: h.name, work: d.name, distance: totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
-    saveLastRoute({ type: isRound ? 'roundtrip' : 'oneway', home: h, work: d, waypoints: route.waypoints, segments: route.segments, totalDistance, totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, scene: 'destination', tripType: tripType.value })
+    saveLastRoute({ type: isRound ? 'roundtrip' : 'oneway', home: h, work: d, waypoints: route.waypoints, segments: route.segments, totalDistance, totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, scene: 'destination', tripType: tripType.value, routeStrategy: routeStrategy.value })
     loadContext(route.segments, route.waypoints, { totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, waypoints: route.waypoints, totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
@@ -486,7 +488,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <SceneCards v-model="scene" />
 
   <!-- 距离滑块（仅休闲骑/训练骑） -->
-  <div v-if="(scene === 'casual' || scene === 'training') && distRange" class="dist-card">
+  <div v-if="scene === 'loop' && distRange" class="dist-card">
     <div class="dist-header">
       <span class="dist-label">骑行距离</span>
       <span class="dist-value">{{ customDist || distRange.default }} <small>km</small></span>
@@ -506,24 +508,9 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     </div>
   </div>
 
-  <!-- 随便骑：随机参数展示 -->
-  <div v-if="scene === 'random'" class="random-card">
-    <div class="random-display">
-      <div class="random-item">
-        <span class="random-label">距离</span>
-        <span class="random-value">{{ randomDist || '??' }} <small>km</small></span>
-      </div>
-      <div class="random-sep">·</div>
-      <div class="random-item">
-        <span class="random-label">方向</span>
-        <span class="random-value">{{ randomDirLabel }}</span>
-      </div>
-    </div>
-    <button class="btn-reroll" @click="rollRandom">🎲 换一组</button>
-  </div>
 
-  <!-- 训练骑：方向选择器 -->
-  <div v-if="scene === 'training'" class="dir-inline">
+  <!-- 指定距离环线：方向偏好（默认随机） -->
+  <div v-if="scene === 'loop'" class="dir-inline">
     <span class="dir-inline-label">方向偏好</span>
     <div class="dir-chips">
       <button v-for="d in COMPASS" :key="d.key" :class="['dir-chip',{active:direction===d.key}]" @click="direction=d.key">{{ d.label }}</button>
@@ -543,6 +530,12 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       <button class="btn-search" @click="searchDestination" :disabled="destLoading">
         {{ destLoading ? '搜索中…' : '搜索' }}
       </button>
+    </div>
+
+    <!-- 路线策略：最优 / 随机 -->
+    <div class="trip-toggle">
+      <button :class="['trip-pill', { active: routeStrategy === 'optimal' }]" @click="routeStrategy = 'optimal'">✨ 最优</button>
+      <button :class="['trip-pill', { active: routeStrategy === 'random' }]" @click="routeStrategy = 'random'">🎲 随机</button>
     </div>
 
     <!-- 单程 / 往返 切换 -->
@@ -587,7 +580,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     :disabled="loading || (scene === 'destination' && !destCoord)"
     @click="handleGenerate"
   >
-    {{ loading ? '生成中…' : scene === 'random' ? '🎲 随机出发！' : scene === 'casual' ? '🌅 休闲出发！' : scene === 'training' ? '🏋 开始训练！' : '🎯 骑过去！' }}
+    {{ loading ? '生成中…' : scene === 'loop' ? '🔄 环线出发！' : (tripType === 'round' ? '🔁 往返出发！' : '🎯 骑过去！') }}
   </button>
 
   <!-- 高级选项折叠 -->
@@ -964,67 +957,6 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .btn-multi:disabled { opacity: .5; cursor: not-allowed; }
 
-/* === 随便骑：随机参数卡片 === */
-.random-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
-  background: linear-gradient(135deg, var(--accent-soft), #f7f5fa);
-  border-radius: 16px;
-  margin-top: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
-}
-.random-display {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-.random-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.random-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #a898b8;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-.random-value {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--accent);
-  letter-spacing: -.5px;
-}
-.random-value small {
-  font-size: 12px;
-  font-weight: 600;
-  opacity: .6;
-}
-.random-sep {
-  font-size: 20px;
-  color: #d0c8d8;
-  font-weight: 400;
-}
-.btn-reroll {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 12px;
-  background: #fff;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all .15s;
-  font-family: inherit;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-.btn-reroll:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
-.btn-reroll:active { transform: scale(.92); }
 
 /* === 训练骑：行内方向选择器 === */
 .dir-inline {

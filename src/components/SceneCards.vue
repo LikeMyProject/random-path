@@ -1,14 +1,12 @@
 <script setup>
 defineProps({
-  modelValue: { type: String, default: 'random' }
+  modelValue: { type: String, default: 'destination' }
 })
 defineEmits(['update:modelValue'])
 
 const SCENES = [
-  { key: 'casual', icon: '🌅', label: '休闲骑', desc: '短途兜风 · 随心方向', dist: '10-1000 km', time: '随心调', tag: '轻松' },
-  { key: 'training', icon: '🏋', label: '训练骑', desc: '中长距离 · 自选方向', dist: '10-1000 km', time: '随心调', tag: '可控' },
-  { key: 'random', icon: '🎲', label: '随便骑', desc: '距离方向全随机', dist: '10-1000 km', time: '盲盒惊喜', tag: '未知' },
-  { key: 'destination', icon: '🎯', label: '骑到某处', desc: '指定目的地 · 来回往返', dist: '看目的地', time: '看来回', tag: '往返' },
+  { key: 'destination', icon: '🎯', label: '指定目的地', desc: '选地点 · 单程/往返 · 最优/随机', dist: '看目的地', time: '看路线', tag: '导航' },
+  { key: 'loop', icon: '🔄', label: '指定距离环线', desc: '设距离 · 当前定位出发 · 随机圆环', dist: '5-200 km', time: '随心调', tag: '自由' },
 ]
 </script>
 
