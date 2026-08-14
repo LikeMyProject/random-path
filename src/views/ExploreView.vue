@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { geocode, setDetectedCity, detectCityFromGPS, getDetectedCity } from '../composables/useAMap.js'
 import { loadAddresses, saveAddresses, deleteAddress, saveHistory, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { useSuggest } from '../composables/useAutoComplete.js'
-import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, COMPASS, nameWaypoint, buildNavUrl, openNavigation, buildGPX, fetchOptimalBikeRoute, calcSlopeProfile } from '../composables/useRouteEngine.js'
+import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, nameWaypoint, buildNavUrl, openNavigation, buildGPX, fetchOptimalBikeRoute, calcSlopeProfile } from '../composables/useRouteEngine.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import { useRouteContext } from '../composables/useRouteContext.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
@@ -49,9 +49,6 @@ const from = ref({ name: '', lng: '', lat: '' }), to = ref({ name: '', lng: '', 
 const activeSuggest = ref('')
 const hasDest = computed(() => (to.value.name && to.value.lng && to.value.lat) || (scene.value === 'destination' && !!destCoord.value))
 
-// === 自定义参数 ===
-const direction = ref('random')
-
 // === 距离滑块 ===
 const customDist = ref(null) // null = 用场景默认
 
@@ -70,8 +67,7 @@ watch(scene, (s) => {
     destCoord.value = null
     destEstimate.value = null
   } else if (s === 'loop') {
-    // 指定距离环线：距离用滑块默认值，方向随机
-    direction.value = 'random'
+    // 指定距离环线：距离用滑块默认值
     if (!customDist.value) customDist.value = DIST_RANGES[s]?.default || 20
   }
 })
@@ -121,7 +117,6 @@ onMounted(async () => {
   if (last && (last.type === 'commute' || last.type === 'loop') && last.home) {
     from.value = { name: last.home.name, lng: String(last.home.lng), lat: String(last.home.lat) }
     if (last.work && last.work.name !== last.home.name) to.value = { name: last.work.name, lng: String(last.work.lng), lat: String(last.work.lat) }
-    if (last.direction) direction.value = last.direction
     if (last.scene) scene.value = last.scene
     result.value = { waypoints: last.waypoints || [], segments: last.segments || [], totalDistance: last.totalDistance, totalDuration: last.totalDuration, totalClimb: last.totalClimb, uphillSections: last.uphillSections || [], downhillSections: last.downhillSections || [] }
     resultShow.value = true; return
@@ -269,8 +264,7 @@ async function doGenerate(isRetry = false) {
   if (!isRetry) { resultShow.value = false; multiResults.value = [] }
   loading.value = true; progress.value = 0; loadingHint.value = '正在规划路线…'; tryInfo.value = ''
   const td = targetDist.value
-  const effDir = direction.value
-  const dirDeg = COMPASS.find(c => c.key === effDir)?.deg ?? null
+  const dirDeg = null // 环线随机朝向
   const onTry = (a, d, e) => {
     progress.value = Math.round((a / MAX_RETRIES) * 100)
     loadingHint.value = e ? `尝试第 ${a} 条路线…` : `已找到 ${(d/1000).toFixed(1)} km 路线，验证中…`
@@ -285,7 +279,7 @@ async function doGenerate(isRetry = false) {
     progress.value = 100; await new Promise(r => setTimeout(r, 200))
     result.value = route; resultShow.value = true; loading.value = false
     saveHistory({ type: 'explore', home: h.name, work: w.name, distance: route.totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
-    saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, scene: scene.value })
+    saveLastRoute({ type: 'explore', home: h, work: w, waypoints: route.waypoints, segments: route.segments, totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, scene: scene.value })
     loadContext(route.segments, route.waypoints, { totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, waypoints: route.waypoints, totalDistance: route.totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
@@ -299,8 +293,7 @@ async function doGenerateMultiple() {
   const w = hasDest.value ? { name: to.value.name, lng: parseFloat(to.value.lng), lat: parseFloat(to.value.lat) } : h
   const isLoop = h.lng === w.lng && h.lat === w.lat
   const td = targetDist.value
-  const effDir = direction.value
-  const dirDeg = COMPASS.find(c => c.key === effDir)?.deg ?? null
+  const dirDeg = null // 环线随机朝向
   loading.value = true; loadingHint.value = '正在同时生成 3 条路线…'
   try {
     const opts = isLoop
@@ -399,7 +392,7 @@ async function doGenerateDestination() {
     result.value = route; resultShow.value = true; loading.value = false
 
     saveHistory({ type: isRound ? 'roundtrip' : 'oneway', home: h.name, work: d.name, distance: totalDistance, waypoints: route.waypoints.map(wp => ({ lng: wp.lng, lat: wp.lat, name: wp.poiName })) })
-    saveLastRoute({ type: isRound ? 'roundtrip' : 'oneway', home: h, work: d, waypoints: route.waypoints, segments: route.segments, totalDistance, totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, direction: direction.value, scene: 'destination', tripType: tripType.value, routeStrategy: routeStrategy.value })
+    saveLastRoute({ type: isRound ? 'roundtrip' : 'oneway', home: h, work: d, waypoints: route.waypoints, segments: route.segments, totalDistance, totalDuration, totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, scene: 'destination', tripType: tripType.value, routeStrategy: routeStrategy.value })
     loadContext(route.segments, route.waypoints, { totalClimb: route.totalClimb, uphillSections: route.uphillSections, downhillSections: route.downhillSections, waypoints: route.waypoints, totalDistance }).catch(() => {})
   } catch (e) { toast('错误: ' + e.message, 'err'); loading.value = false }
 }
@@ -487,7 +480,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <p class="section-title">今天想怎么骑？</p>
   <SceneCards v-model="scene" />
 
-  <!-- 距离滑块（仅休闲骑/训练骑） -->
+  <!-- 距离滑块（指定距离环线） -->
   <div v-if="scene === 'loop' && distRange" class="dist-card">
     <div class="dist-header">
       <span class="dist-label">骑行距离</span>
@@ -508,14 +501,6 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     </div>
   </div>
 
-
-  <!-- 指定距离环线：方向偏好（默认随机） -->
-  <div v-if="scene === 'loop'" class="dir-inline">
-    <span class="dir-inline-label">方向偏好</span>
-    <div class="dir-chips">
-      <button v-for="d in COMPASS" :key="d.key" :class="['dir-chip',{active:direction===d.key}]" @click="direction=d.key">{{ d.label }}</button>
-    </div>
-  </div>
 
   <!-- 骑到某处：目的地搜索 -->
   <div v-if="scene === 'destination'" class="dest-search card">
@@ -957,45 +942,6 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .btn-multi:disabled { opacity: .5; cursor: not-allowed; }
 
-
-/* === 训练骑：行内方向选择器 === */
-.dir-inline {
-  padding: 14px 16px;
-  background: #fff;
-  border-radius: 14px;
-  margin-top: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
-}
-.dir-inline-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #5e5468;
-  display: block;
-  margin-bottom: 8px;
-}
-.dir-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.dir-chip {
-  padding: 7px 12px;
-  border-radius: 10px;
-  border: none;
-  background: #f7f5fa;
-  color: #7a6c8a;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-}
-.dir-chip:hover { background: var(--accent-soft); color: var(--accent); }
-.dir-chip.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25);
-}
 
 /* === 对比模式开关 === */
 .multi-toggle {
