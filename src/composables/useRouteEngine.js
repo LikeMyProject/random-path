@@ -1,6 +1,7 @@
-import { haversine, getBearing, destinationPoint, sortWaypointsAlongCorridor, parsePolyline, samplePoints } from '../utils/math.js'
+import { haversine, getBearing, destinationPoint, sortWaypointsAlongCorridor, parsePolyline } from '../utils/math.js'
 import { buildGpxTrk } from '../utils/gpx.js'
-import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths, loadAMapSDK } from './useAMap.js'
+import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths } from './useAMap.js'
+import { chainElevation, fetchOpenMeteo } from './elevation.js'
 import { getRecentSectors, saveWaypointTracker, loadWaypointTracker } from './useStorage.js'
 
 export const MAX_WAYPOINTS = 10, MAX_RETRIES = 12, EARLY_ACCEPT_AFTER = 5
@@ -273,56 +274,40 @@ async function tryFixDeadEnds(segments, waypoints, td, tt, home, work, maxDist, 
   return { accepted: findDeadEndWaypoints(fs).length === 0, route: { waypoints: fw, segments: fs, totalDistance: fd, totalDuration: ft, sector } }
 }
 
+// 高程主走 Open-Meteo（WGS84，先转坐标）；失败再走高德 JS SDK Elevation 兜底（VITE_ELEVATION_BACKEND=amap 时启用）。
+// 彻底失败返回 []，绝不弹警示 toast 打断骑手。
+async function amapElevFallback(points) {
+  try {
+    const am = await import('./useAMap.js')
+    await am.loadAMapSDK()
+    await new Promise((res, rej) => window.AMap.plugin('AMap.Elevation', res, rej))
+    const els = []
+    for (let i = 0; i < points.length; i += 50) {
+      const batch = points.slice(i, i + 50).map(p => new window.AMap.LngLat(p.lng, p.lat))
+      const r = await new Promise((res, rej) => {
+        const el = new window.AMap.Elevation()
+        el.getElevation(batch, (st, rr) => (st === 'complete' ? res(rr) : rej(new Error(st))))
+      })
+      const arr = Array.isArray(r) ? r : (r?.data || [])
+      for (const x of arr) els.push(typeof x.elevation === 'number' ? x.elevation : (parseFloat(x.z) || 0))
+    }
+    return els.length >= 2 ? els : null
+  } catch { return null }
+}
 export async function queryElevations(points) {
   if (points.length === 0) return []
-  const BATCH = 50
-  const allResults = []
-  try {
-    // 确保 SDK 和 Elevation 插件都已加载
-    await loadAMapSDK()
-    await new Promise((resolve, reject) => {
-      if (!window.AMap) return reject(new Error('AMap SDK not loaded'))
-      if (window.AMap.Elevation) return resolve() // 插件已存在
-      AMap.plugin('AMap.Elevation', resolve, reject)
-    })
-    for (let i = 0; i < points.length; i += BATCH) {
-      const batch = points.slice(i, i + BATCH).map(p => new AMap.LngLat(p.lng, p.lat))
-      const result = await new Promise((resolve, reject) => {
-        const el = new AMap.Elevation()
-        el.getElevation(batch, (status, res) => {
-          // res 可能是数组 {data:[...], info:"OK"} 或直接是数组 [...]
-          if (status === 'complete') resolve(res)
-          else reject(new Error(status))
-        })
-      })
-      const items = Array.isArray(result) ? result : (result?.data || [])
-      for (const r of items) {
-        allResults.push(typeof r.elevation === 'number' ? r.elevation : (parseFloat(r.z) || 0))
-      }
-    }
-    return allResults
-  } catch(e) {
-    const msg = e?.message || String(e)
-    console.error('[queryElevations]', msg)
-    if (window.$toast) window.$toast('高程查询失败: ' + msg, 'warn')
-    return []
-  }
-}
-
-export async function calcClimb(polyline) {
-  const coords = parsePolyline(polyline); if (coords.length < 2) return null
-  const sampled = samplePoints(coords, Math.min(20, coords.length))
-  const els = await queryElevations(sampled); if (els.length < 2) return null
-  let climb = 0
-  for (let i = 1; i < els.length; i++) { const diff = els[i] - els[i-1]; if (diff > 0) climb += diff }
-  return Math.round(climb)
+  const wantAmap = typeof import.meta.env !== 'undefined' && import.meta.env.VITE_ELEVATION_BACKEND === 'amap'
+  const providers = [fetchOpenMeteo]
+  if (wantAmap) providers.push(amapElevFallback)
+  const els = await chainElevation(points, providers)
+  return els || []
 }
 
 // === 坡度分析：沿路线采样高程并识别上坡路段 ===
 const UPHILL_MIN_GRADE = 5 // 坡度阈值：5%（约2.86°），低于此坡度不显示
 const UPHILL_MIN_LENGTH = 0.1 // 最短上坡路段：100m
 
-export async function calcSlopeProfile(segments) {
+export async function calcSlopeProfile(segments, { spacing = 220 } = {}) {
   // 1. 收集所有 polyline 坐标并计算累计距离
   const allCoords = []
   for (const seg of segments) {
@@ -337,8 +322,8 @@ export async function calcSlopeProfile(segments) {
   const totalDist = cumDist[cumDist.length - 1]
   if (totalDist < 100) return null // 路线太短，不分析
 
-  // 2. 按距离均匀采样（每 ~400m 一个点，最少 15 最多 200）
-  const sampleCount = Math.max(15, Math.min(200, Math.ceil(totalDist / 400)))
+  // 2. 按距离均匀采样（米/点，山区可传 <spacing> 收紧；每 spacing 米一个点，最少 15 最多 300）
+  const sampleCount = Math.max(15, Math.min(300, Math.ceil(totalDist / spacing)))
   const sampled = []
   const sampledDists = []
   let ci = 0
@@ -457,6 +442,21 @@ export async function tryGenerateRoute(home, work, opts = {}) {
   const recent = getRecentSectors(5); let best = null, bestDiff = Infinity, lastDist = null
   tickCooldown()
 
+  // 统一「组装 + 必经坡度」：任何接受的路径都补坡度分析；失败仅缺位，不 toast
+  async function finishRoute(rt) {
+    if (rt.totalClimb != null) return rt
+    const bt = checkBacktrack(rt.segments)
+    try {
+      const sp = await calcSlopeProfile(rt.segments)
+      if (sp) rt.totalClimb = sp.totalClimb
+      rt.uphillSections = sp?.uphillSections ?? []
+      rt.downhillSections = sp?.downhillSections ?? []
+      rt.elevationProfile = sp?.elevationProfile ?? null
+    } catch { /* 坡度失败仅缺位，不 toast */ }
+    rt.hasBacktrack = bt.bad
+    return rt
+  }
+
   for (let a = 0; a < MAX_RETRIES; a++) {
     let wo
     if (opts.waypointGenerator) wo = opts.waypointGenerator(lastDist, minDist, maxDist)
@@ -480,9 +480,9 @@ export async function tryGenerateRoute(home, work, opts = {}) {
 
       if (td <= maxDist) {
         const fixed = await tryFixDeadEnds(segs, waypoints, td, tt, home, work, maxDist, onTry, a, sector)
-        if (fixed && fixed.accepted) { recordWaypoints(fixed.route.waypoints); return fixed.route }
-        if (a >= EARLY_ACCEPT_AFTER && fixed && fixed.route) { onTry?.(a+1, fixed.route.totalDistance, '提前接受'); recordWaypoints(fixed.route.waypoints); return fixed.route }
-        const rt = (fixed && fixed.route) ? fixed.route : { waypoints, segments: segs, totalDistance: td, totalDuration: tt, sector }
+        if (fixed && fixed.accepted) { recordWaypoints(fixed.route.waypoints); return finishRoute(fixed.route) }
+        if (a >= EARLY_ACCEPT_AFTER && fixed && fixed.route) { recordWaypoints(fixed.route.waypoints); return finishRoute(fixed.route) }
+        const rt = fixed?.route || { waypoints, segments: segs, totalDistance: td, totalDuration: tt, sector }
         const diff = maxDist - rt.totalDistance
         if (diff < bestDiff) { bestDiff = diff; best = rt }
         onTry?.(a + 1, td, null)
@@ -496,17 +496,7 @@ export async function tryGenerateRoute(home, work, opts = {}) {
 
   if (best) {
     recordWaypoints(best.waypoints)
-    const bt = checkBacktrack(best.segments)
-    let slopeProfile = null
-    try { slopeProfile = await calcSlopeProfile(best.segments) } catch(e) { console.error('[tryGenerateRoute] slope calc failed:', e) }
-    if (slopeProfile) {
-      const nu = slopeProfile.uphillSections?.length || 0
-      const nd = slopeProfile.downhillSections?.length || 0
-      if (nu + nd > 0 && window.$toast) window.$toast(`坡度分析完成: ${nu}段上坡, ${nd}段下坡`)
-    } else if (window.$toast) {
-      window.$toast('坡度分析未成功，请重试', 'warn')
-    }
-    return { ...best, totalClimb: slopeProfile?.totalClimb ?? null, uphillSections: slopeProfile?.uphillSections ?? [], downhillSections: slopeProfile?.downhillSections ?? [], elevationProfile: slopeProfile?.elevationProfile ?? null, hasBacktrack: bt.bad }
+    return finishRoute(best) // 统一必经坡度；不再手动补坡度、去打扰性 toast
   }
   return null
 }
