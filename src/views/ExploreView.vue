@@ -383,6 +383,44 @@ async function doSmart() {
   }
 }
 
+// === 钉段锁定 + 局部重掷（D3）===
+const activeResult = computed(() => multiResults.value[activeResultIdx.value] || result.value)
+const locked = ref(new Set())
+function toggleLock(cid) {
+  const s = new Set(locked.value)
+  if (s.has(cid)) s.delete(cid); else s.add(cid)
+  locked.value = s
+}
+async function doReroll() {
+  // 经典模式产物没有 corridorIds，或没钉任何段 → 走原「换一条」，行为不变
+  if (!activeResult.value?.corridorIds?.length) { doRegenerate(); return }
+  if (!from.value.lng) { toast('请先定位起点', 'warn'); return }
+  const start = { name: from.value.name, lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
+  loading.value = true
+  try {
+    const { reroll } = useSmartDice()
+    const cands = await reroll(start, {
+      distKm: distKm.value,
+      band: band.value,
+      pool: pool.value || null,
+      minTrust: pool.value ? 'green' : 'yellow',
+    }, [...locked.value])
+    if (!cands.length) { toast('没合成出新路线，换个里程或玩法池试试', 'warn'); return }
+    for (const r of cands) {
+      if (r.waypoints?.length) {
+        await Promise.all(r.waypoints.map(async wp => { if (!wp.poiName) wp.poiName = await nameWaypoint(wp.lng, wp.lat) }))
+      }
+    }
+    multiResults.value = cands
+    activeResultIdx.value = 0
+    await selectMulti(0)
+  } catch (e) {
+    toast('重掷失败: ' + e.message, 'err')
+  } finally {
+    loading.value = false
+  }
+}
+
 // === 骑到某处：走高德最优（最短）路线，可选单程/往返，无随机途经点 ===
 async function doGenerateDestination() {
   if (!destCoord.value) { toast('请先搜索目的地', 'warn'); return }
@@ -720,6 +758,14 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     </div>
   </div>
 
+  <!-- 钉段：锁定某几段后「换一条」只重掷其余段 -->
+  <div v-if="activeResult?.corridorIds?.length" class="compass-grid lock-row">
+    <span class="lock-hint">钉住不换：</span>
+    <button v-for="(cid,i) in activeResult.corridorIds" :key="cid"
+      :class="['chip',{active:locked.has(cid)}]"
+      @click="toggleLock(cid)">{{ locked.has(cid) ? '🔒' : '🔓' }} 段{{ i + 1 }}</button>
+  </div>
+
   <!-- 结果 -->
   <ResultView
     v-if="resultShow && result"
@@ -736,7 +782,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     @copyNav="copyNav"
     @downloadGpx="downloadGpx"
     @doShare="doShare"
-    @regenerate="doRegenerate"
+    @regenerate="doReroll"
   />
 
   <!-- 地址管理弹窗 -->
@@ -1392,4 +1438,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .mc-meta { font-size: 11px; color: #a898b8; }
 .mc-sub { margin-bottom: 4px; }
+/* 钉段行（D3） */
+.lock-row { align-items: center; margin: 8px 0 0; }
+.lock-hint { font-size: 11px; color: #a898b8; align-self: center; }
 </style>

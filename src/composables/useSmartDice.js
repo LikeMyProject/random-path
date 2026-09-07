@@ -118,5 +118,10 @@ export function useSmartDice() {
     return results.slice(0, count)
   }
 
-  return { generate, chooseEnvelope, index: ix }
+  // 钉段重掷：语义化出口。lockedIds 非空时以锁定廊道为锚，其余段重新随机
+  async function reroll(start, opts, lockedIds = []) {
+    return generate(start, { ...opts, locked: lockedIds, count: opts.count ?? 3 })
+  }
+
+  return { generate, reroll, chooseEnvelope, index: ix }
 }
