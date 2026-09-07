@@ -850,7 +850,7 @@ git commit -m "feat(corridorData): 廊道索引/吸附/信封过滤 + 信任分�
 
 > 设计说明（v1.1 修订）：不追求在图上硬找完美几何环（真实路网闭环极小概率恰好存在，纯图论 DFS 难收敛）。改为「**随机链 + 真路程复测**」：先随机串起若干条首尾直线可达的廊道，具体能不能骑、够不够远，全部交由 C2 的真实高德补路后按实测里程筛选——更简单、更贴合"聪明骰子随机感"。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```js
 // tests/corridorSearch.test.mjs
@@ -881,12 +881,12 @@ test('reversePolyline: 整串倒序', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `node --test tests/corridorSearch.test.mjs`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```js
 // src/composables/corridorSearch.js
@@ -922,12 +922,12 @@ export function reversePolyline(p) {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `node --test tests/corridorSearch.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/composables/corridorSearch.js tests/corridorSearch.test.mjs
@@ -940,7 +940,7 @@ git commit -m "feat(engine): 廊道随机链装配 + polyline 反向（聪明骰
 
 **Files:** Create `src/composables/useSmartDice.js` · 依赖 A4/C1/B4 + `useRouteEngine` 导出的闸门
 
-- [ ] **Step 1: useRouteEngine 导出闸门供复用**
+- [x] **Step 1: useRouteEngine 导出闸门供复用**
 
 在 `useRouteEngine.js` 给 `checkBacktrack` 前加 `export`（其余不动）：
 
@@ -948,7 +948,7 @@ git commit -m "feat(engine): 廊道随机链装配 + polyline 反向（聪明骰
 export function checkBacktrack(segments) { /* 现函数体原样 */ }
 ```
 
-- [ ] **Step 2: 实现编排器（门到门拼段 + 实测里程带筛选 + 必经坡度）**
+- [x] **Step 2: 实现编排器（门到门拼段 + 实测里程带筛选 + 必经坡度）**
 
 ```js
 // src/composables/useSmartDice.js
@@ -1055,12 +1055,12 @@ export function useSmartDice() {
 
 > 实现注：① 反程段用同段 polyline 倒序，骑行"原路折返"无需重复请求；② `outIds` 去重即供钉段锁定的 `corridorIds`；③ 坡度为硬依赖——若 `calcSlopeProfile` 返回 null 也要保留候选但 `totalClimb=null`（配合 A4 柔和降级）；④ 钉段锁定 `locked` 参数在首版以「换一条时保留相同 `anchor` 与玩法池」近似，精确到"锁某廊道"在 D3 以 `corridorIds` 过滤实现。
 
-- [ ] **Step 3: 构建验证（无法跑 AMap 的部分手动验收）**
+- [x] **Step 3: 构建验证（无法跑 AMap 的部分手动验收）**
 
 Run: `npm run build`
 Expected: 编译通过（`useSmartDice` 由 D1 侧接入，先保证语法/依赖闭合）
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/composables/useSmartDice.js src/composables/useRouteEngine.js
