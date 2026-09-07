@@ -1,6 +1,10 @@
 // src/data/corridors.js
+// 单一事实源：手工精编条目 + 构建脚本产物（corridors.auto.json）在此合并，运行时只读。
+// 注：JSON 导入必须带 import attributes，否则 Node 单测（node --test）无法 import 本模块。
 // trust: grey(自动待实测)|yellow(疑点)|green(实骑)|blue(人工精校)
-export const CORRIDORS = [
+import autoCorridors from './corridors.auto.json' with { type: 'json' }
+
+const MANUAL = [
   {
     id: 'nl-fengyu-fenshuiling', name: '沣峪口→分水岭(G210)', region: '关中·南山',
     type: 'climbRoad', surface: 'paved', climbBand: 'hill', playpool: ['nan-ling'],
@@ -52,3 +56,5 @@ export const CORRIDORS = [
     start: { name: '仪祉湖', lng: 108.764, lat: 34.106 }, end: { name: '沣峪口转盘', lng: 108.822, lat: 34.051 },
   },
 ]
+
+export const CORRIDORS = [...MANUAL, ...autoCorridors]

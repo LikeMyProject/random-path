@@ -9,6 +9,8 @@ import { PLAYPOOLS } from '../src/data/playpools.js'
 const TRUSTS = ['grey', 'yellow', 'green', 'blue']
 const BANDS = ['flat', 'rolling', 'hill', 'mountainous']
 const REQUIRED = ['id', 'name', 'region', 'type', 'surface', 'climbBand', 'playpool', 'distKm', 'climbM', 'trust', 'src', 'status', 'start', 'end']
+// 自动段（build-corridors 产物，id 前缀 auto-）schema 宽松：climbBand 待实测、playpool/climbM 未归类
+const isAuto = c => c.id.startsWith('auto-')
 
 function haversineM(a, b) {
   const toRad = x => (x * Math.PI) / 180
@@ -23,9 +25,9 @@ test('廊道字段完整、取值合法', () => {
   for (const c of CORRIDORS) {
     for (const k of REQUIRED) assert.ok(c[k] !== undefined && c[k] !== null, `${c.id} 缺字段 ${k}`)
     assert.ok(TRUSTS.includes(c.trust), `${c.id} trust 非法: ${c.trust}`)
-    assert.ok(BANDS.includes(c.climbBand), `${c.id} climbBand 非法: ${c.climbBand}`)
+    assert.ok(BANDS.includes(c.climbBand) || (isAuto(c) && c.climbBand === 'unknown'), `${c.id} climbBand 非法: ${c.climbBand}`)
     assert.ok(c.distKm > 0, `${c.id} distKm 必须为正`)
-    assert.ok(c.climbM >= 0, `${c.id} climbM 不能为负`)
+    assert.ok(c.climbM >= 0 || (isAuto(c) && c.climbM === null), `${c.id} climbM 不能为负`)
     assert.equal(c.status, 'open', `${c.id} status 应为 open`)
   }
 })
@@ -44,10 +46,18 @@ test('起终点在陕西境内且互不重合', () => {
   }
 })
 
-test('playpool 引用的玩法池必须存在', () => {
+test('playpool 引用的玩法池必须存在（手工段必填）', () => {
   const poolIds = new Set(PLAYPOOLS.map(p => p.id))
   for (const c of CORRIDORS) {
+    if (isAuto(c)) continue // 自动段尚未归类到玩法池
     assert.ok(Array.isArray(c.playpool) && c.playpool.length > 0, `${c.id} playpool 不能为空`)
     for (const pid of c.playpool) assert.ok(poolIds.has(pid), `${c.id} 引用了不存在的玩法池 ${pid}`)
   }
+})
+
+test('合并入口：手工条目 + 自动库共同构成 CORRIDORS', async () => {
+  const auto = (await import('../src/data/corridors.auto.json', { with: { type: 'json' } })).default
+  assert.ok(Array.isArray(auto), 'corridors.auto.json 必须是数组（空占位为 []）')
+  const manualCount = CORRIDORS.length - auto.length
+  assert.equal(manualCount, 8, `手工精编首批应保持 8 条，实际 ${manualCount}`)
 })
