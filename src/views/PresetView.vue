@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { loadAddresses, saveLastRoute, loadLastRoute } from '../composables/useStorage.js'
 import { fetchBicyclingRoute, searchAlongRoute } from '../composables/useAMap.js'
 import { rateDifficulty } from '../composables/useScoring.js'
@@ -8,8 +9,10 @@ import { nameWaypoint, buildNavUrl, openNavigation, buildGPX, calcCalories, calc
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 import { PRESET_ROUTES } from '../data/presetRoutes.js'
+import { PLAYPOOLS } from '../data/playpools.js'
 
 const toast = (m, t) => window.$toast?.(m, t)
+const router = useRouter()
 const addresses = loadAddresses()
 const { suggestions, showSuggest, searchAddress, pickSuggestion, closeSuggest } = useSuggest()
 
@@ -26,9 +29,21 @@ function onStartInput() { clearTimeout(st); st = setTimeout(() => searchAddress(
 function selectSugg(i) { const p = pickSuggestion(i); if (p) { customStart.value = { name: p.name, lng: p.lng, lat: p.lat }; toast(p.name) } }
 function pickStart(alias) { const a = addresses[alias]; if (a) { customStart.value = { name: a.name, lng: a.lng, lat: a.lat }; toast(alias) } }
 
+const poolFilter = ref('')
 const filteredRoutes = computed(() => {
   const f = customFilter.value.toLowerCase().trim()
-  return f ? PRESET_ROUTES.filter(r => r.name.includes(f) || r.start.name.includes(f) || r.waypoints.some(w => w.name.includes(f))) : PRESET_ROUTES
+  let list = PRESET_ROUTES
+  if (poolFilter.value) {
+    // 首版口径：路线名或途经点链含玩法池锚点关键词即归入该池
+    const pool = PLAYPOOLS.find(p => p.id === poolFilter.value)
+    if (pool) {
+      list = list.filter(r => {
+        const chain = r.name + r.start.name + r.end.name + r.waypoints.map(w => w.name).join()
+        return pool.anchors.some(a => chain.includes(a))
+      })
+    }
+  }
+  return f ? list.filter(r => r.name.includes(f) || r.start.name.includes(f) || r.waypoints.some(w => w.name.includes(f))) : list
 })
 
 const groups = computed(() => {
@@ -50,6 +65,17 @@ function addWP() { waypoints.value.push({ name: '', lng: '', lat: '' }) }
 function removeWP(i) { waypoints.value.splice(i, 1) }
 
 const activeRoute = computed(() => PRESET_ROUTES.find(r => r.name === selectedKey.value))
+
+// 「当灵感」：把该线途经点写入桩，跳转 Explore 用聪明骰子重新合成
+function useAsInspiration() {
+  const r = activeRoute.value
+  if (!r) return
+  try {
+    localStorage.setItem('radompath_inspiration', JSON.stringify({ name: r.name, wps: r.waypoints }))
+  } catch (e) {}
+  toast('灵感已带入，选好里程直接合成')
+  router.push('/explore')
+}
 
 const hasCustomStart = computed(() => !!(customStart.value.name && customStart.value.lng && customStart.value.lat))
 
@@ -196,6 +222,10 @@ onMounted(() => {
   <div class="card">
     <h2>选择经典路线</h2>
     <input v-model="customFilter" placeholder="搜索路线..." style="margin-bottom:8px;font-size:13px" />
+    <select v-model="poolFilter" style="margin-bottom:8px;font-size:12px">
+      <option value="">-- 全部玩法 --</option>
+      <option v-for="p in PLAYPOOLS" :key="p.id" :value="p.id">{{ p.icon }} {{ p.label }}</option>
+    </select>
     <select v-model="selectedKey" @change="onPresetChange" style="font-size:13px">
       <option value="">-- 选择预置路线 ({{ PRESET_ROUTES.length }}条) --</option>
       <optgroup v-for="g in groups" :key="g.city" :label="g.city">
@@ -217,6 +247,7 @@ onMounted(() => {
       <span v-if="activeRoute.waypoints.length>6">... ({{ activeRoute.waypoints.length-6 }}+)</span>
       → <span style="background:#f0a870;color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700">终点</span>{{ activeRoute.end.name }}
     </div>
+    <button class="btn-sm" style="margin-top:12px;display:block;width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;border:none;border-radius:10px;padding:9px 0;font-size:12px;font-weight:700;cursor:pointer" @click="useAsInspiration">💡 当灵感·去 Explore 合成</button>
   </div>
 
   <div class="card">

@@ -107,6 +107,15 @@ const { villages, supplyPoints, routeTags, loadContext } = useRouteContext()
 
 // === 初始化 ===
 onMounted(async () => {
+  // 「当灵感」桩：路线库带入的种子（首版仅提示；后续可按途经点推断里程/玩法池）
+  try {
+    const ins = JSON.parse(localStorage.getItem('radompath_inspiration') || 'null')
+    if (ins?.name) {
+      toast(`灵感已带入：${ins.name}，选好里程直接合成`)
+      localStorage.removeItem('radompath_inspiration')
+    }
+  } catch (e) {}
+
   // 先加载家/公司地址
   if (addresses['家']) {
     from.value = { name: addresses['家'].name, lng: addresses['家'].lng, lat: addresses['家'].lat }
