@@ -1308,7 +1308,7 @@ git commit -m "feat(ui): 路线库玩法池筛选 + 当灵感带入 Explore"
 
 ## 收尾验证
 
-- [ ] **Step: 全量回归**
+- [x] **Step: 全量回归**
 
 Run: `node --test tests/ && npm run build`
 Expected: 全部 PASS + 编译通过
