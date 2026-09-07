@@ -164,7 +164,7 @@ function polylineOverlap(segA, segB, minBacktrack = 350) {
   }
   return false
 }
-function checkBacktrack(segments) {
+export function checkBacktrack(segments) {
   for (let i = 0; i < segments.length - 1; i++) {
     const overlap = polylineOverlap(segments[i], segments[i + 1])
     if (overlap) return { bad: true, reason: `第${i + 1}→${i + 2}段折返重叠` }

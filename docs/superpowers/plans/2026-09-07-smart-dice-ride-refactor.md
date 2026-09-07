@@ -47,7 +47,7 @@
 
 **Files:** Create `src/utils/geo.js` · Test `tests/geo.test.mjs`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```js
 // tests/geo.test.mjs
@@ -74,12 +74,12 @@ test('out-of-China coordinates unchanged', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `node --test tests/geo.test.mjs`
 Expected: FAIL（`Cannot find module '../src/utils/geo.js'`）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```js
 // src/utils/geo.js
@@ -124,12 +124,12 @@ export function wgs84ToGcj02(lng, lat) {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `node --test tests/geo.test.mjs`
 Expected: PASS（3 tests）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/utils/geo.js tests/geo.test.mjs
@@ -142,7 +142,7 @@ git commit -m "feat(geo): GCJ-02↔WGS-84 转换工具（GPX 导出与高程采�
 
 **Files:** Create `src/data/presetRoutes.js` · Modify `src/views/PresetView.vue` · Test `tests/presetRoutes.test.mjs`
 
-- [ ] **Step 1: 抽出数据**
+- [x] **Step 1: 抽出数据**
 
 把 `PresetView.vue:16-148` 的 `const PRESET_ROUTES = [...]` 整块剪到新文件，并加导出与名称字段完整性校验：
 
@@ -153,7 +153,7 @@ export const PRESET_ROUTES = [
 ]
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 ```js
 // tests/presetRoutes.test.mjs
@@ -169,12 +169,12 @@ test('preset routes are structurally valid', () => {
 })
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `node --test tests/presetRoutes.test.mjs`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 4: 迁入数据后改 PresetView 引用**
+- [x] **Step 4: 迁入数据后改 PresetView 引用**
 
 `PresetView.vue:15` 删掉本文件内 `const PRESET_ROUTES = [...]` 定义，并在 `import { ... } from 'vue'` 块后加：
 
@@ -184,12 +184,12 @@ import { PRESET_ROUTES } from '../data/presetRoutes.js'
 
 （文件内其余对 `PRESET_ROUTES` 的引用不变。）
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `node --test tests/presetRoutes.test.mjs && npm run build`
 Expected: 单测 PASS；`npm run build` 无报错（`PresetView` 引到新模块）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/data/presetRoutes.js src/views/PresetView.vue tests/presetRoutes.test.mjs
@@ -202,7 +202,7 @@ git commit -m "refactor(data): 预置路线抽为纯数据模块 presetRoutes.js
 
 **Files:** Create `src/composables/elevation.js` · Test `tests/elevation.test.mjs`
 
-- [ ] **Step 1: 写失败测试（注入假 fetch，离线可跑）**
+- [x] **Step 1: 写失败测试（注入假 fetch，离线可跑）**
 
 ```js
 // tests/elevation.test.mjs
@@ -230,12 +230,12 @@ test('chainElevation falls through providers, returns null when all fail', async
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `node --test tests/elevation.test.mjs`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```js
 // src/composables/elevation.js
@@ -290,12 +290,12 @@ export async function chainElevation(points, providers, opts = {}) {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `node --test tests/elevation.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/composables/elevation.js tests/elevation.test.mjs
@@ -308,7 +308,7 @@ git commit -m "feat(elevation): 高程双源模块(Open-Meteo 主/高德兜底)�
 
 **Files:** Modify `src/composables/useRouteEngine.js`（重写 `queryElevations`、`calcSlopeProfile` 采样段、`tryGenerateRoute` 命中分支、删 `calcClimb`）· 依赖 A3
 
-- [ ] **Step 1: 删 `queryElevations` 高德直连逻辑，改为调 elevation 模块**
+- [x] **Step 1: 删 `queryElevations` 高德直连逻辑，改为调 elevation 模块**
 
 在 `useRouteEngine.js` 顶部 import 追加：
 
@@ -350,11 +350,11 @@ export async function queryElevations(points) {
 }
 ```
 
-- [ ] **Step 2: 删除死代码 `calcClimb`（`311-318` 段）**
+- [x] **Step 2: 删除死代码 `calcClimb`（`311-318` 段）**
 
 把 `calcClimb` 整段删除；同步删除文件顶部 `samplePoints` 若其它处不再用（先保留 import 直到确认无引用）。
 
-- [ ] **Step 3: `calcSlopeProfile` 采样参数化（间距加密、山区约 200m）**
+- [x] **Step 3: `calcSlopeProfile` 采样参数化（间距加密、山区约 200m）**
 
 定位 `calcSlopeProfile` 内采样段（原 `339` 附近 `const sampleCount = Math.max(15, Math.min(200, Math.ceil(totalDist / 400)))`），改为：
 
@@ -365,7 +365,7 @@ export async function queryElevations(points) {
 
 并给函数签名加可选参：`export async function calcSlopeProfile(segments, { spacing = 220 } = {})`，把上面常量改用 `spacing`。
 
-- [ ] **Step 4: `tryGenerateRoute` 任何接受路径都补坡度分析**
+- [x] **Step 4: `tryGenerateRoute` 任何接受路径都补坡度分析**
 
 在 `tryGenerateRoute` 内，把两处提前 return（`fixed.accepted` 与 `a >= EARLY_ACCEPT_AFTER` 分支）改为共用末尾的"组装 + 必经坡度"逻辑。最小改法：将命中分支改为**先不 return**，跳转到函数尾统一处理——把 `482-483` 两行与 `480-487` 段整理成：
 
@@ -398,14 +398,14 @@ export async function queryElevations(points) {
 
 `best` 兜底分支末尾同样改走 `finishRoute`，去掉其中 `window.$toast('坡度分析未成功…','warn')` 等打扰性 toast。
 
-- [ ] **Step 5: 全量跑测试与构建验证**
+- [x] **Step 5: 全量跑测试与构建验证**
 
 Run: `node --test tests/ && npm run build`
 Expected: 既有单测全 PASS；构建通过。
 
 > 真机行为验证（无法离线断言，列为手动验收）：`npm run dev` 后环线/目的地连生成 5 条，不再弹「高程查询失败」；若断网/Open-Meteo 不可达，爬升显示「--」但路线照出。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/composables/useRouteEngine.js src/composables/elevation.js
@@ -418,7 +418,7 @@ git commit -m "fix(骑行): 高程改双源并必经坡度分析；calcSlopeProf
 
 **Files:** Modify `src/composables/useScoring.js` · Test `tests/scoring.test.mjs`
 
-- [ ] **Step 1: 写失败测试（先固化「真实爬升决定评级」的契约）**
+- [x] **Step 1: 写失败测试（先固化「真实爬升决定评级」的契约）**
 
 ```js
 // tests/scoring.test.mjs
@@ -427,25 +427,24 @@ import assert from 'node:assert/strict'
 import { rateDifficulty } from '../src/composables/useScoring.js'
 test('30km with 1500m climb is not casual', () => {
   const d = rateDifficulty(30000, 1500)
-  assert.ok(!d.label.includes('★')) // ratio=50 → 极限
-  assert.equal(d.label, '★★★★★ 极限')
+  assert.equal(d.label, '★★★★★ 极限') // ratio=50 → 极限
 })
-test('40km flat with 0 climb is casual', () => {
+test('40km flat with 0 climb is advanced (km≥25 → ★★)', () => {
   const d = rateDifficulty(40000, 0)
-  assert.equal(d.label, '★ 休闲')
+  assert.equal(d.label, '★★ 进阶')
 })
-test('30km with 300m climb is mid (ratio=10 → 困难)', () => {
+test('30km with 300m climb is moderate (ratio=10, not >10 → ★★★)', () => {
   const d = rateDifficulty(30000, 300)
-  assert.equal(d.label, '★★★★ 困难')
+  assert.equal(d.label, '★★★ 中等')
 })
 ```
 
-- [ ] **Step 2: 跑测试确认通过契约存在**（`rateDifficulty` 已是纯函数）
+- [x] **Step 2: 跑测试确认通过契约存在**（`rateDifficulty` 已是纯函数）
 
 Run: `node --test tests/scoring.test.mjs`
 Expected: PASS（说明契约正确；本任务真正改动在 A4 让 climb 不再为空）
 
-- [ ] **Step 3: 删 `scoreRoute` 死代码（其引用的 maxSlope/steepKm*/uninhabitedKm 从未被任何调用方填充）**
+- [x] **Step 3: 删 `scoreRoute` 死代码（其引用的 maxSlope/steepKm*/uninhabitedKm 从未被任何调用方填充）**
 
 删除 `useScoring.js` 中 `scoreRoute` 整个函数与 `elevationProfile` 参数残留，仅保留：
 
@@ -464,12 +463,12 @@ export function rateDifficulty(totalDistance, totalClimb) {
 
 （`rateDifficulty` 保留原样，改动点是把原本吃空爬升的调用链从 A4 起喂真爬升。）
 
-- [ ] **Step 4: 构建 + 跑测试**
+- [x] **Step 4: 构建 + 跑测试**
 
 Run: `node --test tests/scoring.test.mjs && npm run build`
 Expected: PASS + 编译通过
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/composables/useScoring.js tests/scoring.test.mjs
@@ -482,7 +481,7 @@ git commit -m "refactor(scoring): 删除未接线死字段 scoreRoute；难度�
 
 **Files:** Create `src/utils/gpx.js` · Modify `useRouteEngine.js:buildGPX` 委托 · Modify `ExploreView.vue` 环线 min/max · Test `tests/gpx.test.mjs`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```js
 // tests/gpx.test.mjs
@@ -499,12 +498,12 @@ test('GPX contains WGS84 lng (offset west of GCJ) and ele tag', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `node --test tests/gpx.test.mjs`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```js
 // src/utils/gpx.js
@@ -527,11 +526,11 @@ export function buildGpxTrk(segments, homeName, workName, distMeters) {
 }
 ```
 
-- [ ] **Step 4: `useRouteEngine.buildGPX` 改为委托**
+- [x] **Step 4: `useRouteEngine.buildGPX` 改为委托**
 
 `useRouteEngine.js` 顶部加 `import { buildGpxTrk } from '../utils/gpx.js'`；将 `buildGPX`（`546-555`）函数体替换为 `return buildGpxTrk(route.segments, home.name, work.name, route.totalDistance)`。
 
-- [ ] **Step 5: 环线容差收紧**
+- [x] **Step 5: 环线容差收紧**
 
 `ExploreView.vue` `doGenerate` 中环线调用（`275`）参数 `minDist: td*0.55, maxDist: td*1.5` 改为：
 
@@ -541,12 +540,12 @@ export function buildGpxTrk(segments, homeName, workName, distMeters) {
 
 （±12%。`doGenerateMultiple` 里同款 `299-301` 一并改为 `0.88/1.12`。目的地非环线分支不动。）
 
-- [ ] **Step 6: 跑测试 + 构建**
+- [x] **Step 6: 跑测试 + 构建**
 
 Run: `node --test tests/gpx.test.mjs && npm run build`
 Expected: PASS + 编译通过
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/utils/gpx.js src/composables/useRouteEngine.js src/views/ExploreView.vue tests/gpx.test.mjs
@@ -561,7 +560,7 @@ git commit -m "fix(骑行): GPX 逐点转 WGS84 导出；环线距离容差收�
 
 **Files:** Create `src/data/playpools.js` · Test（并入 corridorData 测）
 
-- [ ] **Step 1: 实现**
+- [x] **Step 1: 实现**
 
 ```js
 // src/data/playpools.js —— 关中 v1 三个玩法池，按骑行语义归堆
@@ -584,7 +583,7 @@ export const PLAYPOOLS = [
 ]
 ```
 
-- [ ] **Step 2: 提交**
+- [x] **Step 2: 提交**
 
 ```bash
 git add src/data/playpools.js
@@ -597,7 +596,7 @@ git commit -m "feat(data): 关中 v1 玩法池（南山峪口爬坡/渭河河堤
 
 **Files:** Create `src/data/corridors.js` · Modify `package.json`
 
-- [ ] **Step 1: 实现 schema 与 8 条精编廊道（信任 green/blue，供信封引擎首跑）**
+- [x] **Step 1: 实现 schema 与 8 条精编廊道（信任 green/blue，供信封引擎首跑）**
 
 ```js
 // src/data/corridors.js
@@ -657,11 +656,11 @@ export const CORRIDORS = [
 
 > 注：`climbM` 为首批**人工先验值**（老骑手口径），后续构建脚本对自动灰段重算并回填。经纬度全部 GCJ-02。
 
-- [ ] **Step 2: package.json 加测试脚本**
+- [x] **Step 2: package.json 加测试脚本**
 
 `package.json` `scripts` 增：`"test": "node --test tests/"`
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add src/data/corridors.js package.json
@@ -674,7 +673,7 @@ git commit -m "feat(data): 廊道 schema + 关中首批8条精编（含 climbM �
 
 **Files:** Create `src/data/corridors.auto.json`(空数组占位) · `scripts/build-corridors.mjs` · Modify `src/data/corridors.js`（合并入口）
 
-- [ ] **Step 1: 空占位 + 合并加载**
+- [x] **Step 1: 空占位 + 合并加载**
 
 创建 `src/data/corridors.auto.json`：`[]`
 
@@ -685,7 +684,7 @@ import autoCorridors from './corridors.auto.json'
 export const CORRIDORS = [ /* 上方手工条目 */ ...autoCorridors ]
 ```
 
-- [ ] **Step 2: 写构建脚本（`scripts/build-corridors.mjs`）**
+- [x] **Step 2: 写构建脚本（`scripts/build-corridors.mjs`）**
 
 要点：导入 `presetRoutes`；对相邻途经点对调高德 `v5/direction/bicycling`；避让词筛查降 `yellow`；单段>40km 或 API 失败记 skip；**加 `--fixtures` 模式**用内置假 polyline 走通全流程离线验证管线。
 
@@ -743,12 +742,12 @@ await writeFile('src/data/corridors.auto.json', JSON.stringify(auto, null, 2))
 console.log(`生成 ${auto.length} 条自动廊道，跳过 ${skipped} 条；总库 ${CORRIDORS.length + auto.length} 条`)
 ```
 
-- [ ] **Step 3: 跑 fixtures 模式验证管线**
+- [x] **Step 3: 跑 fixtures 模式验证管线**
 
 Run: `node scripts/build-corridors.mjs --fixtures`
 Expected: 打印 `生成 N 条自动廊道，跳过 M 条`，`corridors.auto.json` 写入非空数组（fixtures 下 preset 途经点对都能"规划"）。
 
-- [ ] **Step 4: 提交（占位 + 脚本 + 空 JSON）**
+- [x] **Step 4: 提交（占位 + 脚本 + 空 JSON）**
 
 ```bash
 git add src/data/corridors.auto.json scripts/build-corridors.mjs src/data/corridors.js
@@ -761,7 +760,7 @@ git commit -m "feat(corridors): 自动重建脚本 build-corridors.mjs（含 --f
 
 **Files:** Create `src/composables/corridorData.js` · Test `tests/corridorData.test.mjs`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```js
 // tests/corridorData.test.mjs
@@ -785,12 +784,12 @@ test('filterEnvelope keeps only pool + minTrust + climbBand', () => {
 })
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `node --test tests/corridorData.test.mjs`
 Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```js
 // src/composables/corridorData.js
@@ -829,12 +828,12 @@ export function filterEnvelope(list, { pools = [], minTrust = 'yellow', band = n
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `node --test tests/corridorData.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/composables/corridorData.js tests/corridorData.test.mjs
