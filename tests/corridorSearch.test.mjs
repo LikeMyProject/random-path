@@ -18,6 +18,13 @@ test('randomChain: 不重复、长度受控、每条相邻桥接合规', () => {
   }
 })
 
+test('randomChain: 里程感知——接近目标即停，不盲目串满 maxDepth', () => {
+  const chain = randomChain(CORR, { startId: 'c0', maxDepth: 4, maxBridgeKm: 12, targetKm: 8, rng: () => 0.5 })
+  const sum = chain.reduce((s, id) => s + CORR.find(c => c.id === id).distKm, 0)
+  assert.ok(sum <= 8 * 1.3, `链总里程 ${sum}km 超过目标 8km 的 1.3 倍`)
+  assert.ok(chain.length >= 1 && chain.length <= 4)
+})
+
 test('randomChain: 排除已用(locked)廊道', () => {
   const chain = randomChain(CORR, { startId: 'c1', usedIds: ['c2'], maxDepth: 5, maxBridgeKm: 12, rng: () => 0.5 })
   assert.ok(!chain.includes('c2'))

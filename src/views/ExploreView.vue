@@ -601,15 +601,26 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
   <!-- 四步出题（聪明骰子）：多远 → 什么路 → 往哪 → 出发 -->
   <p class="section-title">怎么骑？（点选即出）</p>
-  <div class="compass-grid">
-    <button v-for="s in distSteps" :key="s" :class="['chip',{active:distKm===s}]" @click="distKm=s">{{ s }} km</button>
-  </div>
-  <div class="compass-grid">
-    <button v-for="b in bands" :key="b.k" :class="['chip',{active:band===b.k}]" @click="band=b.k">{{ b.label }}</button>
-  </div>
-  <div class="compass-grid">
-    <button :class="['chip',{active:!pool}]" @click="pool=null">🎲 随缘</button>
-    <button v-for="p in pools" :key="p.id" :class="['chip',{active:pool===p.id}]" @click="pool=p.id">{{ p.icon }} {{ p.label }}</button>
+  <div class="dice-card">
+    <div class="dice-row">
+      <span class="dice-label">多远</span>
+      <div class="dice-opts cols3">
+        <button v-for="s in distSteps" :key="s" :class="['chip',{active:distKm===s}]" @click="distKm=s">{{ s }} km</button>
+      </div>
+    </div>
+    <div class="dice-row">
+      <span class="dice-label">什么路</span>
+      <div class="dice-opts cols2">
+        <button v-for="b in bands" :key="b.k" :class="['chip',{active:band===b.k}]" @click="band=b.k">{{ b.label }}</button>
+      </div>
+    </div>
+    <div class="dice-row">
+      <span class="dice-label">往哪</span>
+      <div class="dice-opts cols2">
+        <button :class="['chip',{active:!pool}]" @click="pool=null">🎲 随缘</button>
+        <button v-for="p in pools" :key="p.id" :class="['chip',{active:pool===p.id}]" @click="pool=p.id">{{ p.icon }} {{ p.label }}</button>
+      </div>
+    </div>
   </div>
   <button class="btn-go" :disabled="loading" @click="doSmart">
     {{ loading ? '合成中…' : '🎲 合成好路' }}
@@ -1447,6 +1458,46 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .mc-meta { font-size: 11px; color: #a898b8; }
 .mc-sub { margin-bottom: 4px; }
+/* 四步出题卡（视觉修整）：行标签 + 等宽网格 */
+.dice-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 12px 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+  margin-bottom: 12px;
+}
+.dice-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.dice-label {
+  flex-shrink: 0;
+  width: 46px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #a898b8;
+  padding-top: 8px;
+}
+.dice-opts { flex: 1; display: grid; gap: 6px; }
+.dice-opts.cols3 { grid-template-columns: repeat(3, 1fr); }
+.dice-opts.cols2 { grid-template-columns: repeat(2, 1fr); }
+.dice-opts .chip {
+  width: 100%;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: none;
+  background: #f7f5fa;
+  color: #7a6c8a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.dice-opts .chip:hover { background: var(--accent-soft); color: var(--accent); }
+.dice-opts .chip.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25);
+}
 /* 钉段行（D3） */
 .lock-row { align-items: center; margin: 8px 0 0; }
 .lock-hint { font-size: 11px; color: #a898b8; align-self: center; }

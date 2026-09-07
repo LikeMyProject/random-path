@@ -11,20 +11,28 @@ export function minBridgeKm(ca, cb) {
   return m
 }
 
-// 从 startId 出发随机串廊道；只允许"直线可达(≤maxBridgeKm)"的下一段；rng 可注入以便测试
-export function randomChain(corridors, { startId, usedIds = [], maxDepth = 6, maxBridgeKm = 15, rng = Math.random } = {}) {
+// 从 startId 出发随机串廊道；只允许"直线可达(≤maxBridgeKm)"的下一段；rng 可注入以便测试。
+// targetKm：链的期望总里程（真路程由 C2 复测，这里用廊道 distKm 先验做粗控）——
+// 接近目标(≥85%)即停；候选段会让总量超目标 130% 时优先排除，避免盲目串满 maxDepth
+// 导致真实里程必然超带、候选全被筛光（机器人冒烟实测的阻断 bug）。
+export function randomChain(corridors, { startId, usedIds = [], maxDepth = 6, maxBridgeKm = 15, targetKm = null, rng = Math.random } = {}) {
   const start = corridors.find(c => c.id === startId)
   if (!start) return []
   const used = new Set(usedIds)
   used.add(startId)
   const chain = [startId]
+  let sum = start.distKm || 0
   let cur = start
   while (chain.length < maxDepth) {
+    if (targetKm != null && sum >= targetKm * 0.85) break
     const opts = corridors.filter(c => !used.has(c.id) && minBridgeKm(c, cur) <= maxBridgeKm)
     if (opts.length === 0) break
-    const pick = opts[Math.min(opts.length - 1, Math.floor(rng() * opts.length))]
+    const fits = targetKm != null ? opts.filter(c => sum + (c.distKm || 0) <= targetKm * 1.3) : opts
+    const pool = fits.length ? fits : opts
+    const pick = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))]
     used.add(pick.id)
     chain.push(pick.id)
+    sum += pick.distKm || 0
     cur = pick
   }
   return chain

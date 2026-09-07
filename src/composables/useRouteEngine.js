@@ -481,7 +481,8 @@ export async function tryGenerateRoute(home, work, opts = {}) {
       if (td <= maxDist) {
         const fixed = await tryFixDeadEnds(segs, waypoints, td, tt, home, work, maxDist, onTry, a, sector)
         if (fixed && fixed.accepted) { recordWaypoints(fixed.route.waypoints); return finishRoute(fixed.route) }
-        if (a >= EARLY_ACCEPT_AFTER && fixed && fixed.route) { recordWaypoints(fixed.route.waypoints); return finishRoute(fixed.route) }
+        // 提前接受也必须守里程下限：否则稀疏路网下吸附塌缩的 5km 伪环线会被当成结果交差
+        if (a >= EARLY_ACCEPT_AFTER && fixed && fixed.route && fixed.route.totalDistance >= minDist) { recordWaypoints(fixed.route.waypoints); return finishRoute(fixed.route) }
         const rt = fixed?.route || { waypoints, segments: segs, totalDistance: td, totalDuration: tt, sector }
         const diff = maxDist - rt.totalDistance
         if (diff < bestDiff) { bestDiff = diff; best = rt }
