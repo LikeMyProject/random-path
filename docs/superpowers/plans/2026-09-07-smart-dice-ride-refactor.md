@@ -1077,7 +1077,7 @@ git commit -m "feat(engine): useSmartDice 编排器——随机链/门到门补�
 
 **Files:** Create `src/components/SceneSteps.vue` · Modify `src/views/ExploreView.vue`（模板出题区 + handler）
 
-- [ ] **Step 1: 新建 SceneSteps 组件（里程/地形/方向三行，参照现有 chip/scene-card 样式）**
+- [x] **Step 1: 新建 SceneSteps 组件（里程/地形/方向三行，参照现有 chip/scene-card 样式）**
 
 ```vue
 <script setup>
@@ -1093,7 +1093,7 @@ const emit = defineEmits(['update:step'])
 
 （占位壳，真正的四组选项直接写在 ExploreView 内联更贴合既有风格，此组件仅为语义收口，可整块并入 ExploreView 而不用。）
 
-- [ ] **Step 2: ExploreView 出题区模板替换**
+- [x] **Step 2: ExploreView 出题区模板替换**
 
 把 `<SceneCards v-model="scene" />`（`ExploreView.vue:481`）到生成按钮区（`569`）之间的「场景卡 + 距离滑块 + 目的地搜索」三块，替换为内联四步（视觉沿用 `.scene-card/.chip/.dist-*` 样式类；关键结构如下，样式复用现有类名，新增少量 scoped 补丁）：
 
@@ -1116,7 +1116,7 @@ const emit = defineEmits(['update:step'])
   </button>
 ```
 
-- [ ] **Step 3: ExploreView 状态与 handler**
+- [x] **Step 3: ExploreView 状态与 handler**
 
 在 `<script setup>` 增：`const distKm = ref(20); const band = ref('any'); const pool = ref(null)`；`const pools = ref(PLAYPOOLS.filter(p=>p.region.includes('关中')))`；新增 `distSteps=[10,20,30,50,80,100]`、`bands=[{k:'flat',label:'平路巡航'},{k:'rolling',label:'起伏有致'},{k:'hill',label:'爬坡过瘾'},{k:'any',label:'随缘'}]`。
 
@@ -1140,11 +1140,11 @@ async function doSmart() {
 
 > import 顶部补：`import { useSmartDice } from '../composables/useSmartDice.js'`、`import { PLAYPOOLS } from '../data/playpools.js'`。
 
-- [ ] **Step 4: 手动验收 + 构建**
+- [x] **Step 4: 手动验收 + 构建**
 
 Run: `npm run build`；`npm run dev` 手测：起点定位后选「20km·爬坡·南山」，应出 3 候选卡（含爬升/路型/信任徽章，见 D2）；信封不足时优雅退回旧随机并给提示。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/views/ExploreView.vue src/components/SceneSteps.vue
@@ -1157,7 +1157,7 @@ git commit -m "feat(ui): Explore 四步出题(里程/地形/玩法池) + 接入 
 
 **Files:** Modify `src/views/ExploreView.vue`（多卡片模板 `612-618`）+ 少量 scoped 样式
 
-- [ ] **Step 1: 多卡片内容升级**
+- [x] **Step 1: 多卡片内容升级**
 
 把 `multiResults` 横滑卡（现有 `<div v-for ... class="multi-card">`）改为内容更实：
 
@@ -1178,11 +1178,11 @@ git commit -m "feat(ui): Explore 四步出题(里程/地形/玩法池) + 接入 
 function poolLabel(r) { return (r.corridorIds || []).length ? '🏔 廊道合成' : '🔄 随机环' }
 ```
 
-- [ ] **Step 2: 构建 + 手动验收**
+- [x] **Step 2: 构建 + 手动验收**
 
 Run: `npm run build`；dev 手测：候选卡一眼可见 距离/爬升/路型/来源徽章，点卡进 `ResultView` 明细与操作（导航/GPX/分享）照常。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add src/views/ExploreView.vue
@@ -1195,7 +1195,7 @@ git commit -m "feat(ui): 三候选卡升级——距离/爬升/路型/合成徽�
 
 **Files:** Modify `src/views/ExploreView.vue` + `useSmartDice.js`
 
-- [ ] **Step 1: useSmartDice 支持 lockedIds**
+- [x] **Step 1: useSmartDice 支持 lockedIds**
 
 `generate()` 已接收 `locked`（C2 已实现：以锁定廊道为锚、其余段重掷）；补一个同义的 `reroll` 出口便于视图语义清晰：
 
@@ -1206,7 +1206,7 @@ git commit -m "feat(ui): 三候选卡升级——距离/爬升/路型/合成徽�
   return { generate, reroll, chooseEnvelope, index: ix }
 ```
 
-- [ ] **Step 2: Explore 侧钉段 UI**
+- [x] **Step 2: Explore 侧钉段 UI**
 
 在选中的多卡片下加一行锁定 chips（按 `activeResult.corridorIds` 渲染，「🔒 第N段」/解锁），并把「换一条」按钮绑到带 `locked` 的 `reroll`：
 
@@ -1233,11 +1233,11 @@ async function doReroll() {
 
 将 `ResultView` 的「换一条」`@regenerate` 从 `doRegenerate` 改绑 `doReroll`（信封不足自动落 `doGenerate` 见 D1 同理降级）。
 
-- [ ] **Step 3: 构建 + 手动验收**
+- [x] **Step 3: 构建 + 手动验收**
 
 Run: `npm run build`；dev 手测：钉住第 2 段点换一条 → 第 2 段不变、其余段换新。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/composables/useSmartDice.js src/views/ExploreView.vue
@@ -1250,7 +1250,7 @@ git commit -m "feat(ui): 钉段锁定 + 局部重掷（reroll with locked corrid
 
 **Files:** Modify `src/views/PresetView.vue`
 
-- [ ] **Step 1: 加玩法池/难度筛选**
+- [x] **Step 1: 加玩法池/难度筛选**
 
 在 `PresetView.vue` 搜索框（`333` select 上方）补玩法池筛选下拉与结果条数；复用现有 `groups`/`filteredRoutes` 逻辑，只在 `filteredRoutes` 增加池匹配（按池内 `corridorIds` 反查预置线名相关性，首版简化为按名称关键词 OR 玩法池名）：
 
@@ -1279,7 +1279,7 @@ const filteredRoutes = computed(() => {
 
 import 补 `PLAYPOOLS`。
 
-- [ ] **Step 2: 「当灵感」按钮**
+- [x] **Step 2: 「当灵感」按钮**
 
 选中路线详情卡操作区加按钮，把该线途经点序列写入 localStorage 桩 `radompath_inspiration`，跳转 Explore（`/explore`）并提示；Explore onMounted 读到该桩即把它当作 4 步的种子（首版：把途经点最远两点当起点/方向 hint，简化：仅 toast 提示「灵感已带入，选里程直接合成」）。
 
@@ -1293,11 +1293,11 @@ function useAsInspiration() {
 
 > import 顶部补 `useRouter`。Explore 侧按需读取该桩（可延后，不阻塞本任务提交）。
 
-- [ ] **Step 3: 构建 + 手动验收**
+- [x] **Step 3: 构建 + 手动验收**
 
 Run: `npm run build`；dev 手测：库内可按玩法池过滤；点「当灵感」跳到 Explore。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/views/PresetView.vue
