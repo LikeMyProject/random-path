@@ -1,7 +1,7 @@
 // tests/corridorSearch.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { randomChain, reversePolyline, minBridgeKm } from '../src/composables/corridorSearch.js'
+import { randomChain, reversePolyline, minBridgeKm, planChainPath } from '../src/composables/corridorSearch.js'
 
 // 六条首尾相衔的廊道，c_i.end = c_{i+1}.start（lng 每段 +0.05°≈5km）
 const CORR = Array.from({ length: 6 }, (_, i) => ({
@@ -42,4 +42,27 @@ test('reversePolyline: 整串倒序', () => {
   assert.equal(reversePolyline('108.00,34.00;108.01,34.01;108.02,34.02'), '108.02,34.02;108.01,34.01;108.00,34.00')
   assert.equal(reversePolyline('108.00,34.00'), '108.00,34.00')
   assert.equal(reversePolyline(''), '')
+})
+
+test('planChainPath: 从近端进、另一端出；近端为 end 时标记反向', () => {
+  const byId = Object.fromEntries(CORR.map(c => [c.id, c]))
+  // 从 c0 起点侧进入：应正向穿越
+  const fwd = planChainPath(byId, ['c0', 'c1'], { lng: 108, lat: 34 })
+  assert.deepEqual(fwd.map(s => s.id), ['c0', 'c1'])
+  assert.equal(fwd[0].reversed, false)
+  assert.deepEqual(fwd[0].entry, CORR[0].start)
+  assert.deepEqual(fwd[0].exit, CORR[0].end)
+  // 第二段入口应接在第一段出口上
+  assert.deepEqual(fwd[1].entry, CORR[1].start)
+
+  // 从 c0 终点侧进入：应反向穿越（entry=end, exit=start）
+  const rev = planChainPath(byId, ['c0'], { lng: 108.05, lat: 34 })
+  assert.equal(rev[0].reversed, true)
+  assert.deepEqual(rev[0].entry, CORR[0].end)
+  assert.deepEqual(rev[0].exit, CORR[0].start)
+})
+
+test('planChainPath: 忽略链中不存在的 id', () => {
+  const byId = Object.fromEntries(CORR.map(c => [c.id, c]))
+  assert.deepEqual(planChainPath(byId, ['c0', 'ghost'], { lng: 108, lat: 34 }).map(s => s.id), ['c0'])
 })

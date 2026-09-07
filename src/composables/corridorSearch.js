@@ -30,6 +30,25 @@ export function randomChain(corridors, { startId, usedIds = [], maxDepth = 6, ma
   return chain
 }
 
+// 把一串廊道 id 变成「从哪端进、哪端出」的行进计划。
+// 关键：廊道是双向可骑的，若不判方向，一律从 start 骑到 end，当上一段出口恰好靠近下一段 end 时，
+// 会规划出一条横跨整条廊道再回头的怪路线。故逐段取离当前位置更近的一端作为入口。
+export function planChainPath(byId, ids, from) {
+  const out = []
+  let cur = from
+  for (const id of ids) {
+    const c = byId[id]
+    if (!c || !cur) continue
+    const dStart = toKm(cur, c.start), dEnd = toKm(cur, c.end)
+    const reversed = dEnd < dStart
+    const entry = reversed ? c.end : c.start
+    const exit = reversed ? c.start : c.end
+    out.push({ id, corridor: c, entry, exit, reversed })
+    cur = exit
+  }
+  return out
+}
+
 // 返程复用同一段 polyline 直接倒序即可（同一条路往回骑，不必重复请求）
 export function reversePolyline(p) {
   if (!p) return ''
