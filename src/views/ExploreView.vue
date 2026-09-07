@@ -272,7 +272,7 @@ async function doGenerate(isRetry = false) {
   }
   try {
     const route = isLoop
-      ? await tryGenerateRoute(h, h, { minDist: Math.round(td * 0.55), maxDist: Math.round(td * 1.5), waypointGenerator: () => generateCompassLoop(h, td, dirDeg), onTry })
+      ? await tryGenerateRoute(h, h, { minDist: Math.round(td * 0.88), maxDist: Math.round(td * 1.12), waypointGenerator: () => generateCompassLoop(h, td, dirDeg), onTry })
       : await tryGenerateRoute(h, w, { minDist: Math.round(td * 0.6), maxDist: Math.round(td * 1.4), directionDeg: dirDeg, onTry })
     if (!route) { toast('生成失败，请重试', 'err'); loading.value = false; return }
     if (route.waypoints.length > 0) { loadingHint.value = '正在获取途经点地名…'; await Promise.all(route.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) }
@@ -297,7 +297,7 @@ async function doGenerateMultiple() {
   loading.value = true; loadingHint.value = '正在同时生成 3 条路线…'
   try {
     const opts = isLoop
-      ? { minDist: Math.round(td * 0.55), maxDist: Math.round(td * 1.5), waypointGenerator: () => generateCompassLoop(h, td, dirDeg) }
+      ? { minDist: Math.round(td * 0.88), maxDist: Math.round(td * 1.12), waypointGenerator: () => generateCompassLoop(h, td, dirDeg) }
       : { minDist: Math.round(td * 0.6), maxDist: Math.round(td * 1.4), directionDeg: dirDeg }
     const results = await generateMultipleRoutes(h, w, opts, 3)
     for (const r of results) { if (r.waypoints.length > 0) { await Promise.all(r.waypoints.map(async (wp) => { wp.poiName = await nameWaypoint(wp.lng, wp.lat) })) } }

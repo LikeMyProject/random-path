@@ -1,4 +1,5 @@
 import { haversine, getBearing, destinationPoint, sortWaypointsAlongCorridor, parsePolyline, samplePoints } from '../utils/math.js'
+import { buildGpxTrk } from '../utils/gpx.js'
 import { fetchBicyclingRoute, reverseGeocode, searchPOIs, fetchBicyclingPaths, loadAMapSDK } from './useAMap.js'
 import { getRecentSectors, saveWaypointTracker, loadWaypointTracker } from './useStorage.js'
 
@@ -544,14 +545,7 @@ export async function fetchOptimalBikeRoute(o, d) {
 }
 
 export function buildGPX(route, home, work) {
-  let trkpts = ''
-  for (const seg of (route.segments || [])) {
-    if (!seg.polyline) continue
-    for (const pt of parsePolyline(seg.polyline)) trkpts += `      <trkpt lat="${pt.lat.toFixed(6)}" lon="${pt.lng.toFixed(6)}">\n        <ele>0</ele>\n      </trkpt>\n`
-  }
-  const distKm = (route.totalDistance / 1000).toFixed(1)
-  const name = `${home.name} → ${work.name} (${distKm}km)`
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="漫途" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><trkseg>\n${trkpts}    </trkseg></trk></gpx>`
+  return buildGpxTrk(route.segments, home.name, work.name, route.totalDistance)
 }
 
 export function isBadLocationName(name) {
