@@ -9,6 +9,10 @@ import { useRouteContext } from '../composables/useRouteContext.js'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 import ResultView from './ResultView.vue'
 import SceneCards from '../components/SceneCards.vue'
+import { useSmartDice } from '../composables/useSmartDice.js'
+import { PLAYPOOLS } from '../data/playpools.js'
+import { CORRIDORS } from '../data/corridors.js'
+import { indexCorridors } from '../composables/corridorData.js'
 
 const toast = (m, t) => window.$toast?.(m, t)
 const addresses = loadAddresses()
@@ -307,6 +311,78 @@ async function doGenerateMultiple() {
   loading.value = false
 }
 
+// === 候选卡徽章：来源 / 形状 / 信任（信任取各段最低，木桶效应）===
+const corridorIx = indexCorridors(CORRIDORS)
+const TRUST_META = {
+  blue: { badge: '人工精校', color: '#185fa5' },
+  green: { badge: '实骑验证', color: '#0f6e56' },
+  yellow: { badge: '待核实', color: '#854f0b' },
+  grey: { badge: '自动待实测', color: '#5f5e5a' },
+}
+const TRUST_RANK = { grey: 1, yellow: 2, green: 3, blue: 4 }
+function poolLabel(r) { return (r.corridorIds || []).length ? '🏔 廊道合成' : '🔄 随机环' }
+function shapeLabel(r) { return r.shape === 'loop' ? '环线闭合' : '往返折返' }
+function trustOf(r) {
+  const ids = r.corridorIds || []
+  if (!ids.length) return null
+  let worst = null
+  for (const id of ids) {
+    const c = corridorIx.byId[id]
+    if (!c) continue
+    if (!worst || (TRUST_RANK[c.trust] ?? 0) < (TRUST_RANK[worst] ?? 9)) worst = c.trust
+  }
+  return worst ? TRUST_META[worst] : null
+}
+
+// === 四步出题（聪明骰子）：多远 → 什么路 → 往哪 ===
+const distKm = ref(20)
+const band = ref('any')
+const pool = ref(null)
+const showClassic = ref(false) // 经典模式折叠：保留「骑到某处 / 环线」旧入口
+const distSteps = [10, 20, 30, 50, 80, 100]
+const bands = [
+  { k: 'flat', label: '平路巡航' },
+  { k: 'rolling', label: '起伏有致' },
+  { k: 'hill', label: '爬坡过瘾' },
+  { k: 'any', label: '随缘' },
+]
+const pools = PLAYPOOLS.filter(p => p.region.includes('关中'))
+
+async function doSmart() {
+  if (!from.value.name || !from.value.lng) { toast('请先定位起点', 'warn'); return }
+  const start = { name: from.value.name, lng: parseFloat(from.value.lng), lat: parseFloat(from.value.lat) }
+  loading.value = true; resultShow.value = false; multiResults.value = []
+  try {
+    const { generate } = useSmartDice()
+    const cands = await generate(start, {
+      distKm: distKm.value,
+      band: band.value,
+      pool: pool.value || null,
+      minTrust: pool.value ? 'green' : 'yellow',
+    })
+    if (!cands.length) {
+      // 信封不足：降级旧引擎，并把里程口径对齐到用户所选，避免兜底路线与预期差太远
+      toast('该区好路还不够，先用经典随机兜底', 'warn')
+      scene.value = 'loop'
+      customDist.value = distKm.value
+      await doGenerate(true)
+      return
+    }
+    for (const r of cands) {
+      if (r.waypoints?.length) {
+        await Promise.all(r.waypoints.map(async wp => { if (!wp.poiName) wp.poiName = await nameWaypoint(wp.lng, wp.lat) }))
+      }
+    }
+    multiResults.value = cands
+    activeResultIdx.value = 0
+    await selectMulti(0) // 沿用既有：渲染缩略图 + 加载沿途上下文
+  } catch (e) {
+    toast('合成失败: ' + e.message, 'err')
+  } finally {
+    loading.value = false
+  }
+}
+
 // === 骑到某处：走高德最优（最短）路线，可选单程/往返，无随机途经点 ===
 async function doGenerateDestination() {
   if (!destCoord.value) { toast('请先搜索目的地', 'warn'); return }
@@ -476,6 +552,28 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     </div>
   </div>
 
+  <!-- 四步出题（聪明骰子）：多远 → 什么路 → 往哪 → 出发 -->
+  <p class="section-title">怎么骑？（点选即出）</p>
+  <div class="compass-grid">
+    <button v-for="s in distSteps" :key="s" :class="['chip',{active:distKm===s}]" @click="distKm=s">{{ s }} km</button>
+  </div>
+  <div class="compass-grid">
+    <button v-for="b in bands" :key="b.k" :class="['chip',{active:band===b.k}]" @click="band=b.k">{{ b.label }}</button>
+  </div>
+  <div class="compass-grid">
+    <button :class="['chip',{active:!pool}]" @click="pool=null">🎲 随缘</button>
+    <button v-for="p in pools" :key="p.id" :class="['chip',{active:pool===p.id}]" @click="pool=p.id">{{ p.icon }} {{ p.label }}</button>
+  </div>
+  <button class="btn-go" :disabled="loading" @click="doSmart">
+    {{ loading ? '合成中…' : '🎲 合成好路' }}
+  </button>
+
+  <!-- 经典模式（折叠保留旧入口） -->
+  <div class="advanced-toggle" @click="showClassic = !showClassic">
+    <span>经典模式（骑到某处 / 环线）</span>
+    <span class="arrow" :class="{ open: showClassic }">▾</span>
+  </div>
+  <div v-if="showClassic">
   <!-- 模式卡片 -->
   <p class="section-title">今天想怎么骑？</p>
   <SceneCards v-model="scene" />
@@ -567,6 +665,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   >
     {{ loading ? '生成中…' : scene === 'loop' ? '🔄 环线出发！' : (tripType === 'round' ? '🔁 往返出发！' : '🎯 骑过去！') }}
   </button>
+  </div><!-- /经典模式 -->
 
   <!-- 高级选项折叠 -->
   <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
@@ -611,8 +710,12 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <!-- 多路线 -->
   <div v-if="multiResults.length > 1" class="multi-cards">
     <div v-for="(r,i) in multiResults" :key="i" :class="['multi-card',{active:activeResultIdx===i}]" @click="selectMulti(i)">
-      <div style="font-weight:700;font-size:13px;color:#5e5468">{{ hasDest ? '路线' : '环线' }} {{ i+1 }}</div>
-      <div style="font-size:11px;color:#a898b8">{{ (r.totalDistance/1000).toFixed(1) }}km · {{ Math.round(r.totalDuration/60) }}min · ↗{{ r.totalClimb||0 }}m</div>
+      <div class="mc-head">
+        <strong class="mc-title">{{ poolLabel(r) }}</strong>
+        <span v-if="trustOf(r)" class="mc-badge" :style="{background: trustOf(r).color + '1f', color: trustOf(r).color}">{{ trustOf(r).badge }}</span>
+      </div>
+      <div class="mc-meta">{{ (r.totalDistance/1000).toFixed(1) }}km · {{ Math.round(r.totalDuration/60) }}min · ↗{{ r.totalClimb ?? '--' }}m</div>
+      <div class="mc-meta mc-sub">{{ shapeLabel(r) }}<template v-if="(r.corridorIds||[]).length"> · {{ r.corridorIds.length }} 段廊道</template></div>
       <RouteThumbnail :segments="r.segments" :waypoints="r.waypoints" :home="homeObj" :work="workObj" :uphillSections="r.uphillSections" :downhillSections="r.downhillSections" />
     </div>
   </div>
@@ -1264,4 +1367,29 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   border-color: var(--accent);
   box-shadow: 0 4px 16px rgba(var(--accent-rgb),.15);
 }
+/* 候选卡徽章行（D2） */
+.mc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.mc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3a3045;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mc-badge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.mc-meta { font-size: 11px; color: #a898b8; }
+.mc-sub { margin-bottom: 4px; }
 </style>
