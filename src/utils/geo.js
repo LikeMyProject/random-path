@@ -1,5 +1,8 @@
+// 克拉索夫斯基椭球参数（a=6378245, e²≈0.0066934216），非 CGCS2000/GRS80 的 6378137。
+// 公式取自广为流传的 GCJ-02 反推实现（官方无公开算法，勿用坐标反算军事等敏感用途）。
 const A = 6378245.0
 const EE = 0.00669342162296594323
+// 境外矩形粗判（标准算法约定），国境线边缘个别点会误判为境外。
 function outOfChina(lng, lat) { return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271 }
 function transformLat(x, y) {
   let ret = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))

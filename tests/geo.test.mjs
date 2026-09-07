@@ -16,6 +16,8 @@ test('wgs offset is a few hundred meters, not zero', () => {
   const w = gcj02ToWgs84(g.lng, g.lat)
   const dLngDeg = Math.abs(w.lng - g.lng)
   assert.ok(dLngDeg > 0.0015 && dLngDeg < 0.01) // ~150m~1km
+  const dLatDeg = Math.abs(w.lat - g.lat)
+  assert.ok(dLatDeg > 0.0015 && dLatDeg < 0.01) // 西安钟楼 lat 偏移约 0.00154°（~170m），同数百米量级
 })
 test('out-of-China coordinates unchanged', () => {
   const r = gcj02ToWgs84(2.35, 48.86) // 巴黎
