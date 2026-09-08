@@ -11,10 +11,37 @@ export function minBridgeKm(ca, cb) {
   return m
 }
 
-// 从 startId 出发随机串廊道；只允许"直线可达(≤maxBridgeKm)"的下一段；rng 可注入以便测试。
-// targetKm：链的期望总里程（真路程由 C2 复测，这里用廊道 distKm 先验做粗控）——
-// 接近目标(≥85%)即停；候选段会让总量超目标 130% 时优先排除，避免盲目串满 maxDepth
-// 导致真实里程必然超带、候选全被筛光（机器人冒烟实测的阻断 bug）。
+// 锚点排序：家周边可作为起链的廊道，按「预测总程贴近目标」排序返回多个候选。
+// 背景（2026-09-08 修复）：旧实现只挑一个锚点固定跑满 10 次尝试——若锚点自身里程已撑爆
+// 里程带（如家离南山 1.8km 却锚定 9.9km 段去凑 20km 往返，总程 2×11.7=23.4 超 22.4 上带），
+// 10 次尝试全废、必然 MISS 走经典兜底。故改为「多锚点轮流试」，并按贴近目标的偏差排序。
+// 往返(outback) 总程 ≈ 2 × (引道 + 链)；环线(loop) ≈ 引道 + 链 + 回程(≈引道)。
+// 过滤口径：真实高德里程可能低于 detour 系数预测，故不硬剔「单段往返略超上带」的锚点，
+// 而是把几何已无解的排到最后、最接近的放最前，交给 genRoute 用真实总程判定。
+export function rankAnchors(home, env, { distKm = 20, shape = 'outback', maxAccessKm = 18, detour = 1.35 } = {}) {
+  const dMax = distKm * 1.12
+  const cands = []
+  for (const c of env) {
+    const dStart = toKm(home, c.start), dEnd = toKm(home, c.end)
+    const d = Math.min(dStart, dEnd)
+    if (d > maxAccessKm) continue
+    const acc = d * detour
+    const km = c.distKm || 0
+    const predict = shape === 'loop' ? acc + km + acc : 2 * (acc + km)
+    // 单段往返明显超上带(>25%) → 几何无解，直接排除（连串小段都救不回超出的部分）
+    const hopeless = shape === 'loop' ? km > dMax * 1.25 : predict > dMax * 1.25
+    if (hopeless) continue
+    cands.push({ c, d, predict, gap: Math.abs(predict - distKm) })
+  }
+  return cands.sort((a, b) => a.gap - b.gap)
+}
+
+// 随机串廊道，累计里程朝 targetKm（链的目标里程）收敛。
+// 设计（2026-09-08 修复）：
+//   - 往返形状下真正约束总程的是「引道 + 链」，故 targetKm 由调用方按几何反推传入，
+//     不能简单 clamp 到 3——否则 4.7km 锚点一上来 sum≥3×0.9 就停，永远不串第 2、3 小段。
+//   - 每轮在「桥接可达」的候选里随机挑，但优先选让累计贴近 target 的段（贴边收尾）。
+//   - 累计已 ≥ target 且超出的部分不足以靠更小段补救 → 停；反之继续。
 export function randomChain(corridors, { startId, usedIds = [], maxDepth = 6, maxBridgeKm = 15, targetKm = null, rng = Math.random } = {}) {
   const start = corridors.find(c => c.id === startId)
   if (!start) return []
@@ -24,18 +51,30 @@ export function randomChain(corridors, { startId, usedIds = [], maxDepth = 6, ma
   let sum = start.distKm || 0
   let cur = start
   while (chain.length < maxDepth) {
-    if (targetKm != null && sum >= targetKm * 0.85) break
+    // 有目标且已达目标下界(90%) → 停；无目标则一直串满或用尽可达段
+    if (targetKm != null && sum >= targetKm * 0.9) break
     const opts = corridors.filter(c => !used.has(c.id) && minBridgeKm(c, cur) <= maxBridgeKm)
     if (opts.length === 0) break
-    const fits = targetKm != null ? opts.filter(c => sum + (c.distKm || 0) <= targetKm * 1.3) : opts
-    const pool = fits.length ? fits : opts
-    const pick = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))]
+    // 有目标：找「补上这跳仍不超 target×1.15」的候选；没有则只能接受超一点
+    const under = targetKm != null ? opts.filter(c => sum + (c.distKm || 0) <= targetKm * 1.15) : opts
+    const pool = under.length ? under : opts
+    const pick = targetKm != null ? pickClosest(sum, pool, targetKm, rng)
+      : opts[Math.min(opts.length - 1, Math.floor(rng() * opts.length))]
     used.add(pick.id)
     chain.push(pick.id)
     sum += pick.distKm || 0
     cur = pick
   }
   return chain
+}
+
+// 从候选里挑下一段：优先让「累计贴近 target」，兼顾随机性。
+function pickClosest(sum, opts, targetKm, rng) {
+  if (targetKm == null) return opts[Math.min(opts.length - 1, Math.floor(rng() * opts.length))]
+  const quota = targetKm - sum
+  const scored = opts.map(c => ({ c, d: Math.abs((c.distKm || 0) - quota) + rng() * 1.5 }))
+  scored.sort((a, b) => a.d - b.d)
+  return scored[0].c
 }
 
 // 把一串廊道 id 变成「从哪端进、哪端出」的行进计划。

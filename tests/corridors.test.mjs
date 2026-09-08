@@ -23,7 +23,11 @@ const inShaanxi = p => p.lng > 105 && p.lng < 112 && p.lat > 32 && p.lat < 36
 test('廊道字段完整、取值合法', () => {
   assert.ok(CORRIDORS.length > 0, '廊道不应为空')
   for (const c of CORRIDORS) {
-    for (const k of REQUIRED) assert.ok(c[k] !== undefined && c[k] !== null, `${c.id} 缺字段 ${k}`)
+    for (const k of REQUIRED) {
+      // 自动段爬升待实测，允许 null（与下方 climbM 断言口径一致）
+      if (isAuto(c) && k === 'climbM') continue
+      assert.ok(c[k] !== undefined && c[k] !== null, `${c.id} 缺字段 ${k}`)
+    }
     assert.ok(TRUSTS.includes(c.trust), `${c.id} trust 非法: ${c.trust}`)
     assert.ok(BANDS.includes(c.climbBand) || (isAuto(c) && c.climbBand === 'unknown'), `${c.id} climbBand 非法: ${c.climbBand}`)
     assert.ok(c.distKm > 0, `${c.id} distKm 必须为正`)

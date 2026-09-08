@@ -1,1 +1,2959 @@
-[]
+[
+  {
+    "id": "auto-西安·三河一山绿道-0",
+    "name": "三河一山起点→灞渭驿",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 17.4,
+    "climbM": null,
+    "start": {
+      "name": "三河一山起点",
+      "lng": 109.063,
+      "lat": 34.314
+    },
+    "end": {
+      "name": "灞渭驿",
+      "lng": 109.01,
+      "lat": 34.431
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-1",
+    "name": "灞渭驿→漕渭驿",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 7.4,
+    "climbM": null,
+    "start": {
+      "name": "灞渭驿",
+      "lng": 109.01,
+      "lat": 34.431
+    },
+    "end": {
+      "name": "漕渭驿",
+      "lng": 108.946,
+      "lat": 34.403
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-2",
+    "name": "漕渭驿→沣河绿道",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "weihe-west"
+    ],
+    "distKm": 21.7,
+    "climbM": null,
+    "start": {
+      "name": "漕渭驿",
+      "lng": 108.946,
+      "lat": 34.403
+    },
+    "end": {
+      "name": "沣河绿道",
+      "lng": 108.747,
+      "lat": 34.323
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-3",
+    "name": "沣河绿道→仪祉湖",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "weihe-west",
+      "greenway"
+    ],
+    "distKm": 29.8,
+    "climbM": null,
+    "start": {
+      "name": "沣河绿道",
+      "lng": 108.747,
+      "lat": 34.323
+    },
+    "end": {
+      "name": "仪祉湖",
+      "lng": 108.764,
+      "lat": 34.106
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-4",
+    "name": "仪祉湖→沣峪口转盘",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway",
+      "nan-ling"
+    ],
+    "distKm": 11.9,
+    "climbM": null,
+    "start": {
+      "name": "仪祉湖",
+      "lng": 108.764,
+      "lat": 34.106
+    },
+    "end": {
+      "name": "沣峪口转盘",
+      "lng": 108.822,
+      "lat": 34.051
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-5",
+    "name": "沣峪口转盘→太乙驿",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 19.4,
+    "climbM": null,
+    "start": {
+      "name": "沣峪口转盘",
+      "lng": 108.822,
+      "lat": 34.051
+    },
+    "end": {
+      "name": "太乙驿",
+      "lng": 109.015,
+      "lat": 34.032
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-6",
+    "name": "太乙驿→库峪河大桥",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 17.6,
+    "climbM": null,
+    "start": {
+      "name": "太乙驿",
+      "lng": 109.015,
+      "lat": 34.032
+    },
+    "end": {
+      "name": "库峪河大桥",
+      "lng": 109.172,
+      "lat": 34.028
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-7",
+    "name": "库峪河大桥→半坡驿",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 31.3,
+    "climbM": null,
+    "start": {
+      "name": "库峪河大桥",
+      "lng": 109.172,
+      "lat": 34.028
+    },
+    "end": {
+      "name": "半坡驿",
+      "lng": 109.044,
+      "lat": 34.267
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三河一山绿道-8",
+    "name": "半坡驿→三河一山起点",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 8.1,
+    "climbM": null,
+    "start": {
+      "name": "半坡驿",
+      "lng": 109.044,
+      "lat": 34.267
+    },
+    "end": {
+      "name": "三河一山起点",
+      "lng": 109.063,
+      "lat": 34.314
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三河一山绿道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·骊山环山路（最美72拐）-0",
+    "name": "骊山索道大门→骊山牡丹门",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 7.2,
+    "climbM": null,
+    "start": {
+      "name": "骊山索道大门",
+      "lng": 109.21,
+      "lat": 34.36
+    },
+    "end": {
+      "name": "骊山牡丹门",
+      "lng": 109.22,
+      "lat": 34.35
+    },
+    "trust": "yellow",
+    "src": "preset:西安·骊山环山路（最美72拐）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·骊山环山路（最美72拐）-1",
+    "name": "骊山牡丹门→骊山天文台",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 2,
+    "climbM": null,
+    "start": {
+      "name": "骊山牡丹门",
+      "lng": 109.22,
+      "lat": 34.35
+    },
+    "end": {
+      "name": "骊山天文台",
+      "lng": 109.23,
+      "lat": 34.34
+    },
+    "trust": "yellow",
+    "src": "preset:西安·骊山环山路（最美72拐）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·骊山环山路（最美72拐）-2",
+    "name": "骊山天文台→藤原豆腐店",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 12.7,
+    "climbM": null,
+    "start": {
+      "name": "骊山天文台",
+      "lng": 109.23,
+      "lat": 34.34
+    },
+    "end": {
+      "name": "藤原豆腐店",
+      "lng": 109.24,
+      "lat": 34.33
+    },
+    "trust": "yellow",
+    "src": "preset:西安·骊山环山路（最美72拐）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·骊山环山路（最美72拐）-3",
+    "name": "藤原豆腐店→人祖庙",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 3.4,
+    "climbM": null,
+    "start": {
+      "name": "藤原豆腐店",
+      "lng": 109.24,
+      "lat": 34.33
+    },
+    "end": {
+      "name": "人祖庙",
+      "lng": 109.25,
+      "lat": 34.32
+    },
+    "trust": "yellow",
+    "src": "preset:西安·骊山环山路（最美72拐）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·骊山环山路（最美72拐）-4",
+    "name": "人祖庙→洪庆山",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 10.3,
+    "climbM": null,
+    "start": {
+      "name": "人祖庙",
+      "lng": 109.25,
+      "lat": 34.32
+    },
+    "end": {
+      "name": "洪庆山",
+      "lng": 109.18,
+      "lat": 34.28
+    },
+    "trust": "yellow",
+    "src": "preset:西安·骊山环山路（最美72拐）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·骊山环山路（最美72拐）-5",
+    "name": "洪庆山→骊山索道大门",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway",
+      "nan-ling"
+    ],
+    "distKm": 21.3,
+    "climbM": null,
+    "start": {
+      "name": "洪庆山",
+      "lng": 109.18,
+      "lat": 34.28
+    },
+    "end": {
+      "name": "骊山索道大门",
+      "lng": 109.21,
+      "lat": 34.36
+    },
+    "trust": "yellow",
+    "src": "preset:西安·骊山环山路（最美72拐）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·秦岭分水岭（G210爬坡线）-0",
+    "name": "沣峪口→净业寺",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling",
+      "greenway"
+    ],
+    "distKm": 13.8,
+    "climbM": null,
+    "start": {
+      "name": "沣峪口",
+      "lng": 108.83,
+      "lat": 34.05
+    },
+    "end": {
+      "name": "净业寺",
+      "lng": 108.85,
+      "lat": 34.02
+    },
+    "trust": "yellow",
+    "src": "preset:西安·秦岭分水岭（G210爬坡线）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·秦岭分水岭（G210爬坡线）-1",
+    "name": "净业寺→九龙潭",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 15.3,
+    "climbM": null,
+    "start": {
+      "name": "净业寺",
+      "lng": 108.85,
+      "lat": 34.02
+    },
+    "end": {
+      "name": "九龙潭",
+      "lng": 108.87,
+      "lat": 33.98
+    },
+    "trust": "yellow",
+    "src": "preset:西安·秦岭分水岭（G210爬坡线）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·秦岭分水岭（G210爬坡线）-2",
+    "name": "九龙潭→黎元坪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 5.8,
+    "climbM": null,
+    "start": {
+      "name": "九龙潭",
+      "lng": 108.87,
+      "lat": 33.98
+    },
+    "end": {
+      "name": "黎元坪",
+      "lng": 108.89,
+      "lat": 33.95
+    },
+    "trust": "yellow",
+    "src": "preset:西安·秦岭分水岭（G210爬坡线）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·关中环线串骑峪口-0",
+    "name": "祥峪→高冠峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling",
+      "greenway"
+    ],
+    "distKm": 4.7,
+    "climbM": null,
+    "start": {
+      "name": "祥峪",
+      "lng": 108.75,
+      "lat": 34
+    },
+    "end": {
+      "name": "高冠峪",
+      "lng": 108.78,
+      "lat": 34.02
+    },
+    "trust": "yellow",
+    "src": "preset:西安·关中环线串骑峪口",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·关中环线串骑峪口-3",
+    "name": "子午峪→天子峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 12.3,
+    "climbM": null,
+    "start": {
+      "name": "子午峪",
+      "lng": 108.87,
+      "lat": 34.02
+    },
+    "end": {
+      "name": "天子峪",
+      "lng": 108.89,
+      "lat": 34.01
+    },
+    "trust": "yellow",
+    "src": "preset:西安·关中环线串骑峪口",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·关中环线串骑峪口-4",
+    "name": "天子峪→石砭峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 13,
+    "climbM": null,
+    "start": {
+      "name": "天子峪",
+      "lng": 108.89,
+      "lat": 34.01
+    },
+    "end": {
+      "name": "石砭峪",
+      "lng": 108.92,
+      "lat": 34
+    },
+    "trust": "yellow",
+    "src": "preset:西安·关中环线串骑峪口",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·关中环线串骑峪口-5",
+    "name": "石砭峪→太乙峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 21.1,
+    "climbM": null,
+    "start": {
+      "name": "石砭峪",
+      "lng": 108.92,
+      "lat": 34
+    },
+    "end": {
+      "name": "太乙峪",
+      "lng": 108.98,
+      "lat": 33.98
+    },
+    "trust": "yellow",
+    "src": "preset:西安·关中环线串骑峪口",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·关中环线串骑峪口-6",
+    "name": "太乙峪→小峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 24.6,
+    "climbM": null,
+    "start": {
+      "name": "太乙峪",
+      "lng": 108.98,
+      "lat": 33.98
+    },
+    "end": {
+      "name": "小峪",
+      "lng": 109.01,
+      "lat": 33.96
+    },
+    "trust": "yellow",
+    "src": "preset:西安·关中环线串骑峪口",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·关中环线串骑峪口-7",
+    "name": "小峪→大峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 8.1,
+    "climbM": null,
+    "start": {
+      "name": "小峪",
+      "lng": 109.01,
+      "lat": 33.96
+    },
+    "end": {
+      "name": "大峪",
+      "lng": 109.04,
+      "lat": 33.94
+    },
+    "trust": "grey",
+    "src": "preset:西安·关中环线串骑峪口",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·大雁塔→祥峪-0",
+    "name": "大雁塔→秦岭野生动物园",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 21.8,
+    "climbM": null,
+    "start": {
+      "name": "大雁塔",
+      "lng": 108.963,
+      "lat": 34.217
+    },
+    "end": {
+      "name": "秦岭野生动物园",
+      "lng": 108.868,
+      "lat": 34.102
+    },
+    "trust": "yellow",
+    "src": "preset:西安·大雁塔→祥峪",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·大雁塔→祥峪-1",
+    "name": "秦岭野生动物园→沣峪口",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling",
+      "greenway"
+    ],
+    "distKm": 9.9,
+    "climbM": null,
+    "start": {
+      "name": "秦岭野生动物园",
+      "lng": 108.868,
+      "lat": 34.102
+    },
+    "end": {
+      "name": "沣峪口",
+      "lng": 108.83,
+      "lat": 34.05
+    },
+    "trust": "yellow",
+    "src": "preset:西安·大雁塔→祥峪",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·大雁塔→祥峪-3",
+    "name": "高冠瀑布→祥峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling",
+      "greenway"
+    ],
+    "distKm": 4.7,
+    "climbM": null,
+    "start": {
+      "name": "高冠瀑布",
+      "lng": 108.78,
+      "lat": 34.02
+    },
+    "end": {
+      "name": "祥峪",
+      "lng": 108.75,
+      "lat": 34
+    },
+    "trust": "yellow",
+    "src": "preset:西安·大雁塔→祥峪",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝田荞麦岭-0",
+    "name": "蓝田→九间房镇",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 6.1,
+    "climbM": null,
+    "start": {
+      "name": "蓝田",
+      "lng": 109.32,
+      "lat": 34.15
+    },
+    "end": {
+      "name": "九间房镇",
+      "lng": 109.35,
+      "lat": 34.12
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝田荞麦岭",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝田荞麦岭-1",
+    "name": "九间房镇→荞麦岭",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 5.2,
+    "climbM": null,
+    "start": {
+      "name": "九间房镇",
+      "lng": 109.35,
+      "lat": 34.12
+    },
+    "end": {
+      "name": "荞麦岭",
+      "lng": 109.38,
+      "lat": 34.1
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝田荞麦岭",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝田荞麦岭-2",
+    "name": "荞麦岭→蓝田猿人遗址",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 12.4,
+    "climbM": null,
+    "start": {
+      "name": "荞麦岭",
+      "lng": 109.38,
+      "lat": 34.1
+    },
+    "end": {
+      "name": "蓝田猿人遗址",
+      "lng": 109.32,
+      "lat": 34.08
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝田荞麦岭",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝田荞麦岭-3",
+    "name": "蓝田猿人遗址→蓝田",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 11.3,
+    "climbM": null,
+    "start": {
+      "name": "蓝田猿人遗址",
+      "lng": 109.32,
+      "lat": 34.08
+    },
+    "end": {
+      "name": "蓝田",
+      "lng": 109.32,
+      "lat": 34.15
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝田荞麦岭",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·周至骆峪线-0",
+    "name": "周至→最美环山路",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 4.2,
+    "climbM": null,
+    "start": {
+      "name": "周至",
+      "lng": 108.222,
+      "lat": 34.163
+    },
+    "end": {
+      "name": "最美环山路",
+      "lng": 108.2,
+      "lat": 34.14
+    },
+    "trust": "yellow",
+    "src": "preset:西安·周至骆峪线",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·周至骆峪线-1",
+    "name": "最美环山路→骆峪水库",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 6.7,
+    "climbM": null,
+    "start": {
+      "name": "最美环山路",
+      "lng": 108.2,
+      "lat": 34.14
+    },
+    "end": {
+      "name": "骆峪水库",
+      "lng": 108.15,
+      "lat": 34.11
+    },
+    "trust": "yellow",
+    "src": "preset:西安·周至骆峪线",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·周至骆峪线-2",
+    "name": "骆峪水库→骆峪",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 4.5,
+    "climbM": null,
+    "start": {
+      "name": "骆峪水库",
+      "lng": 108.15,
+      "lat": 34.11
+    },
+    "end": {
+      "name": "骆峪",
+      "lng": 108.12,
+      "lat": 34.09
+    },
+    "trust": "yellow",
+    "src": "preset:西安·周至骆峪线",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·秦楚古道穿越线-0",
+    "name": "沣峪口→分水岭",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 31.7,
+    "climbM": null,
+    "start": {
+      "name": "沣峪口",
+      "lng": 108.83,
+      "lat": 34.05
+    },
+    "end": {
+      "name": "分水岭",
+      "lng": 108.95,
+      "lat": 33.88
+    },
+    "trust": "yellow",
+    "src": "preset:西安·秦楚古道穿越线",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·秦楚古道穿越线-3",
+    "name": "黄花岭→营盘镇",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 18.4,
+    "climbM": null,
+    "start": {
+      "name": "黄花岭",
+      "lng": 109,
+      "lat": 33.79
+    },
+    "end": {
+      "name": "营盘镇",
+      "lng": 109.1,
+      "lat": 33.75
+    },
+    "trust": "yellow",
+    "src": "preset:西安·秦楚古道穿越线",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝关古道-0",
+    "name": "蓝田→辋川",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 10.2,
+    "climbM": null,
+    "start": {
+      "name": "蓝田",
+      "lng": 109.317,
+      "lat": 34.152
+    },
+    "end": {
+      "name": "辋川",
+      "lng": 109.28,
+      "lat": 34.11
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝关古道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝关古道-1",
+    "name": "辋川→蓝关古道",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 9.4,
+    "climbM": null,
+    "start": {
+      "name": "辋川",
+      "lng": 109.28,
+      "lat": 34.11
+    },
+    "end": {
+      "name": "蓝关古道",
+      "lng": 109.34,
+      "lat": 34.09
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝关古道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝关古道-2",
+    "name": "蓝关古道→蓝桥镇",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 6.8,
+    "climbM": null,
+    "start": {
+      "name": "蓝关古道",
+      "lng": 109.34,
+      "lat": 34.09
+    },
+    "end": {
+      "name": "蓝桥镇",
+      "lng": 109.37,
+      "lat": 34.06
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝关古道",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三环全环-0",
+    "name": "曲江→长安立交",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 5.6,
+    "climbM": null,
+    "start": {
+      "name": "曲江",
+      "lng": 108.99,
+      "lat": 34.2
+    },
+    "end": {
+      "name": "长安立交",
+      "lng": 108.94,
+      "lat": 34.19
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三环全环-1",
+    "name": "长安立交→西三环",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 14,
+    "climbM": null,
+    "start": {
+      "name": "长安立交",
+      "lng": 108.94,
+      "lat": 34.19
+    },
+    "end": {
+      "name": "西三环",
+      "lng": 108.83,
+      "lat": 34.23
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三环全环-2",
+    "name": "西三环→北三环",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "weihe-west"
+    ],
+    "distKm": 21.9,
+    "climbM": null,
+    "start": {
+      "name": "西三环",
+      "lng": 108.83,
+      "lat": 34.23
+    },
+    "end": {
+      "name": "北三环",
+      "lng": 108.93,
+      "lat": 34.35
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三环全环-3",
+    "name": "北三环→东三环",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 16,
+    "climbM": null,
+    "start": {
+      "name": "北三环",
+      "lng": 108.93,
+      "lat": 34.35
+    },
+    "end": {
+      "name": "东三环",
+      "lng": 109.05,
+      "lat": 34.3
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·三环全环-4",
+    "name": "东三环→曲江",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 16.8,
+    "climbM": null,
+    "start": {
+      "name": "东三环",
+      "lng": 109.05,
+      "lat": 34.3
+    },
+    "end": {
+      "name": "曲江",
+      "lng": 108.99,
+      "lat": 34.2
+    },
+    "trust": "yellow",
+    "src": "preset:西安·三环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-0",
+    "name": "辛家庙→石家街",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 6.6,
+    "climbM": null,
+    "start": {
+      "name": "辛家庙",
+      "lng": 108.99,
+      "lat": 34.31
+    },
+    "end": {
+      "name": "石家街",
+      "lng": 109.01,
+      "lat": 34.27
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-1",
+    "name": "石家街→沙坡",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 5.3,
+    "climbM": null,
+    "start": {
+      "name": "石家街",
+      "lng": 109.01,
+      "lat": 34.27
+    },
+    "end": {
+      "name": "沙坡",
+      "lng": 108.99,
+      "lat": 34.24
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-2",
+    "name": "沙坡→太白立交",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling",
+      "greenway"
+    ],
+    "distKm": 9.1,
+    "climbM": null,
+    "start": {
+      "name": "沙坡",
+      "lng": 108.99,
+      "lat": 34.24
+    },
+    "end": {
+      "name": "太白立交",
+      "lng": 108.92,
+      "lat": 34.23
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-3",
+    "name": "太白立交→土门",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 5.5,
+    "climbM": null,
+    "start": {
+      "name": "太白立交",
+      "lng": 108.92,
+      "lat": 34.23
+    },
+    "end": {
+      "name": "土门",
+      "lng": 108.89,
+      "lat": 34.26
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-4",
+    "name": "土门→大兴立交",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 5.2,
+    "climbM": null,
+    "start": {
+      "name": "土门",
+      "lng": 108.89,
+      "lat": 34.26
+    },
+    "end": {
+      "name": "大兴立交",
+      "lng": 108.91,
+      "lat": 34.29
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-5",
+    "name": "大兴立交→未央立交",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 5.6,
+    "climbM": null,
+    "start": {
+      "name": "大兴立交",
+      "lng": 108.91,
+      "lat": 34.29
+    },
+    "end": {
+      "name": "未央立交",
+      "lng": 108.95,
+      "lat": 34.31
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·二环全环-6",
+    "name": "未央立交→辛家庙",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 4.3,
+    "climbM": null,
+    "start": {
+      "name": "未央立交",
+      "lng": 108.95,
+      "lat": 34.31
+    },
+    "end": {
+      "name": "辛家庙",
+      "lng": 108.99,
+      "lat": 34.31
+    },
+    "trust": "yellow",
+    "src": "preset:西安·二环全环",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→临潼（骊山方向）-0",
+    "name": "十里铺→灞桥",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 5.5,
+    "climbM": null,
+    "start": {
+      "name": "十里铺",
+      "lng": 109.02,
+      "lat": 34.287
+    },
+    "end": {
+      "name": "灞桥",
+      "lng": 109.059,
+      "lat": 34.309
+    },
+    "trust": "yellow",
+    "src": "preset:西安→临潼（骊山方向）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→临潼（骊山方向）-1",
+    "name": "灞桥→华清池",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 17.4,
+    "climbM": null,
+    "start": {
+      "name": "灞桥",
+      "lng": 109.059,
+      "lat": 34.309
+    },
+    "end": {
+      "name": "华清池",
+      "lng": 109.207,
+      "lat": 34.364
+    },
+    "trust": "yellow",
+    "src": "preset:西安→临潼（骊山方向）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→蓝田（G312东行）-0",
+    "name": "纺织城→白鹿原",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 12.2,
+    "climbM": null,
+    "start": {
+      "name": "纺织城",
+      "lng": 109.068,
+      "lat": 34.261
+    },
+    "end": {
+      "name": "白鹿原",
+      "lng": 109.13,
+      "lat": 34.22
+    },
+    "trust": "yellow",
+    "src": "preset:西安→蓝田（G312东行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→蓝田（G312东行）-1",
+    "name": "白鹿原→蓝田县城",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 22.6,
+    "climbM": null,
+    "start": {
+      "name": "白鹿原",
+      "lng": 109.13,
+      "lat": 34.22
+    },
+    "end": {
+      "name": "蓝田县城",
+      "lng": 109.317,
+      "lat": 34.152
+    },
+    "trust": "yellow",
+    "src": "preset:西安→蓝田（G312东行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→蓝田（G312东行）-2",
+    "name": "蓝田县城→水陆庵",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 2.8,
+    "climbM": null,
+    "start": {
+      "name": "蓝田县城",
+      "lng": 109.317,
+      "lat": 34.152
+    },
+    "end": {
+      "name": "水陆庵",
+      "lng": 109.33,
+      "lat": 34.135
+    },
+    "trust": "yellow",
+    "src": "preset:西安→蓝田（G312东行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→鄠邑区（西户）-0",
+    "name": "西安高新→秦渡镇",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling",
+      "greenway",
+      "weihe-west"
+    ],
+    "distKm": 19.5,
+    "climbM": null,
+    "start": {
+      "name": "西安高新",
+      "lng": 108.89,
+      "lat": 34.198
+    },
+    "end": {
+      "name": "秦渡镇",
+      "lng": 108.73,
+      "lat": 34.156
+    },
+    "trust": "yellow",
+    "src": "preset:西安→鄠邑区（西户）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→鄠邑区（西户）-1",
+    "name": "秦渡镇→鄠邑区钟楼",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 15.8,
+    "climbM": null,
+    "start": {
+      "name": "秦渡镇",
+      "lng": 108.73,
+      "lat": 34.156
+    },
+    "end": {
+      "name": "鄠邑区钟楼",
+      "lng": 108.608,
+      "lat": 34.112
+    },
+    "trust": "yellow",
+    "src": "preset:西安→鄠邑区（西户）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→周至（S107西行）-1",
+    "name": "秦渡镇→鄠邑区",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 15.8,
+    "climbM": null,
+    "start": {
+      "name": "秦渡镇",
+      "lng": 108.73,
+      "lat": 34.156
+    },
+    "end": {
+      "name": "鄠邑区",
+      "lng": 108.608,
+      "lat": 34.112
+    },
+    "trust": "yellow",
+    "src": "preset:西安→周至（S107西行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→周至（S107西行）-2",
+    "name": "鄠邑区→终南镇",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 24.2,
+    "climbM": null,
+    "start": {
+      "name": "鄠邑区",
+      "lng": 108.608,
+      "lat": 34.112
+    },
+    "end": {
+      "name": "终南镇",
+      "lng": 108.39,
+      "lat": 34.14
+    },
+    "trust": "yellow",
+    "src": "preset:西安→周至（S107西行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→周至（S107西行）-3",
+    "name": "终南镇→周至县城",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 18.5,
+    "climbM": null,
+    "start": {
+      "name": "终南镇",
+      "lng": 108.39,
+      "lat": 34.14
+    },
+    "end": {
+      "name": "周至县城",
+      "lng": 108.222,
+      "lat": 34.163
+    },
+    "trust": "yellow",
+    "src": "preset:西安→周至（S107西行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→杨凌（渭河河堤路）-0",
+    "name": "沣西新城→涝渭湿地",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "weihe-west"
+    ],
+    "distKm": 9.5,
+    "climbM": null,
+    "start": {
+      "name": "沣西新城",
+      "lng": 108.74,
+      "lat": 34.27
+    },
+    "end": {
+      "name": "涝渭湿地",
+      "lng": 108.68,
+      "lat": 34.24
+    },
+    "trust": "yellow",
+    "src": "preset:西安→杨凌（渭河河堤路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→杨凌（渭河河堤路）-1",
+    "name": "涝渭湿地→耿峪河大桥",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "weihe-west"
+    ],
+    "distKm": 14.7,
+    "climbM": null,
+    "start": {
+      "name": "涝渭湿地",
+      "lng": 108.68,
+      "lat": 34.24
+    },
+    "end": {
+      "name": "耿峪河大桥",
+      "lng": 108.55,
+      "lat": 34.22
+    },
+    "trust": "yellow",
+    "src": "preset:西安→杨凌（渭河河堤路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→杨凌（渭河河堤路）-2",
+    "name": "耿峪河大桥→黑河大桥",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 28.9,
+    "climbM": null,
+    "start": {
+      "name": "耿峪河大桥",
+      "lng": 108.55,
+      "lat": 34.22
+    },
+    "end": {
+      "name": "黑河大桥",
+      "lng": 108.25,
+      "lat": 34.19
+    },
+    "trust": "yellow",
+    "src": "preset:西安→杨凌（渭河河堤路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→杨凌（渭河河堤路）-3",
+    "name": "黑河大桥→杨凌渭河大桥",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 21.4,
+    "climbM": null,
+    "start": {
+      "name": "黑河大桥",
+      "lng": 108.25,
+      "lat": 34.19
+    },
+    "end": {
+      "name": "杨凌渭河大桥",
+      "lng": 108.08,
+      "lat": 34.26
+    },
+    "trust": "yellow",
+    "src": "preset:西安→杨凌（渭河河堤路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→杨凌（渭河河堤路）-4",
+    "name": "杨凌渭河大桥→杨凌",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 2.3,
+    "climbM": null,
+    "start": {
+      "name": "杨凌渭河大桥",
+      "lng": 108.08,
+      "lat": 34.26
+    },
+    "end": {
+      "name": "杨凌",
+      "lng": 108.07,
+      "lat": 34.272
+    },
+    "trust": "yellow",
+    "src": "preset:西安→杨凌（渭河河堤路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→阎良（航空城）-0",
+    "name": "西安北站→高陵区",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 31.1,
+    "climbM": null,
+    "start": {
+      "name": "西安北站",
+      "lng": 108.935,
+      "lat": 34.377
+    },
+    "end": {
+      "name": "高陵区",
+      "lng": 109.082,
+      "lat": 34.534
+    },
+    "trust": "yellow",
+    "src": "preset:西安→阎良（航空城）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→阎良（航空城）-1",
+    "name": "高陵区→阎良",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 25,
+    "climbM": null,
+    "start": {
+      "name": "高陵区",
+      "lng": 109.082,
+      "lat": 34.534
+    },
+    "end": {
+      "name": "阎良",
+      "lng": 109.23,
+      "lat": 34.656
+    },
+    "trust": "yellow",
+    "src": "preset:西安→阎良（航空城）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→渭南（关中平原东行）-0",
+    "name": "临潼→新丰镇",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 12.4,
+    "climbM": null,
+    "start": {
+      "name": "临潼",
+      "lng": 109.207,
+      "lat": 34.364
+    },
+    "end": {
+      "name": "新丰镇",
+      "lng": 109.29,
+      "lat": 34.41
+    },
+    "trust": "yellow",
+    "src": "preset:西安→渭南（关中平原东行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→渭南（关中平原东行）-1",
+    "name": "新丰镇→渭南",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 26.5,
+    "climbM": null,
+    "start": {
+      "name": "新丰镇",
+      "lng": 109.29,
+      "lat": 34.41
+    },
+    "end": {
+      "name": "渭南",
+      "lng": 109.502,
+      "lat": 34.499
+    },
+    "trust": "yellow",
+    "src": "preset:西安→渭南（关中平原东行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→铜川（G210北上）-0",
+    "name": "张家堡→高陵区",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway"
+    ],
+    "distKm": 32.8,
+    "climbM": null,
+    "start": {
+      "name": "张家堡",
+      "lng": 108.948,
+      "lat": 34.34
+    },
+    "end": {
+      "name": "高陵区",
+      "lng": 109.082,
+      "lat": 34.534
+    },
+    "trust": "yellow",
+    "src": "preset:西安→铜川（G210北上）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→铜川（G210北上）-1",
+    "name": "高陵区→三原县",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 18.5,
+    "climbM": null,
+    "start": {
+      "name": "高陵区",
+      "lng": 109.082,
+      "lat": 34.534
+    },
+    "end": {
+      "name": "三原县",
+      "lng": 108.936,
+      "lat": 34.617
+    },
+    "trust": "yellow",
+    "src": "preset:西安→铜川（G210北上）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→铜川（G210北上）-2",
+    "name": "三原县→铜川新区",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 37.2,
+    "climbM": null,
+    "start": {
+      "name": "三原县",
+      "lng": 108.936,
+      "lat": 34.617
+    },
+    "end": {
+      "name": "铜川新区",
+      "lng": 108.979,
+      "lat": 34.893
+    },
+    "trust": "yellow",
+    "src": "preset:西安→铜川（G210北上）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→铜川（G210北上）-3",
+    "name": "铜川新区→铜川",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 23.6,
+    "climbM": null,
+    "start": {
+      "name": "铜川新区",
+      "lng": 108.979,
+      "lat": 34.893
+    },
+    "end": {
+      "name": "铜川",
+      "lng": 109.075,
+      "lat": 35.069
+    },
+    "trust": "yellow",
+    "src": "preset:西安→铜川（G210北上）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→商洛（G312蓝小公路）-0",
+    "name": "纺织城→蓝田县城",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 32.5,
+    "climbM": null,
+    "start": {
+      "name": "纺织城",
+      "lng": 109.068,
+      "lat": 34.261
+    },
+    "end": {
+      "name": "蓝田县城",
+      "lng": 109.317,
+      "lat": 34.152
+    },
+    "trust": "yellow",
+    "src": "preset:西安→商洛（G312蓝小公路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→商洛（G312蓝小公路）-2",
+    "name": "水陆庵→牧户关隧道",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 33.2,
+    "climbM": null,
+    "start": {
+      "name": "水陆庵",
+      "lng": 109.33,
+      "lat": 34.135
+    },
+    "end": {
+      "name": "牧户关隧道",
+      "lng": 109.57,
+      "lat": 34.04
+    },
+    "trust": "grey",
+    "src": "preset:西安→商洛（G312蓝小公路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→商洛（G312蓝小公路）-3",
+    "name": "牧户关隧道→黑龙口镇",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 22.4,
+    "climbM": null,
+    "start": {
+      "name": "牧户关隧道",
+      "lng": 109.57,
+      "lat": 34.04
+    },
+    "end": {
+      "name": "黑龙口镇",
+      "lng": 109.7,
+      "lat": 33.98
+    },
+    "trust": "grey",
+    "src": "preset:西安→商洛（G312蓝小公路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→商洛（G312蓝小公路）-4",
+    "name": "黑龙口镇→商洛",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 29.6,
+    "climbM": null,
+    "start": {
+      "name": "黑龙口镇",
+      "lng": 109.7,
+      "lat": 33.98
+    },
+    "end": {
+      "name": "商洛",
+      "lng": 109.918,
+      "lat": 33.87
+    },
+    "trust": "yellow",
+    "src": "preset:西安→商洛（G312蓝小公路）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→宝鸡（渭河南岸）-2",
+    "name": "眉县→岐山县",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 30.5,
+    "climbM": null,
+    "start": {
+      "name": "眉县",
+      "lng": 107.755,
+      "lat": 34.274
+    },
+    "end": {
+      "name": "岐山县",
+      "lng": 107.621,
+      "lat": 34.444
+    },
+    "trust": "yellow",
+    "src": "preset:西安→宝鸡（渭河南岸）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→华山（G310东行）-2",
+    "name": "渭南→华州区",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 25.2,
+    "climbM": null,
+    "start": {
+      "name": "渭南",
+      "lng": 109.502,
+      "lat": 34.499
+    },
+    "end": {
+      "name": "华州区",
+      "lng": 109.76,
+      "lat": 34.512
+    },
+    "trust": "yellow",
+    "src": "preset:西安→华山（G310东行）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安→安康（G210秦岭段）-4",
+    "name": "石泉县→汉阴县",
+    "region": "西安→",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 33.5,
+    "climbM": null,
+    "start": {
+      "name": "石泉县",
+      "lng": 108.247,
+      "lat": 33.038
+    },
+    "end": {
+      "name": "汉阴县",
+      "lng": 108.51,
+      "lat": 32.893
+    },
+    "trust": "yellow",
+    "src": "preset:西安→安康（G210秦岭段）",
+    "status": "open"
+  },
+  {
+    "id": "auto-关中环线S107-3",
+    "name": "阎良→三原县",
+    "region": "关中环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 31,
+    "climbM": null,
+    "start": {
+      "name": "阎良",
+      "lng": 109.23,
+      "lat": 34.656
+    },
+    "end": {
+      "name": "三原县",
+      "lng": 108.936,
+      "lat": 34.617
+    },
+    "trust": "yellow",
+    "src": "preset:关中环线S107",
+    "status": "open"
+  },
+  {
+    "id": "auto-关中环线S107-5",
+    "name": "礼泉县→乾县",
+    "region": "关中环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 18.1,
+    "climbM": null,
+    "start": {
+      "name": "礼泉县",
+      "lng": 108.422,
+      "lat": 34.483
+    },
+    "end": {
+      "name": "乾县",
+      "lng": 108.24,
+      "lat": 34.528
+    },
+    "trust": "yellow",
+    "src": "preset:关中环线S107",
+    "status": "open"
+  },
+  {
+    "id": "auto-关中环线S107-7",
+    "name": "扶风法门寺→岐山县",
+    "region": "关中环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 28.8,
+    "climbM": null,
+    "start": {
+      "name": "扶风法门寺",
+      "lng": 107.9,
+      "lat": 34.439
+    },
+    "end": {
+      "name": "岐山县",
+      "lng": 107.621,
+      "lat": 34.444
+    },
+    "trust": "yellow",
+    "src": "preset:关中环线S107",
+    "status": "open"
+  },
+  {
+    "id": "auto-关中环线S107-8",
+    "name": "岐山县→眉县",
+    "region": "关中环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 31,
+    "climbM": null,
+    "start": {
+      "name": "岐山县",
+      "lng": 107.621,
+      "lat": 34.444
+    },
+    "end": {
+      "name": "眉县",
+      "lng": 107.755,
+      "lat": 34.274
+    },
+    "trust": "yellow",
+    "src": "preset:关中环线S107",
+    "status": "open"
+  },
+  {
+    "id": "auto-渭北环线（泾阳→三原→富平→阎良→高陵）-0",
+    "name": "泾阳→三原",
+    "region": "渭北环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 15,
+    "climbM": null,
+    "start": {
+      "name": "泾阳",
+      "lng": 108.842,
+      "lat": 34.53
+    },
+    "end": {
+      "name": "三原",
+      "lng": 108.936,
+      "lat": 34.617
+    },
+    "trust": "yellow",
+    "src": "preset:渭北环线（泾阳→三原→富平→阎良→高陵）",
+    "status": "open"
+  },
+  {
+    "id": "auto-渭北环线（泾阳→三原→富平→阎良→高陵）-1",
+    "name": "三原→富平",
+    "region": "渭北环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 31.6,
+    "climbM": null,
+    "start": {
+      "name": "三原",
+      "lng": 108.936,
+      "lat": 34.617
+    },
+    "end": {
+      "name": "富平",
+      "lng": 109.18,
+      "lat": 34.751
+    },
+    "trust": "yellow",
+    "src": "preset:渭北环线（泾阳→三原→富平→阎良→高陵）",
+    "status": "open"
+  },
+  {
+    "id": "auto-渭北环线（泾阳→三原→富平→阎良→高陵）-2",
+    "name": "富平→阎良",
+    "region": "渭北环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 14.8,
+    "climbM": null,
+    "start": {
+      "name": "富平",
+      "lng": 109.18,
+      "lat": 34.751
+    },
+    "end": {
+      "name": "阎良",
+      "lng": 109.23,
+      "lat": 34.656
+    },
+    "trust": "yellow",
+    "src": "preset:渭北环线（泾阳→三原→富平→阎良→高陵）",
+    "status": "open"
+  },
+  {
+    "id": "auto-渭北环线（泾阳→三原→富平→阎良→高陵）-3",
+    "name": "阎良→高陵",
+    "region": "渭北环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 25,
+    "climbM": null,
+    "start": {
+      "name": "阎良",
+      "lng": 109.23,
+      "lat": 34.656
+    },
+    "end": {
+      "name": "高陵",
+      "lng": 109.082,
+      "lat": 34.534
+    },
+    "trust": "yellow",
+    "src": "preset:渭北环线（泾阳→三原→富平→阎良→高陵）",
+    "status": "open"
+  },
+  {
+    "id": "auto-渭北环线（泾阳→三原→富平→阎良→高陵）-4",
+    "name": "高陵→泾渭分明",
+    "region": "渭北环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 12.1,
+    "climbM": null,
+    "start": {
+      "name": "高陵",
+      "lng": 109.082,
+      "lat": 34.534
+    },
+    "end": {
+      "name": "泾渭分明",
+      "lng": 109.05,
+      "lat": 34.46
+    },
+    "trust": "yellow",
+    "src": "preset:渭北环线（泾阳→三原→富平→阎良→高陵）",
+    "status": "open"
+  },
+  {
+    "id": "auto-渭北环线（泾阳→三原→富平→阎良→高陵）-5",
+    "name": "泾渭分明→泾阳",
+    "region": "渭北环",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 27.5,
+    "climbM": null,
+    "start": {
+      "name": "泾渭分明",
+      "lng": 109.05,
+      "lat": 34.46
+    },
+    "end": {
+      "name": "泾阳",
+      "lng": 108.842,
+      "lat": 34.53
+    },
+    "trust": "yellow",
+    "src": "preset:渭北环线（泾阳→三原→富平→阎良→高陵）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·鳌太穿越线（太白→鳌山）-0",
+    "name": "太白县→咀头镇",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 2.4,
+    "climbM": null,
+    "start": {
+      "name": "太白县",
+      "lng": 107.319,
+      "lat": 34.058
+    },
+    "end": {
+      "name": "咀头镇",
+      "lng": 107.3,
+      "lat": 34.05
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·鳌太穿越线（太白→鳌山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·鳌太穿越线（太白→鳌山）-1",
+    "name": "咀头镇→鳌山登山口",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 33.9,
+    "climbM": null,
+    "start": {
+      "name": "咀头镇",
+      "lng": 107.3,
+      "lat": 34.05
+    },
+    "end": {
+      "name": "鳌山登山口",
+      "lng": 107.42,
+      "lat": 33.95
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·鳌太穿越线（太白→鳌山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·鳌太穿越线（太白→鳌山）-2",
+    "name": "鳌山登山口→塘口村",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 18.6,
+    "climbM": null,
+    "start": {
+      "name": "鳌山登山口",
+      "lng": 107.42,
+      "lat": 33.95
+    },
+    "end": {
+      "name": "塘口村",
+      "lng": 107.5,
+      "lat": 33.92
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·鳌太穿越线（太白→鳌山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·鳌太穿越线（太白→鳌山）-4",
+    "name": "桃川镇→太白县",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 7.3,
+    "climbM": null,
+    "start": {
+      "name": "桃川镇",
+      "lng": 107.25,
+      "lat": 34.02
+    },
+    "end": {
+      "name": "太白县",
+      "lng": 107.319,
+      "lat": 34.058
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·鳌太穿越线（太白→鳌山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·黄柏塬环线-1",
+    "name": "黄柏塬→二郎坝",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 16.9,
+    "climbM": null,
+    "start": {
+      "name": "黄柏塬",
+      "lng": 107.51,
+      "lat": 33.82
+    },
+    "end": {
+      "name": "二郎坝",
+      "lng": 107.62,
+      "lat": 33.75
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·黄柏塬环线",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·紫柏山穿越（留坝→凤县）-0",
+    "name": "留坝→张良庙",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 6.6,
+    "climbM": null,
+    "start": {
+      "name": "留坝",
+      "lng": 106.921,
+      "lat": 33.618
+    },
+    "end": {
+      "name": "张良庙",
+      "lng": 106.88,
+      "lat": 33.65
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·紫柏山穿越（留坝→凤县）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·紫柏山穿越（留坝→凤县）-1",
+    "name": "张良庙→紫柏山",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 31.6,
+    "climbM": null,
+    "start": {
+      "name": "张良庙",
+      "lng": 106.88,
+      "lat": 33.65
+    },
+    "end": {
+      "name": "紫柏山",
+      "lng": 106.7,
+      "lat": 33.72
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·紫柏山穿越（留坝→凤县）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·紫柏山穿越（留坝→凤县）-2",
+    "name": "紫柏山→留凤关",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 13.7,
+    "climbM": null,
+    "start": {
+      "name": "紫柏山",
+      "lng": 106.7,
+      "lat": 33.72
+    },
+    "end": {
+      "name": "留凤关",
+      "lng": 106.62,
+      "lat": 33.8
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·紫柏山穿越（留坝→凤县）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·紫柏山穿越（留坝→凤县）-3",
+    "name": "留凤关→凤县",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 20.7,
+    "climbM": null,
+    "start": {
+      "name": "留凤关",
+      "lng": 106.62,
+      "lat": 33.8
+    },
+    "end": {
+      "name": "凤县",
+      "lng": 106.524,
+      "lat": 33.911
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·紫柏山穿越（留坝→凤县）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·牛背梁穿越（柞水→广货街）-0",
+    "name": "柞水→牛背梁",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 23.8,
+    "climbM": null,
+    "start": {
+      "name": "柞水",
+      "lng": 109.114,
+      "lat": 33.686
+    },
+    "end": {
+      "name": "牛背梁",
+      "lng": 108.99,
+      "lat": 33.76
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·牛背梁穿越（柞水→广货街）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·牛背梁穿越（柞水→广货街）-1",
+    "name": "牛背梁→营盘镇",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 21,
+    "climbM": null,
+    "start": {
+      "name": "牛背梁",
+      "lng": 108.99,
+      "lat": 33.76
+    },
+    "end": {
+      "name": "营盘镇",
+      "lng": 109.1,
+      "lat": 33.75
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·牛背梁穿越（柞水→广货街）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·米仓山环线（汉中→南郑→光雾山）-0",
+    "name": "汉中→南郑",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 13.1,
+    "climbM": null,
+    "start": {
+      "name": "汉中",
+      "lng": 107.023,
+      "lat": 33.068
+    },
+    "end": {
+      "name": "南郑",
+      "lng": 106.94,
+      "lat": 33
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·米仓山环线（汉中→南郑→光雾山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·米仓山环线（汉中→南郑→光雾山）-1",
+    "name": "南郑→红寺湖",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 14.9,
+    "climbM": null,
+    "start": {
+      "name": "南郑",
+      "lng": 106.94,
+      "lat": 33
+    },
+    "end": {
+      "name": "红寺湖",
+      "lng": 106.87,
+      "lat": 32.91
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·米仓山环线（汉中→南郑→光雾山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·米仓山环线（汉中→南郑→光雾山）-3",
+    "name": "米仓山→光雾山",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 5.3,
+    "climbM": null,
+    "start": {
+      "name": "米仓山",
+      "lng": 106.95,
+      "lat": 32.68
+    },
+    "end": {
+      "name": "光雾山",
+      "lng": 106.99,
+      "lat": 32.66
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·米仓山环线（汉中→南郑→光雾山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·麦积山穿越（宝鸡→天水麦积山）-3",
+    "name": "街亭→麦积山",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 26.5,
+    "climbM": null,
+    "start": {
+      "name": "街亭",
+      "lng": 106.15,
+      "lat": 34.4
+    },
+    "end": {
+      "name": "麦积山",
+      "lng": 105.99,
+      "lat": 34.36
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·麦积山穿越（宝鸡→天水麦积山）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·华阳古镇穿越（洋县→太白）-2",
+    "name": "二郎坝→黄柏塬",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 16.9,
+    "climbM": null,
+    "start": {
+      "name": "二郎坝",
+      "lng": 107.62,
+      "lat": 33.75
+    },
+    "end": {
+      "name": "黄柏塬",
+      "lng": 107.51,
+      "lat": 33.82
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·华阳古镇穿越（洋县→太白）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·子午道穿越（子午镇→宁陕）-0",
+    "name": "子午镇→子午峪",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 23.7,
+    "climbM": null,
+    "start": {
+      "name": "子午镇",
+      "lng": 108.87,
+      "lat": 34.05
+    },
+    "end": {
+      "name": "子午峪",
+      "lng": 108.89,
+      "lat": 33.97
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·子午道穿越（子午镇→宁陕）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·子午道穿越（子午镇→宁陕）-2",
+    "name": "喂子坪→广货街",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 37.4,
+    "climbM": null,
+    "start": {
+      "name": "喂子坪",
+      "lng": 108.87,
+      "lat": 33.8
+    },
+    "end": {
+      "name": "广货街",
+      "lng": 108.8,
+      "lat": 33.83
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·子午道穿越（子午镇→宁陕）",
+    "status": "open"
+  },
+  {
+    "id": "auto-秦岭·洛南→蓝田（灞源古道）-3",
+    "name": "九间房→蓝田",
+    "region": "秦岭·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 7.1,
+    "climbM": null,
+    "start": {
+      "name": "九间房",
+      "lng": 109.35,
+      "lat": 34.12
+    },
+    "end": {
+      "name": "蓝田",
+      "lng": 109.317,
+      "lat": 34.152
+    },
+    "trust": "yellow",
+    "src": "preset:秦岭·洛南→蓝田（灞源古道）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·沣峪→广货街→牛背梁→营盘→西安（大秦岭环线）-6",
+    "name": "太乙宫→西安曲江",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 35.3,
+    "climbM": null,
+    "start": {
+      "name": "太乙宫",
+      "lng": 108.98,
+      "lat": 34
+    },
+    "end": {
+      "name": "西安曲江",
+      "lng": 108.99,
+      "lat": 34.2
+    },
+    "trust": "yellow",
+    "src": "preset:西安·沣峪→广货街→牛背梁→营盘→西安（大秦岭环线）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·蓝田→商洛→丹凤→洛南→蓝田（商洛大环线）-0",
+    "name": "蓝田→牧户关",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 34.4,
+    "climbM": null,
+    "start": {
+      "name": "蓝田",
+      "lng": 109.317,
+      "lat": 34.152
+    },
+    "end": {
+      "name": "牧户关",
+      "lng": 109.57,
+      "lat": 34.04
+    },
+    "trust": "yellow",
+    "src": "preset:西安·蓝田→商洛→丹凤→洛南→蓝田（商洛大环线）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·黑河穿越（户县→厚畛子→老县城）-2",
+    "name": "马召→黑河水库",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "rolling",
+    "playpool": [],
+    "distKm": 20.8,
+    "climbM": null,
+    "start": {
+      "name": "马召",
+      "lng": 108.23,
+      "lat": 34.04
+    },
+    "end": {
+      "name": "黑河水库",
+      "lng": 108.18,
+      "lat": 33.98
+    },
+    "trust": "yellow",
+    "src": "preset:西安·黑河穿越（户县→厚畛子→老县城）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）-0",
+    "name": "鄠邑区→涝峪口",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 16.8,
+    "climbM": null,
+    "start": {
+      "name": "鄠邑区",
+      "lng": 108.608,
+      "lat": 34.112
+    },
+    "end": {
+      "name": "涝峪口",
+      "lng": 108.55,
+      "lat": 34
+    },
+    "trust": "yellow",
+    "src": "preset:西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）-1",
+    "name": "涝峪口→朱雀森林公园",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 36.5,
+    "climbM": null,
+    "start": {
+      "name": "涝峪口",
+      "lng": 108.55,
+      "lat": 34
+    },
+    "end": {
+      "name": "朱雀森林公园",
+      "lng": 108.58,
+      "lat": 33.8
+    },
+    "trust": "yellow",
+    "src": "preset:西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）-2",
+    "name": "朱雀森林公园→广货街",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [],
+    "distKm": 37.9,
+    "climbM": null,
+    "start": {
+      "name": "朱雀森林公园",
+      "lng": 108.58,
+      "lat": 33.8
+    },
+    "end": {
+      "name": "广货街",
+      "lng": 108.8,
+      "lat": 33.83
+    },
+    "trust": "yellow",
+    "src": "preset:西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）-4",
+    "name": "分水岭→沣峪口",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "hill",
+    "playpool": [
+      "nan-ling"
+    ],
+    "distKm": 32,
+    "climbM": null,
+    "start": {
+      "name": "分水岭",
+      "lng": 108.95,
+      "lat": 33.88
+    },
+    "end": {
+      "name": "沣峪口",
+      "lng": 108.83,
+      "lat": 34.05
+    },
+    "trust": "yellow",
+    "src": "preset:西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）",
+    "status": "open"
+  },
+  {
+    "id": "auto-西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）-5",
+    "name": "沣峪口→鄠邑区",
+    "region": "西安·",
+    "type": "countyRoad",
+    "surface": "paved",
+    "climbBand": "flat",
+    "playpool": [
+      "greenway",
+      "nan-ling"
+    ],
+    "distKm": 27.7,
+    "climbM": null,
+    "start": {
+      "name": "沣峪口",
+      "lng": 108.83,
+      "lat": 34.05
+    },
+    "end": {
+      "name": "鄠邑区",
+      "lng": 108.608,
+      "lat": 34.112
+    },
+    "trust": "yellow",
+    "src": "preset:西安·涝沣环线（鄠邑→涝峪→朱雀→广货街→沣峪→鄠邑）",
+    "status": "open"
+  }
+]

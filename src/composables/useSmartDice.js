@@ -5,11 +5,12 @@
 import { CORRIDORS } from '../data/corridors.js'
 import { PLAYPOOLS } from '../data/playpools.js'
 import { indexCorridors, filterEnvelope } from './corridorData.js'
-import { randomChain, reversePolyline, planChainPath } from './corridorSearch.js'
+import { randomChain, reversePolyline, planChainPath, rankAnchors } from './corridorSearch.js'
 import { fetchBicyclingRoute } from './useAMap.js'
 import { calcSlopeProfile, checkBacktrack } from './useRouteEngine.js'
 
 const MAX_ATTEMPTS = 10   // 最多尝试次数（每次约 ids+2 次规划调用）
+const ANCHOR_TRIES = 4    // 前 N 次尝试各换一个锚点（锚点选择见 corridorSearch.rankAnchors）
 const MAX_ACCESS_KM = 18  // 家→首廊道 直线上限
 const MAX_RETURN_KM = 30  // 环形回程「末廊道→家」直线上限，超出判定为需折返
 const SNAP_KM = 0.05      // 起点已落在廊道端点上时不再补引道
@@ -23,42 +24,34 @@ export function useSmartDice() {
     return filterEnvelope(CORRIDORS, { pools, minTrust, band })
   }
 
-  // 起点旁的锚点廊道：优先端点离 home 最近的；且锚点自身里程要与链目标匹配——
-  // 33km 大廊道去撑 20km 需求必然超带，盲选它纯属浪费全部尝试次数。
-  function pickStart(home, env, { distKm = 20, shape = 'outback' } = {}) {
-    const cands = []
-    for (const c of env) {
-      const d = Math.min(toKm(home, c.start), toKm(home, c.end))
-      if (d <= MAX_ACCESS_KM) cands.push({ c, d })
-    }
-    if (!cands.length) return null
-    const fit = cands.filter(x => {
-      const ct = Math.max(3, shape === 'loop' ? distKm - x.d * 2 : distKm / 2 - x.d)
-      return (x.c.distKm || 0) <= ct * 1.3
-    })
-    const pool = (fit.length ? fit : cands).slice().sort((a, b) => a.d - b.d)
-    return pool[0]
-  }
-
   async function genRoute(home, env, byId, { distKm, shape, anchor, onDebug = null }) {
     const dbg = m => onDebug?.(m)
     const dMinM = distKm * 1000 * 0.88, dMaxM = distKm * 1000 * 1.12
     const wps = []
     // 1) 引道：home→锚点入口（home 不在廊道端点上时补一段）
     const anchorEntry = toKm(home, anchor.c.start) <= toKm(home, anchor.c.end) ? anchor.c.start : anchor.c.end
-    const accessKm = toKm(home, anchorEntry)
+    const accessLin = toKm(home, anchorEntry)
     let access = null
-    if (accessKm > SNAP_KM) {
+    if (accessLin > SNAP_KM) {
       access = await fetchBicyclingRoute(home, anchorEntry).catch(() => null)
       if (!access) { dbg('引道规划失败'); return null }
     }
 
     // 2) 正向串廊道：逐段按「近端进、另一端出」决定行进方向。
-    //    链的期望里程按形状粗估：往返(outback)总程≈2×(引道+链)；环线(loop)≈引道+链+回程(按引道同量级估)。
-    //    不给目标里程的话 randomChain 会盲串满 maxDepth，真实里程必然超带、候选全被筛光。
+    //    链的目标里程按「让往返闭合总程落进里程带」反推。
+    //    引道预算优先用「真实引道已量出的里程」（access.distance，绕路已含其中），
+    //    只有 SNAP 内(没打真实引道)才退化用直线×保守系数 1.8 —— 否则 1.35 低估真实绕路、
+    //    短引道实测可绕到 2.2 倍，chainTarget 系统性偏低、总程必超带（2026-09-08 校准）。
+    //      往返(outback) total = 2×(链实际 + 引道实际)  → 链目标 = (dMin+dMax)/4 − 引道实际
+    //      环线(loop)    total = 链实际 + 引道 + 回程(≈引道) → 链目标 = (dMin+dMax)/2 − 2×引道实际
+    //    不给目标会盲串满 maxDepth、真实里程必然超带（历史阻断 bug）；target 太紧又会
+    //    单段就停、凑不出小段链（2026-09-08 新修）。
+    const dMin = distKm * 0.88, dMax = distKm * 1.12
+    const accessRealKm = access ? access.distance / 1000 : accessLin * 1.8
+    const chainTarget = Math.max(2.5, shape === 'loop' ? (dMin + dMax) / 2 - accessRealKm * 2 : (dMin + dMax) / 4 - accessRealKm)
     const outIds = randomChain(env, {
       startId: anchor.c.id, maxDepth: 5, maxBridgeKm: 15,
-      targetKm: Math.max(3, shape === 'loop' ? distKm - accessKm * 2 : distKm / 2 - accessKm),
+      targetKm: chainTarget,
     })
     const path = planChainPath(byId, outIds, anchorEntry)
     if (path.length === 0) { dbg('随机链为空'); return null }
@@ -107,29 +100,39 @@ export function useSmartDice() {
 
   // 一次出 N 条候选；每颗种子随机链 → 实测补路 → 过里程带与折返闸门 → 必经坡度
   async function generate(home, { distKm, band = 'any', pool = null, minTrust = 'yellow', count = 3, locked = [], onDebug = null } = {}) {
-    const env = chooseEnvelope({ pool, band, minTrust })
-    if (env.length < 3) return []
-    const byId = Object.fromEntries(env.map(c => [c.id, c]))
-    const shape = pool ? (PLAYPOOLS.find(p => p.id === pool)?.defaultShape || 'outback') : 'outback'
-    let anchor = pickStart(home, env, { distKm, shape })
-    if (!anchor) return [] // 起点周边没廊道 → 由调用方降级旧引擎
-    if (locked.length) {
-      const lk = env.find(c => locked.includes(c.id))
-      if (lk) anchor = { c: lk, d: 0 } // 钉段：以锁定廊道为锚，其余段重新随机
+    const out = await generateAt(minTrust)
+    // 柔和降级：玩法池模式门槛为 green，而池内「实骑/精校」段太少（南山池仅 3 段，凑不出
+    // 20-30km）时直接走经典兜底太浪费——降一级到 yellow，让有真实高德路径依据的自动段参与合成。
+    return out.length ? out : (minTrust === 'green' ? generateAt('yellow') : [])
+
+    async function generateAt(trust) {
+      const env = chooseEnvelope({ pool, band, minTrust: trust })
+      if (env.length < 3) return []
+      const byId = Object.fromEntries(env.map(c => [c.id, c]))
+      const shape = pool ? (PLAYPOOLS.find(p => p.id === pool)?.defaultShape || 'outback') : 'outback'
+      const anchors = rankAnchors(home, env, { distKm, shape, maxAccessKm: MAX_ACCESS_KM })
+      if (!anchors.length) return [] // 起点周边没廊道 → 由调用方降级旧引擎
+      if (locked.length) {
+        const lk = env.find(c => locked.includes(c.id))
+        if (lk) { anchors.length = 0; anchors.push({ c: lk, d: 0 }) } // 钉段：以锁定廊道为锚，其余段重新随机
+      }
+      const results = []
+      for (let a = 0; a < MAX_ATTEMPTS && results.length < count; a++) {
+        const anchor = anchors[a % Math.min(anchors.length, ANCHOR_TRIES)]
+        const r = await genRoute(home, env, byId, { distKm, shape, anchor, onDebug })
+        if (!r) continue
+        const sig = r.corridorIds.join('>')
+        if (results.some(x => x.corridorIds.join('>') === sig)) continue // 同一串链不必重复出候选
+        // 坡度为硬依赖但柔和降级：失败仅置 null，不丢弃候选（配合 A4）
+        const sp = await calcSlopeProfile(r.segments).catch(() => null)
+        r.totalClimb = sp?.totalClimb ?? null
+        r.uphillSections = sp?.uphillSections ?? []
+        r.downhillSections = sp?.downhillSections ?? []
+        r.elevationProfile = sp?.elevationProfile ?? null
+        results.push(r)
+      }
+      return results.slice(0, count)
     }
-    const results = []
-    for (let a = 0; a < MAX_ATTEMPTS && results.length < count; a++) {
-      const r = await genRoute(home, env, byId, { distKm, shape, anchor, onDebug })
-      if (!r) continue
-      // 坡度为硬依赖但柔和降级：失败仅置 null，不丢弃候选（配合 A4）
-      const sp = await calcSlopeProfile(r.segments).catch(() => null)
-      r.totalClimb = sp?.totalClimb ?? null
-      r.uphillSections = sp?.uphillSections ?? []
-      r.downhillSections = sp?.downhillSections ?? []
-      r.elevationProfile = sp?.elevationProfile ?? null
-      results.push(r)
-    }
-    return results.slice(0, count)
   }
 
   // 钉段重掷：语义化出口。lockedIds 非空时以锁定廊道为锚，其余段重新随机
