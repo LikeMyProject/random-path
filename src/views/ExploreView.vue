@@ -371,8 +371,10 @@ async function doSmart() {
       minTrust: pool.value ? 'green' : 'yellow',
     })
     if (!cands.length) {
-      // 信封不足：降级旧引擎，并把里程口径对齐到用户所选，避免兜底路线与预期差太远
-      toast('该区好路还不够，先用经典随机兜底', 'warn')
+      // 信封不足/拼不出精确里程：降级经典引擎，并把里程口径对齐到用户所选。
+      // 文案要「说人话」：不是"没路"，而是"附近已收录的骑行段不足以精确凑出所选里程"。
+      const tag = pool ? PLAYPOOLS.find(p => p.id === pool)?.label || '' : ''
+      toast(tag ? `${tag}附近已收录的路段，凑不精确 ${distKm.value}km，已改为经典环线` : `附近已收录的骑行段，暂时凑不精确 ${distKm.value}km，已改为经典环线`, 'warn')
       scene.value = 'loop'
       customDist.value = distKm.value
       await doGenerate(true)

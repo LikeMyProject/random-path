@@ -11,7 +11,7 @@ export const PRESET_ROUTES = [
   { name:'西安·秦楚古道穿越线',start:{name:'沣峪口',lng:108.830,lat:34.050},end:{name:'终南山',lng:109.050,lat:33.730},waypoints:[{name:'分水岭',lng:108.950,lat:33.880},{name:'广货街',lng:108.800,lat:33.830},{name:'黄花岭',lng:109.000,lat:33.790},{name:'营盘镇',lng:109.100,lat:33.750}]},
   { name:'西安·蓝关古道',start:{name:'蓝田',lng:109.317,lat:34.152},end:{name:'蓝桥镇',lng:109.370,lat:34.060},waypoints:[{name:'辋川',lng:109.280,lat:34.110},{name:'蓝关古道',lng:109.340,lat:34.090}]},
   { name:'西安·三环全环',start:{name:'曲江',lng:108.99,lat:34.2},end:{name:'曲江',lng:108.99,lat:34.2},waypoints:[{name:'长安立交',lng:108.94,lat:34.19},{name:'西三环',lng:108.83,lat:34.23},{name:'北三环',lng:108.93,lat:34.35},{name:'东三环',lng:109.05,lat:34.3}]},
-  { name:'西安·二环全环',start:{name:'辛家庙',lng:108.99,lat:34.31},end:{name:'辛家庙',lng:108.99,lat:34.31},waypoints:[{name:'石家街',lng:109.01,lat:34.27},{name:'沙坡',lng:108.99,lat:34.24},{name:'太白立交',lng:108.92,lat:34.23},{name:'土门',lng:108.89,lat:34.26},{name:'大兴立交',lng:108.91,lat:34.29},{name:'未央立交',lng:108.95,lat:34.31}]},
+  { name:'西安·二环全环',start:{name:'辛家庙',lng:108.99,lat:34.31},end:{name:'辛家庙',lng:108.99,lat:34.31},waypoints:[{name:'石家街',lng:109.01,lat:34.27},{name:'沙坡',lng:108.99,lat:34.24},{name:'沙坡西',lng:108.9721,lat:34.2335},{name:'西影路口',lng:108.9406,lat:34.2302},{name:'太白立交',lng:108.92,lat:34.23},{name:'太白立交北',lng:108.9083,lat:34.2371},{name:'土门',lng:108.89,lat:34.26},{name:'丰庆路口',lng:108.8914,lat:34.2756},{name:'大兴立交',lng:108.91,lat:34.29},{name:'未央立交',lng:108.95,lat:34.31}]},
 
   // === 西安→周边城市 (12条) ===
   { name:'西安→临潼（骊山方向）',start:{name:'十里铺',lng:109.020,lat:34.287},end:{name:'华清池',lng:109.207,lat:34.364},waypoints:[{name:'灞桥',lng:109.059,lat:34.309}]},
