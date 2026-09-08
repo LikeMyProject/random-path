@@ -120,7 +120,7 @@ function draw(flashInfo = { index: -1, flash: 0 }) {
     ctx.beginPath(); ctx.moveTo(tx(pts[0].lng), ty(pts[0].lat)); for (let i = 1; i < pts.length; i++) ctx.lineTo(tx(pts[i].lng), ty(pts[i].lat)); ctx.stroke()
   })
 
-  // 上下坡着色：上坡🔴红色，下坡🟢绿色，沿实际路线路径绘制
+  // 上下坡着色：上坡红色，下坡绿色，沿实际路线路径绘制
   function drawSlopeSections(sections, colorFn) {
     if (!sections || sections.length === 0) return
     for (const sec of sections) {

@@ -54,8 +54,8 @@ function draw() {
   ctx.fillText(distKm.toFixed(1) + 'km', W - PAD.right, PAD.top + ph + 4)
 
   // uphill/downhill indicators
-  if (props.uphillSections?.length) { ctx.fillStyle = '#dc2626'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('🔴上坡 ' + props.uphillSections.length + '段', PAD.left, 2) }
-  if (props.downhillSections?.length) { ctx.fillStyle = '#16a34a'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(props.downhillSections.length + '段下坡🟢', W - PAD.right, 2) }
+  if (props.uphillSections?.length) { ctx.fillStyle = '#dc2626'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('上坡 ' + props.uphillSections.length + '段', PAD.left, 2) }
+  if (props.downhillSections?.length) { ctx.fillStyle = '#16a34a'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(props.downhillSections.length + '段下坡', W - PAD.right, 2) }
 }
 
 onMounted(draw)

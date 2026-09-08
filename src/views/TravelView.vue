@@ -6,6 +6,7 @@ import { SPOT_EXT, SPOT_FOOD, SPOT_SHOP } from '../composables/useAMap.js'
 import { searchFoodNear } from '../composables/useAMap.js'
 import { searchHotelsForCity, formatPrice, formatRating, formatDist, isGoodRated, nearestMall, PERSONA_OPTIONS, PERSONA_GROUPS, estimateTransit, TRANSIT_LABEL } from '../composables/useHotel.js'
 import { shareGuideImage } from '../composables/useShareGuide.js'
+import Icon from '../components/Icon.vue'
 
 const toast = (m, t) => window.$toast?.(m, t)
 
@@ -324,8 +325,8 @@ async function doShareGuide() {
   try {
     const r = await shareGuideImage(plan.value, shareHotel.value)
     shareModal.value = false
-    if (r === 'shared') toast('已分享 🎉')
-    else toast('长图已下载 📥')
+    if (r === 'shared') toast('已分享')
+    else toast('长图已下载')
   } catch (e) { toast('生成失败: ' + e.message, 'err') }
   sharing.value = false
 }
@@ -335,10 +336,10 @@ async function doShareGuide() {
 <div>
   <!-- ===== 输入区 ===== -->
   <div class="card">
-    <h2>✈️ 旅行景点清单</h2>
+    <h2><Icon name="plane" :size="15" />旅行景点清单</h2>
     <p class="tip">选城市即可生成按顺序的景点清单，点景点看附近特色美食（无天数规划）</p>
 
-    <label class="lbl">📍 目的地城市 <span class="hint">(按顺序 = 推荐游览顺序)</span></label>
+    <label class="lbl">目的地城市 <span class="hint">（按顺序 = 推荐游览顺序）</span></label>
     <div class="city-sel">
       <select v-model="cityToAdd" class="inp" @change="onSelectCity">
         <option value="">-- 选择要去的城市（共 {{ remaining.length }} 城可选）--</option>
@@ -351,9 +352,9 @@ async function doShareGuide() {
       <div v-for="(c, i) in selectedCities" :key="c" class="city-chip">
         <span class="cc-order">{{ i + 1 }}</span>
         <span class="cc-name">{{ c }}</span>
-        <button class="cc-btn" :disabled="i === 0" @click="moveCity(i, -1)">↑</button>
-        <button class="cc-btn" :disabled="i === selectedCities.length - 1" @click="moveCity(i, 1)">↓</button>
-        <button class="cc-btn cc-del" @click="removeCity(i)">✕</button>
+        <button class="cc-btn" :disabled="i === 0" @click="moveCity(i, -1)"><Icon name="arrowUp" :size="12" /></button>
+        <button class="cc-btn" :disabled="i === selectedCities.length - 1" @click="moveCity(i, 1)"><Icon name="arrowDown" :size="12" /></button>
+        <button class="cc-btn cc-del" @click="removeCity(i)"><Icon name="x" :size="12" /></button>
       </div>
     </div>
     <div v-else class="empty-tip">还没选城市，从下拉选择或点下方热门推荐</div>
@@ -364,7 +365,7 @@ async function doShareGuide() {
     </div>
 
     <div class="city-advice" v-if="cityAdviceList.length">
-      <div class="ca-title">🗓 城市推荐天数 <span class="hint">（含时间理由）</span></div>
+      <div class="ca-title"><Icon name="calendar" :size="13" />城市推荐天数 <span class="hint">（含时间理由）</span></div>
       <div v-for="a in cityAdviceList" :key="a.name" class="ca-card" :class="{ off: a.seasonFit === 'off' }">
         <div class="ca-head">
           <span class="ca-name">{{ a.name }}</span>
@@ -375,17 +376,17 @@ async function doShareGuide() {
       </div>
     </div>
 
-    <label class="lbl">🎯 兴趣偏好 <span class="hint">(可多选，用于筛选景点)</span></label>
+    <label class="lbl">兴趣偏好 <span class="hint">（可多选，用于筛选景点）</span></label>
     <div class="chip-row">
       <button v-for="(label, key) in INTEREST_LABEL" :key="key"
         :class="['chip', { active: interests.includes(key) }]"
         @click="toggleInterest(key)">
-        {{ key === 'nature' ? '🏔 ' : key === 'culture' ? '🏛 ' : key === 'food' ? '🍜 ' : key === 'family' ? '👨‍👩‍👧 ' : '🏙 ' }}{{ label }}
+        {{ label }}
       </button>
     </div>
 
     <button class="btn btn-primary btn-gen" :disabled="loading" @click="generate">
-      {{ loading ? '生成中…' : '✨ 生成景点清单' }}
+      {{ loading ? '生成中…' : '生成景点清单' }}
     </button>
   </div>
 
@@ -400,7 +401,7 @@ async function doShareGuide() {
         </div>
         <div class="city-right">
           <span class="city-weather" v-if="cp.weather">{{ cp.weather.low }}~{{ cp.weather.high }}°C {{ cp.weather.feel }}</span>
-          <span class="arrow" :class="{ open: showAdvanced === cp.name }">▾</span>
+          <span class="arrow" :class="{ open: showAdvanced === cp.name }"><Icon name="chevronDown" :size="14" /></span>
         </div>
       </div>
       <p class="city-desc">{{ cp.data.desc }}</p>
@@ -408,7 +409,7 @@ async function doShareGuide() {
       <!-- 地点清单（按 景点/美食/购物 分类显示，点击展开附近特色美食） -->
       <div v-for="grp in groupByCategory(cp.attractions)" :key="grp.key" class="cat-sec">
         <div class="cat-head" :class="'cat-' + grp.key">
-          <span class="cat-icon">{{ grp.icon }}</span>
+          <span class="cat-icon cat-ic"><Icon :name="{ sight: 'star', food: 'utensils', shop: 'bag' }[grp.key] || 'star'" :size="14" /></span>
           <span class="cat-name">{{ grp.label }}</span>
           <span class="cat-count">{{ grp.items.length }}</span>
         </div>
@@ -417,30 +418,30 @@ async function doShareGuide() {
             <div class="attr-row" @click="toggleAttractionFood(cp, a)">
               <span class="attr-idx">{{ i + 1 }}</span>
               <span class="attr-must" v-if="a.category !== 'food' && a.category !== 'shop'">★{{ a.mustSee }}</span>
-              <span class="attr-cat-icon" v-else :title="CAT_META[a.category]?.label">{{ CAT_META[a.category]?.icon }}</span>
+              <span class="attr-cat-icon cat-ic" v-else :title="CAT_META[a.category]?.label"><Icon :name="{ sight: 'star', food: 'utensils', shop: 'bag' }[a.category] || 'star'" :size="12" /></span>
               <span class="attr-name">{{ a.name }}<span v-if="a.tag" class="poi-badge tag">{{ a.tag }}</span><span v-else-if="a.poi" class="poi-badge">实时</span></span>
               <span class="attr-ticket">{{ a.ticket }}</span>
-              <span class="attr-fold" :class="{ open: attrFood(cp,a)?.open }">▾</span>
-              <span class="attr-nav" title="高德导航" @click.stop="openAmapNav(a.coord.lng, a.coord.lat, a.name)">🧭</span>
+              <span class="attr-fold" :class="{ open: attrFood(cp,a)?.open }"><Icon name="chevronDown" :size="12" /></span>
+              <span class="attr-nav" title="高德导航" @click.stop="openAmapNav(a.coord.lng, a.coord.lat, a.name)"><Icon name="navigation" :size="13" /></span>
             </div>
 
             <!-- 附近特色美食（点击后懒加载） -->
             <div v-if="attrFood(cp, a)?.open" class="attr-food">
               <div v-if="attrFood(cp, a).loading" class="food-loading-bar">
-                <span class="spin">⏳</span> 正在搜索「{{ a.name }}」附近特色美食…
+                正在搜索「{{ a.name }}」附近特色美食…
               </div>
               <div v-else-if="attrFood(cp, a).list.length" class="food-grid">
                 <div v-for="(r, j) in attrFood(cp, a).list" :key="j" class="food-item restaurant-item">
                   <div class="rest-header">
-                    <span class="food-name">🍜 {{ r.name }}</span>
-                    <span v-if="r.rating" class="rest-rating">⭐ {{ r.rating }}</span>
+                    <span class="food-name">{{ r.name }}</span>
+                    <span v-if="r.rating" class="rest-rating">★ {{ r.rating }}</span>
                   </div>
                   <div class="rest-meta">
                     <span v-if="r.price" class="food-price">{{ r.price }}</span>
                     <span v-if="r.tag" class="rest-tag">{{ r.tag }}</span>
                   </div>
-                  <div v-if="r.address" class="food-desc">📍 {{ r.address }}</div>
-                  <div v-if="r.distM != null" class="food-dist">🚶 {{ formatFoodDist(r) }}</div>
+                  <div v-if="r.address" class="food-desc">{{ r.address }}</div>
+                  <div v-if="r.distM != null" class="food-dist">{{ formatFoodDist(r) }}</div>
                 </div>
               </div>
               <div v-else class="food-empty">附近暂未搜索到特色美食，换个点试试</div>
@@ -450,16 +451,16 @@ async function doShareGuide() {
       </div>
 
       <button class="btn btn-sm btn-supp" :disabled="suppLoading === cp.name" @click="doSupplement(cp.name)">
-        {{ suppLoading === cp.name ? '搜索中' + suppDots : '🔍 补充更多地点（景点/美食/购物）' }}
+        <span style="display:inline-flex;align-items:center;gap:5px;justify-content:center"><Icon name="search" :size="12" />{{ suppLoading === cp.name ? '搜索中' + suppDots : '补充更多地点（景点/美食/购物）' }}</span>
       </button>
 
       <!-- 酒店搜索 -->
       <button class="btn btn-sm btn-hotel" :class="{ on: hotelOpen === cp.name }" @click="toggleHotel(cp.name)">
-        🏨 按预算找附近住宿（酒店/民宿）
+        <span style="display:inline-flex;align-items:center;gap:5px;justify-content:center"><Icon name="bed" :size="12" />按预算找附近住宿（酒店/民宿）</span>
       </button>
       <div v-if="hotelOpen === cp.name" class="hotel-panel">
         <div class="persona-sec">
-          <div class="persona-title">🎯 个性化偏好 <span class="hint">多选，按匹配度推荐</span></div>
+          <div class="persona-title">个性化偏好 <span class="hint">多选，按匹配度推荐</span></div>
           <div v-for="g in PERSONA_GROUPS" :key="g" class="persona-group">
             <span class="persona-group-label">{{ g }}</span>
             <div class="persona-chips">
@@ -482,7 +483,7 @@ async function doShareGuide() {
           <button
             :class="['chip-sm', { on: hotelPreset[cp.name] === 'custom' }]"
             @click="setHotelPreset(cp.name, 'custom')"
-          >✏️ 自定义</button>
+          >自定义</button>
         </div>
         <div v-if="hotelPreset[cp.name] === 'custom'" class="hotel-custom">
           <input v-model="hotelCustomMin[cp.name]" type="number" min="0" placeholder="最低 ¥" class="inp" />
@@ -491,12 +492,12 @@ async function doShareGuide() {
         </div>
         <div class="hotel-attraction-sel">
           <select v-model="hotelAttraction[cp.name]" class="inp">
-            <option value="">📍 全部热门景点周边</option>
+            <option value="">全部热门景点周边</option>
             <option v-for="a in cp.attractions" :key="a.name" :value="a.name">{{ a.name }}</option>
           </select>
         </div>
         <button class="btn btn-sm btn-hotel-search" :disabled="hotelState[cp.name]?.loading" @click="doSearchHotel(cp)">
-          {{ hotelState[cp.name]?.loading ? '搜索中…' : '🔍 搜索住宿' }}
+          {{ hotelState[cp.name]?.loading ? '搜索中…' : '搜索住宿' }}
         </button>
 
         <div v-if="personas.length && hotelState[cp.name]?.searched" class="hotel-prefs">
@@ -506,7 +507,7 @@ async function doShareGuide() {
         </div>
 
         <div v-if="hotelState[cp.name]?.loading" class="hotel-loading">
-          <span class="spin">⏳</span> {{ hotelState[cp.name]?.progress }}
+          {{ hotelState[cp.name]?.progress }}
         </div>
         <div v-else-if="hotelState[cp.name]?.list?.length" class="hotel-results">
           <div class="hotel-count">共 {{ hotelState[cp.name].list.length }} 家 · {{ personas.length ? '仅显示 100% 匹配偏好' : '按评分/距离排序' }} · 点击查看出行估算</div>
@@ -523,8 +524,8 @@ async function doShareGuide() {
               <span class="h-name">{{ h.name }}</span>
               <span v-if="isGoodRated(h)" class="h-badge good">好评</span>
               <span v-if="h.priceInferred" class="h-badge ref">参考价</span>
-              <span class="h-nav" title="高德导航" @click.stop="openHotelNav(h)">🧭</span>
-              <span class="h-arrow" :class="{ open: hotelExpand[cp.name] === i }">▾</span>
+              <span class="h-nav" title="高德导航" @click.stop="openHotelNav(h)"><Icon name="navigation" :size="13" /></span>
+              <span class="h-arrow" :class="{ open: hotelExpand[cp.name] === i }"><Icon name="chevronDown" :size="12" /></span>
             </div>
             <div class="h-row2">
               <span class="h-price">{{ formatPrice(h) }}/晚</span>
@@ -533,11 +534,11 @@ async function doShareGuide() {
             </div>
             <div v-if="h.tags?.length" class="h-tags">
               <span v-for="t in h.tags" :key="t" class="h-tag">{{ t }}</span>
-              <span v-if="nearestMall(h)" class="h-mall">🏬 近{{ nearestMall(h).name }} {{ nearestMall(h).km.toFixed(1) }}km</span>
+              <span v-if="nearestMall(h)" class="h-mall">近{{ nearestMall(h).name }} {{ nearestMall(h).km.toFixed(1) }}km</span>
             </div>
 
             <div v-if="hotelExpand[cp.name] === i" class="transit-panel">
-              <div class="transit-title">🚗 从本酒店到各景点 <span class="hint">（直线距离估算）</span></div>
+              <div class="transit-title"><Icon name="car" :size="13" />从本酒店到各景点 <span class="hint">（直线距离估算）</span></div>
               <div v-for="t in estimateTransit(h, cp.attractions)" :key="t.attraction" class="transit-row">
                 <span class="tr-attr">{{ t.attraction }}</span>
                 <span class="tr-dist">{{ t.km }}km</span>
@@ -545,7 +546,7 @@ async function doShareGuide() {
                 <span class="tr-time">{{ t.timeMin }}min</span>
                 <span class="tr-fee">{{ t.fee }}</span>
               </div>
-              <div class="transit-note">💡 估算参考：步行 5km/h · 骑行 15km/h · 公交地铁 22km/h · 打车 30km/h，实际以导航为准</div>
+              <div class="transit-note">估算参考：步行 5km/h · 骑行 15km/h · 公交地铁 22km/h · 打车 30km/h，实际以导航为准</div>
             </div>
           </div>
         </div>
@@ -559,7 +560,7 @@ async function doShareGuide() {
       <!-- 折叠：贴士 -->
       <div v-if="showAdvanced === cp.name" class="city-more">
         <div class="more-sec">
-          <div class="more-title">💡 实用贴士</div>
+          <div class="more-title"><Icon name="info" :size="13" />实用贴士</div>
           <ul class="tips-list">
             <li v-for="(t, i) in cp.data.tips" :key="i">{{ t }}</li>
           </ul>
@@ -569,7 +570,7 @@ async function doShareGuide() {
 
     <!-- 预算 -->
     <div class="card" v-if="plan.budget">
-      <h2>💰 预算参考（人均）</h2>
+      <h2><Icon name="wallet" :size="15" />预算参考（人均）</h2>
       <div class="budget-items">
         <div v-for="(it, i) in plan.budget.items" :key="i" class="budget-item">
           <span class="b-label">{{ it.label }}</span>
@@ -584,20 +585,20 @@ async function doShareGuide() {
 
     <!-- 导出 -->
     <div class="card">
-      <h2>📤 攻略导出</h2>
+      <h2><Icon name="share" :size="15" />攻略导出</h2>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-sm btn-secondary" style="flex:1" @click="copyGuide">📋 复制文本</button>
-        <button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGuide">📥 下载 .md</button>
+        <button class="btn btn-sm btn-secondary" style="flex:1" @click="copyGuide"><Icon name="copy" :size="12" /> 复制文本</button>
+        <button class="btn btn-sm btn-secondary" style="flex:1" @click="downloadGuide"><Icon name="download" :size="12" /> 下载 .md</button>
       </div>
-      <button class="btn btn-sm btn-share" style="margin-top:8px;width:100%" @click="openShareModal">🖼 生成分享长图（含精选酒店）</button>
+      <button class="btn btn-sm btn-share" style="margin-top:8px;width:100%" @click="openShareModal"><Icon name="image" :size="12" /> 生成分享长图（含精选酒店）</button>
     </div>
 
     <!-- 酒店选择弹窗（长图分享前） -->
     <div class="modal" v-if="shareModal" @click.self="shareModal = false">
       <div class="inner">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <h3>🏨 选择一家住宿入图</h3>
-          <button class="btn btn-sm" style="background:transparent;color:#a898b8" @click="shareModal=false">✕</button>
+          <h3>选择一家住宿入图</h3>
+          <button class="btn btn-sm" style="background:transparent;border-color:transparent" @click="shareModal=false"><Icon name="x" :size="14" /></button>
         </div>
         <p style="font-size:11px;color:#a898b8;margin:4px 0 8px">长图将包含你选中的酒店信息（共 {{ allHotels.length }} 家可选）</p>
         <div class="share-hotel-list">
@@ -611,11 +612,11 @@ async function doShareGuide() {
               <div class="sh-name">{{ h.name }}</div>
               <div class="sh-meta">{{ formatPrice(h) }} · {{ formatRating(h) }} · 距 {{ h.attraction }} {{ formatDist(h) }}</div>
             </div>
-            <span class="sh-check" :class="{ on: shareHotel === h }">✓</span>
+            <span class="sh-check" :class="{ on: shareHotel === h }"><Icon name="check" :size="12" /></span>
           </div>
         </div>
         <button class="btn btn-primary" style="margin-top:10px" :disabled="sharing || !shareHotel" @click="doShareGuide">
-          {{ sharing ? '生成中…' : '🖼 生成长图并分享' }}
+          <span style="display:inline-flex;align-items:center;gap:6px;justify-content:center"><Icon name="image" :size="14" />{{ sharing ? '生成中…' : '生成长图并分享' }}</span>
         </button>
       </div>
     </div>
@@ -624,214 +625,209 @@ async function doShareGuide() {
 </template>
 
 <style scoped>
-.tip { font-size: 12px; color: #a898b8; margin-bottom: 14px; }
-.lbl { display: block; font-size: 11px; font-weight: 700; color: #7a6c8a; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .3px; }
-.hint { font-size: 10px; color: #b0a3bc; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.tip { font-size: 12px; color: var(--ink-400); margin-bottom: 14px; }
+.lbl { display: block; font-size: 11px; font-weight: 600; color: var(--ink-600); margin: 14px 0 6px; letter-spacing: .3px; }
+.hint { font-size: 10px; color: var(--ink-300); font-weight: 400; letter-spacing: 0; }
 .inp { font-size: 13px; }
 .chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .chip {
-  border: none; background: #f0edf5; border-radius: 10px; padding: 7px 12px; font-size: 11px; font-weight: 600;
-  color: #7a6c8a; cursor: pointer; transition: all .2s; font-family: inherit;
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; font-size: 11px; font-weight: 500;
+  color: var(--ink-600); cursor: pointer; transition: all .15s; font-family: inherit;
 }
-.chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 3px 10px rgba(var(--accent-rgb),.22); }
+.chip:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.chip.active { background: var(--ink-900); border-color: var(--ink-900); color: #fff; font-weight: 600; }
 .city-sel { position: relative; }
 .city-chips { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .city-chip {
-  display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: #f7f5fa;
-  border: none; border-radius: 12px; font-size: 12px; transition: background .15s;
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 10px; font-size: 12px; transition: background .15s;
 }
-.city-chip:hover { background: var(--accent-soft); }
-.cc-order { width: 22px; height: 22px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.cc-name { flex: 1; font-weight: 700; color: #4a3f55; }
-.cc-btn { border: none; background: rgba(0,0,0,.04); border-radius: 8px; width: 26px; height: 26px; cursor: pointer; font-size: 11px; color: #8a8098; transition: all .15s; }
-.cc-btn:hover { background: rgba(0,0,0,.08); }
+.cc-order { width: 22px; height: 22px; border-radius: 7px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.cc-name { flex: 1; font-weight: 600; color: var(--ink-900); }
+.cc-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; width: 26px; height: 26px; cursor: pointer; color: var(--ink-400); transition: all .15s; display: flex; align-items: center; justify-content: center; }
+.cc-btn:hover { border-color: var(--line-strong); color: var(--ink-900); }
 .cc-btn:disabled { opacity: .3; }
-.cc-del { background: rgba(220,38,38,.08); color: #dc2626; }
-.cc-del:hover { background: rgba(220,38,38,.15); }
-.empty-tip { font-size: 12px; color: #c4b5d0; padding: 10px 0; }
+.cc-del { background: #fef2f2; color: var(--err); border-color: #fecaca; }
+.empty-tip { font-size: 12px; color: var(--ink-300); padding: 10px 0; }
 .hot-cities { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
 .chip-sm {
-  padding: 5px 12px; border-radius: 10px; border: none; background: #f0edf5; color: #5e5468;
-  font-size: 10px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s;
+  padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-600);
+  font-size: 10px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .15s;
 }
-.chip-sm:hover { background: var(--accent-soft); color: var(--accent); }
-.chip-sm.on { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
-.city-advice { margin-top: 12px; background: #faf8fc; border: 1px solid #efe9f4; border-radius: 12px; padding: 10px 12px; }
-.ca-title { font-size: 12px; font-weight: 700; color: #5e5468; margin-bottom: 8px; }
-.ca-card { background: #fff; border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; border-left: 3px solid var(--accent); }
+.chip-sm:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.chip-sm.on { background: var(--ink-900); border-color: var(--ink-900); color: #fff; font-weight: 600; }
+.city-advice { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.ca-title { font-size: 12px; font-weight: 600; color: var(--ink-700); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+.ca-card { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
 .ca-card:last-child { margin-bottom: 0; }
-.ca-card.off { border-left-color: #e0a83c; }
+.ca-card.off { border-left-color: #d97706; }
 .ca-head { display: flex; align-items: center; gap: 8px; }
-.ca-name { font-weight: 700; color: #3a3145; font-size: 13px; }
-.ca-days { background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; border-radius: 8px; padding: 2px 8px; }
-.ca-season { font-size: 10px; font-weight: 700; border-radius: 8px; padding: 2px 8px; }
-.ca-season.good { background: #e6f6ec; color: #2e9e5b; }
-.ca-season.warn { background: #fdf0db; color: #c8881f; }
-.ca-reason { font-size: 11px; color: #8074a0; margin-top: 5px; line-height: 1.5; }
+.ca-name { font-weight: 600; color: var(--ink-900); font-size: 13px; }
+.ca-days { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-700); font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 8px; font-variant-numeric: tabular-nums; }
+.ca-season { font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 8px; }
+.ca-season.good { background: #eef6f2; color: #0d7a57; }
+.ca-season.warn { background: #fdf3e3; color: #b45309; }
+.ca-reason { font-size: 11px; color: var(--ink-400); margin-top: 5px; line-height: 1.5; }
 .btn-gen { margin-top: 16px; }
 
 /* 结果区 */
 .city-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-.city-name { font-size: 18px; font-weight: 800; color: #3a3045; letter-spacing: -.3px; }
-.city-count { background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700; border-radius: 8px; padding: 3px 9px; margin-left: 6px; }
+.city-name { font-size: 17px; font-weight: 700; color: var(--ink-900); }
+.city-count { background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-600); font-size: 10px; font-weight: 600; border-radius: 5px; padding: 3px 9px; margin-left: 6px; font-variant-numeric: tabular-nums; }
 .city-right { display: flex; align-items: center; gap: 8px; }
-.city-weather { font-size: 11px; color: #f0a870; font-weight: 700; }
-.arrow { transition: transform .2s; color: #b0a3bc; }
+.city-weather { font-size: 11px; color: var(--ink-600); font-weight: 500; font-variant-numeric: tabular-nums; }
+.arrow { transition: transform .2s; color: var(--ink-300); display: inline-flex; }
 .arrow.open { transform: rotate(180deg); }
-.city-desc { font-size: 11px; color: #a898b8; margin: 4px 0 10px; line-height: 1.6; }
-.btn-supp { margin-top: 8px; background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; box-shadow: 0 3px 10px rgba(124,58,237,.25); }
-.city-more { margin-top: 10px; border-top: 1px solid rgba(0,0,0,.04); padding-top: 10px; }
+.city-desc { font-size: 11px; color: var(--ink-400); margin: 4px 0 10px; line-height: 1.6; }
+.btn-supp { margin-top: 8px; background: var(--surface); color: var(--ink-700); }
+.city-more { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
 .more-sec { margin-bottom: 12px; }
-.more-title { font-size: 12px; font-weight: 700; color: #4a3f55; margin-bottom: 6px; }
+.more-title { font-size: 12px; font-weight: 600; color: var(--ink-700); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
 
 /* 景点清单 */
 .attr-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 
 /* 分类区块（景点 / 美食 / 购物） */
 .cat-sec { margin-top: 4px; }
-.cat-head { display: flex; align-items: center; gap: 6px; margin: 12px 2px 7px; padding-bottom: 4px; border-bottom: 1px dashed rgba(0,0,0,.06); }
-.cat-icon { font-size: 15px; line-height: 1; }
-.cat-name { font-size: 14px; font-weight: 800; letter-spacing: -.2px; }
-.cat-count { font-size: 10px; background: #f0edf5; color: #7a6c8a; border-radius: 8px; padding: 2px 8px; font-weight: 700; }
-.cat-sight .cat-name { color: var(--accent); }
-.cat-food .cat-name { color: #e0890a; }
-.cat-shop .cat-name { color: #4f6bed; }
-.cat-sight .cat-count { background: var(--accent-soft); color: var(--accent); }
-.cat-food .cat-count { background: #fdf0db; color: #c8881f; }
-.cat-shop .cat-count { background: #e8edfd; color: #4f6bed; }
+.cat-head { display: flex; align-items: center; gap: 6px; margin: 12px 2px 7px; padding-bottom: 4px; border-bottom: 1px dashed var(--line-strong); }
+.cat-head .cat-ic { display: inline-flex; color: var(--ink-400); }
+.cat-name { font-size: 13px; font-weight: 700; }
+.cat-count { font-size: 10px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-600); border-radius: 5px; padding: 2px 8px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cat-sight .cat-name { color: var(--ink-900); }
+.cat-food .cat-name { color: #b45309; }
+.cat-shop .cat-name { color: #1d4ed8; }
 .attr-cat-icon { flex-shrink: 0; font-size: 13px; width: 24px; text-align: center; }
-.attr-item.cat-food { border-left: 3px solid #f59e0b; }
-.attr-item.cat-shop { border-left: 3px solid #3b82f6; }
+.attr-item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.attr-item.cat-food { border-left: 3px solid #d97706; }
+.attr-item.cat-shop { border-left: 3px solid #2563eb; }
 .attr-item.cat-sight { border-left: 3px solid var(--accent); }
-.attr-item { background: #f7f5fa; border: none; border-radius: 12px; overflow: hidden; }
 .attr-row {
-  display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; transition: background .15s; font-size: 12px;
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; transition: background .12s; font-size: 12px;
 }
-.attr-row:hover { background: var(--accent-soft); }
-.attr-idx { width: 20px; height: 20px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.attr-must { color: #f0a870; font-weight: 800; font-size: 11px; width: 24px; flex-shrink: 0; }
-.attr-name { flex: 1; font-weight: 600; color: #4a3f55; display: flex; align-items: center; gap: 5px; }
-.attr-ticket { font-size: 10px; color: #a898b8; flex-shrink: 0; }
-.attr-fold { color: #b0a3bc; font-size: 11px; transition: transform .2s; flex-shrink: 0; }
+.attr-row:hover { background: var(--surface-2); }
+.attr-idx { width: 20px; height: 20px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-600); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.attr-must { color: #b45309; font-weight: 600; font-size: 11px; width: 28px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.attr-name { flex: 1; font-weight: 500; color: var(--ink-900); display: flex; align-items: center; gap: 5px; }
+.attr-ticket { font-size: 10px; color: var(--ink-300); flex-shrink: 0; }
+.attr-fold { color: var(--ink-300); font-size: 11px; transition: transform .2s; flex-shrink: 0; display: inline-flex; }
 .attr-fold.open { transform: rotate(180deg); }
-.attr-nav { font-size: 13px; flex-shrink: 0; }
-.poi-badge { font-size: 9px; background: #e6f1fb; color: #185fa5; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
-.poi-badge.tag { background: #e9fbf2; color: #0f6e56; }
+.attr-nav { font-size: 13px; flex-shrink: 0; color: var(--ink-400); cursor: pointer; }
+.attr-nav:hover { color: var(--accent); }
+.poi-badge { font-size: 9px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-600); border-radius: 4px; padding: 1px 5px; font-weight: 500; }
+.poi-badge.tag { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 
 /* 附近美食 */
-.attr-food { background: #fffdfa; border-top: 1px dashed #f0e2cf; padding: 10px 12px; }
+.attr-food { background: var(--surface-2); border-top: 1px dashed var(--line-strong); padding: 10px 12px; }
 .food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.food-item { background: #f7f5fa; border: none; border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; }
+.food-item { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; }
 .restaurant-item { padding: 10px 12px; gap: 3px; }
 .rest-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.rest-rating { font-size: 10px; color: #f59e0b; font-weight: 700; flex-shrink: 0; }
+.rest-rating { font-size: 10px; color: #b45309; font-weight: 600; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .rest-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.rest-tag { font-size: 9px; background: #f0edf5; color: #7c6fd8; border-radius: 6px; padding: 2px 6px; font-weight: 600; }
-.food-empty { font-size: 12px; color: #b0a3bc; padding: 8px; text-align: center; }
-.food-loading-bar { padding: 8px 4px; color: var(--accent); font-size: 12px; display: flex; align-items: center; gap: 8px; }
-.food-loading-bar .spin { display: inline-block; animation: hspin 1s linear infinite; }
-@keyframes hspin { to { transform: rotate(360deg) } }
-.food-name { font-size: 12px; font-weight: 700; color: #4a3f55; }
-.food-price { font-size: 10px; color: var(--accent); font-weight: 700; }
-.food-desc { font-size: 10px; color: #a898b8; margin-top: 2px; }
-.food-dist { font-size: 10px; color: var(--accent); font-weight: 700; margin-top: 2px; }
+.rest-tag { font-size: 9px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-600); border-radius: 4px; padding: 2px 6px; font-weight: 500; }
+.food-empty { font-size: 12px; color: var(--ink-300); padding: 8px; text-align: center; }
+.food-loading-bar { padding: 8px 4px; color: var(--ink-400); font-size: 12px; }
+.food-name { font-size: 12px; font-weight: 600; color: var(--ink-900); }
+.food-price { font-size: 10px; color: var(--ink-700); font-weight: 600; font-variant-numeric: tabular-nums; }
+.food-desc { font-size: 10px; color: var(--ink-400); margin-top: 2px; }
+.food-dist { font-size: 10px; color: var(--accent); font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
-.tips-list { margin: 0; padding-left: 16px; font-size: 11px; color: #7a6c8a; line-height: 1.8; }
+.tips-list { margin: 0; padding-left: 16px; font-size: 11px; color: var(--ink-600); line-height: 1.8; }
 
 .budget-items { display: flex; flex-direction: column; }
-.budget-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,.04); font-size: 12px; }
+.budget-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .budget-item:last-child { border: none; }
-.b-label { color: #7a6c8a; }
-.b-value { font-weight: 700; color: #4a3f55; }
-.budget-total { text-align: center; margin-top: 12px; font-size: 13px; color: #7a6c8a; padding: 10px; background: var(--accent-soft); border-radius: 12px; }
-.budget-total strong { color: var(--accent); font-size: 17px; }
+.b-label { color: var(--ink-400); }
+.b-value { font-weight: 600; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+.budget-total { text-align: center; margin-top: 12px; font-size: 13px; color: var(--ink-600); padding: 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+.budget-total strong { color: var(--ink-900); font-size: 16px; font-variant-numeric: tabular-nums; }
 
 /* 酒店搜索 */
-.btn-hotel { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; box-shadow: 0 3px 10px rgba(99,102,241,.25); }
-.btn-hotel.on { opacity: .85; }
-.hotel-panel { margin-top: 8px; background: #f7f5fa; border: none; border-radius: 14px; padding: 12px; }
-.persona-sec { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,.04); }
-.persona-title { font-size: 12px; font-weight: 700; color: #4a3f55; margin-bottom: 8px; }
+.btn-hotel { margin-top: 8px; background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-hotel.on { background: var(--accent-hover); }
+.hotel-panel { margin-top: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.persona-sec { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.persona-title { font-size: 12px; font-weight: 600; color: var(--ink-700); margin-bottom: 8px; }
 .persona-group { margin-bottom: 6px; }
-.persona-group-label { font-size: 10px; color: #a898b8; font-weight: 700; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .3px; }
+.persona-group-label { font-size: 10px; color: var(--ink-400); font-weight: 600; display: block; margin-bottom: 3px; letter-spacing: .3px; }
 .persona-chips { display: flex; gap: 4px; flex-wrap: wrap; }
-.persona-chips .chip-sm.on { background: #8b5cf6; color: #fff; }
+.persona-chips .chip-sm.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .hotel-presets { display: flex; gap: 4px; flex-wrap: wrap; }
-.hotel-presets .chip-sm.on { background: #6366f1; color: #fff; }
+.hotel-presets .chip-sm.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .hotel-custom { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
 .hotel-custom .inp { flex: 1; }
 .hotel-attraction-sel { margin-top: 8px; }
-.btn-hotel-search { margin-top: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; width: 100%; box-shadow: 0 3px 10px rgba(99,102,241,.25); }
+.btn-hotel-search { margin-top: 8px; background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; }
 .hotel-prefs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; }
-.hotel-prefs .pref-label { color: #7c6fd8; font-weight: 700; }
-.hotel-prefs .pref-chip { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; border-radius: 999px; padding: 2px 8px; font-weight: 700; }
-.hotel-prefs .pref-note { color: #a898b8; }
-.hotel-loading { text-align: center; color: #7c6fd8; font-size: 12px; padding: 16px 0; }
-.hotel-loading .spin { display: inline-block; animation: hspin 1s linear infinite; }
+.hotel-prefs .pref-label { color: var(--ink-600); font-weight: 600; }
+.hotel-prefs .pref-chip { background: var(--surface); border: 1px solid var(--line); color: var(--ink-700); border-radius: 999px; padding: 2px 8px; font-weight: 500; }
+.hotel-prefs .pref-note { color: var(--ink-300); }
+.hotel-loading { text-align: center; color: var(--ink-400); font-size: 12px; padding: 16px 0; }
 .hotel-results { margin-top: 8px; }
-.hotel-count { font-size: 11px; color: #a898b8; margin-bottom: 6px; }
+.hotel-count { font-size: 11px; color: var(--ink-400); margin-bottom: 6px; }
 .hotel-item {
-  background: #fff; border: none; border-radius: 14px; padding: 10px 12px;
-  margin-bottom: 6px; cursor: pointer; transition: all .15s; box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  margin-bottom: 6px; cursor: pointer; transition: all .15s; box-shadow: 0 1px 2px rgba(22,24,29,.03);
 }
-.hotel-item:hover { box-shadow: 0 3px 12px rgba(99,102,241,.12); transform: translateY(-1px); }
+.hotel-item:hover { border-color: var(--line-strong); }
 .h-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.h-name { font-size: 13px; font-weight: 700; color: #3a3045; flex: 1; }
-.h-match { font-size: 10px; font-weight: 800; border-radius: 6px; padding: 2px 8px; color: #fff; flex-shrink: 0; }
-.h-match.high { background: #16a34a; }
-.h-match.mid { background: #f59e0b; }
-.h-match.low { background: #a898b8; }
-.h-kind { font-size: 10px; font-weight: 800; border-radius: 6px; padding: 2px 8px; flex-shrink: 0; border: 1px solid transparent; }
-.h-kind.hotel { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
-.h-kind.bnb { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
-.h-kind.inn { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
-.h-kind.hostel { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-.h-kind.apt { background: #faf5ff; color: #7e22ce; border-color: #e9d5ff; }
-.h-kind.innn { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
-.h-kind.stay { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
-.h-badge { font-size: 9px; border-radius: 4px; padding: 1px 6px; font-weight: 700; }
-.h-badge.good { background: #f0fdf4; color: #166534; }
-.h-badge.ref { background: #f0edf5; color: #7a6c8a; }
+.h-name { font-size: 13px; font-weight: 600; color: var(--ink-900); flex: 1; }
+.h-match { font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 8px; color: #fff; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.h-match.high { background: #0d7a57; }
+.h-match.mid { background: #d97706; }
+.h-match.low { background: var(--ink-300); }
+.h-kind { font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 8px; flex-shrink: 0; border: 1px solid transparent; }
+.h-kind.hotel { background: var(--surface-2); color: var(--ink-700); border-color: var(--line); }
+.h-kind.bnb { background: #eef6f2; color: #0d7a57; border-color: #d3ecdd; }
+.h-kind.inn { background: #fef6f3; color: #b45309; border-color: #f5dccd; }
+.h-kind.hostel { background: #eff4fd; color: #1d4ed8; border-color: #d3e2fa; }
+.h-kind.apt { background: #f4f1fb; color: #6d28d9; border-color: #e4dcf5; }
+.h-kind.innn { background: var(--surface-2); color: var(--ink-600); border-color: var(--line); }
+.h-kind.stay { background: var(--surface-2); color: var(--ink-600); border-color: var(--line); }
+.h-badge { font-size: 9px; border-radius: 4px; padding: 1px 6px; font-weight: 600; }
+.h-badge.good { background: #eef6f2; color: #0d7a57; }
+.h-badge.ref { background: var(--surface-2); color: var(--ink-400); border: 1px solid var(--line); }
 .h-row2 { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
-.h-price { font-size: 13px; font-weight: 800; color: var(--accent-2); }
-.h-rating { font-size: 11px; font-weight: 700; color: #f59e0b; }
-.h-rating.none { color: #b0a3bc; font-weight: 400; }
-.h-rating.premium { color: #8b5cf6; }
-.h-rating.chain { color: #0f6e56; }
-.h-rating.bnb { color: #d4537e; }
-.h-dist { font-size: 11px; color: #8a8098; margin-left: auto; }
+.h-price { font-size: 13px; font-weight: 700; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+.h-rating { font-size: 11px; font-weight: 600; color: #b45309; font-variant-numeric: tabular-nums; }
+.h-rating.none { color: var(--ink-300); font-weight: 400; }
+.h-rating.premium { color: #6d28d9; }
+.h-rating.chain { color: #0d7a57; }
+.h-rating.bnb { color: #be4a73; }
+.h-dist { font-size: 11px; color: var(--ink-400); margin-left: auto; font-variant-numeric: tabular-nums; }
 .h-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; align-items: center; }
-.h-tag { font-size: 9px; background: #f0edf5; color: #7c6fd8; border-radius: 6px; padding: 2px 7px; font-weight: 600; }
-.h-mall { font-size: 9px; color: #b0a3bc; margin-left: auto; }
-.h-nav { font-size: 13px; cursor: pointer; padding: 0 2px; }
-.h-arrow { font-size: 10px; color: #b0a3bc; transition: transform .2s; }
+.h-tag { font-size: 9px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-600); border-radius: 4px; padding: 2px 7px; font-weight: 500; }
+.h-mall { font-size: 9px; color: var(--ink-300); margin-left: auto; }
+.h-nav { font-size: 13px; cursor: pointer; padding: 0 2px; color: var(--ink-400); }
+.h-nav:hover { color: var(--accent); }
+.h-arrow { font-size: 10px; color: var(--ink-300); transition: transform .2s; display: inline-flex; }
 .h-arrow.open { transform: rotate(180deg); }
-.transit-panel { margin-top: 8px; border-top: 1px solid rgba(0,0,0,.04); padding-top: 8px; }
-.transit-title { font-size: 11px; font-weight: 700; color: #4a3f55; margin-bottom: 6px; }
-.transit-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,.03); font-size: 11px; }
+.transit-panel { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.transit-title { font-size: 11px; font-weight: 600; color: var(--ink-700); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.transit-row { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 11px; }
 .transit-row:last-child { border-bottom: none; }
-.tr-attr { flex: 1; color: #4a3f55; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tr-dist { color: #b0a3bc; font-size: 10px; width: 42px; text-align: right; }
-.tr-mode { font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 6px; width: 76px; text-align: center; }
-.tr-mode.m-walk { background: #e1f5ee; color: #0f6e56; }
-.tr-mode.m-bike { background: #e6f1fb; color: #185fa5; }
-.tr-mode.m-transit { background: #faeeda; color: #854f0b; }
-.tr-mode.m-taxi { background: #fbeaf0; color: #993556; }
-.tr-time { color: #8a8098; width: 42px; text-align: right; font-size: 10px; }
-.tr-fee { font-weight: 700; color: var(--accent-2); width: 56px; text-align: right; font-size: 11px; }
-.transit-note { margin-top: 6px; font-size: 9px; color: #b0a3bc; line-height: 1.5; }
-.hotel-empty { text-align: center; color: #b0a3bc; font-size: 12px; padding: 16px 8px; }
-.btn-share { background: linear-gradient(135deg, #1e1b4b, #312e81); color: #fff; box-shadow: 0 3px 10px rgba(30,27,75,.25); }
+.tr-attr { flex: 1; color: var(--ink-700); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-dist { color: var(--ink-300); font-size: 10px; width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+.tr-mode { font-size: 10px; font-weight: 600; border-radius: 5px; padding: 2px 6px; width: 76px; text-align: center; }
+.tr-mode.m-walk { background: #eef6f2; color: #0d7a57; }
+.tr-mode.m-bike { background: #eff4fd; color: #1d4ed8; }
+.tr-mode.m-transit { background: #fdf3e3; color: #b45309; }
+.tr-mode.m-taxi { background: #fbeef3; color: #993556; }
+.tr-time { color: var(--ink-400); width: 42px; text-align: right; font-size: 10px; font-variant-numeric: tabular-nums; }
+.tr-fee { font-weight: 600; color: var(--ink-900); width: 56px; text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
+.transit-note { margin-top: 6px; font-size: 9px; color: var(--ink-300); line-height: 1.5; }
+.hotel-empty { text-align: center; color: var(--ink-300); font-size: 12px; padding: 16px 8px; }
+.btn-share { background: var(--ink-900); color: #fff; border-color: var(--ink-900); }
 .share-hotel-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .share-hotel-item {
-  display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px;
-  border: 2px solid transparent; background: #f7f5fa; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; transition: all .15s;
 }
-.share-hotel-item.on { border-color: #7c3aed; background: #f8f6ff; }
-.sh-city { font-size: 10px; background: #f0edf5; color: #7c6fd8; border-radius: 6px; padding: 2px 7px; font-weight: 700; flex-shrink: 0; }
+.share-hotel-item.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.sh-city { font-size: 10px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-600); border-radius: 5px; padding: 2px 7px; font-weight: 600; flex-shrink: 0; }
 .sh-main { flex: 1; min-width: 0; }
-.sh-name { font-size: 13px; font-weight: 700; color: #3a3045; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sh-meta { font-size: 11px; color: #b0a3bc; margin-top: 2px; }
-.sh-check { width: 24px; height: 24px; border-radius: 8px; border: 2px solid #d4c4dc; display: flex; align-items: center; justify-content: center; font-size: 12px; color: transparent; flex-shrink: 0; transition: all .15s; }
-.sh-check.on { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+.sh-name { font-size: 13px; font-weight: 600; color: var(--ink-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-meta { font-size: 11px; color: var(--ink-400); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.sh-check { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--line-strong); display: flex; align-items: center; justify-content: center; color: transparent; flex-shrink: 0; transition: all .15s; }
+.sh-check.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 </style>

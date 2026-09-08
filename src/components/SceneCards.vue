@@ -1,12 +1,13 @@
 <script setup>
+import Icon from './Icon.vue'
 defineProps({
   modelValue: { type: String, default: 'destination' }
 })
 defineEmits(['update:modelValue'])
 
 const SCENES = [
-  { key: 'destination', icon: '🎯', label: '指定目的地', desc: '选地点 · 单程/往返 · 最优/随机', dist: '看目的地', time: '看路线', tag: '导航' },
-  { key: 'loop', icon: '🔄', label: '指定距离环线', desc: '设距离 · 当前定位出发 · 随机圆环', dist: '5-200 km', time: '随心调', tag: '自由' },
+  { key: 'destination', icon: 'navigation', label: '指定目的地', desc: '选地点 · 单程/往返 · 最优/随机', dist: '看目的地', time: '看路线', tag: '导航' },
+  { key: 'loop', icon: 'refresh', label: '指定距离环线', desc: '设距离 · 当前定位出发 · 随机圆环', dist: '5-200 km', time: '随心调', tag: '自由' },
 ]
 </script>
 
@@ -19,9 +20,9 @@ const SCENES = [
       @click="$emit('update:modelValue', s.key)"
     >
       <div class="scene-top">
-        <span class="scene-icon">{{ s.icon }}</span>
+        <span class="scene-icon"><Icon :name="s.icon" :size="18" /></span>
         <span class="scene-label">{{ s.label }}</span>
-        <span class="scene-tag" :class="s.key">{{ s.tag }}</span>
+        <span v-if="modelValue === s.key" class="scene-check"><Icon name="check" :size="12" /></span>
       </div>
       <div class="scene-desc">{{ s.desc }}</div>
       <div class="scene-stats">
@@ -37,101 +38,46 @@ const SCENES = [
 .scene-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   margin-top: 12px;
 }
 .scene-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 16px 14px;
-  border-radius: 16px;
-  border: none;
-  background: #fff;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
   cursor: pointer;
-  transition: all .25s cubic-bezier(.34,1.56,.64,1);
+  transition: all .15s;
   font-family: inherit;
-  color: #7a6c8a;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
-  position: relative;
-  overflow: hidden;
+  color: var(--ink-600);
   text-align: left;
+  box-shadow: 0 1px 2px rgba(22,24,29,.03);
 }
-.scene-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 6px rgba(0,0,0,.06), 0 8px 20px var(--shadow-color);
-}
+.scene-card:hover { border-color: var(--line-strong); }
+.scene-card:active { transform: scale(.98); }
 .scene-card.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(var(--accent-rgb),.30);
-  transform: translateY(-2px);
+  border-color: var(--accent);
+  color: var(--ink-900);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+  background: var(--accent-soft);
 }
-.scene-card.active::before {
-  content: '';
-  position: absolute;
-  top: -24px;
-  right: -24px;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.12);
-}
-.scene-card.active::after {
-  content: '✓';
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  font-size: 14px;
-  font-weight: 800;
-  color: rgba(255,255,255,.7);
-  z-index: 1;
-}
-.scene-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-.scene-icon { font-size: 28px; line-height: 1; }
-.scene-label { font-size: 16px; font-weight: 800; letter-spacing: -.3px; }
-.scene-tag {
+.scene-top { display: flex; align-items: center; gap: 8px; }
+.scene-icon { color: var(--ink-400); display: flex; }
+.scene-card.active .scene-icon { color: var(--accent); }
+.scene-label { font-size: 14px; font-weight: 600; }
+.scene-check {
   margin-left: auto;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: #f0edf5;
-  color: #8a8098;
-  letter-spacing: .3px;
-}
-.scene-card.active .scene-tag {
-  background: rgba(255,255,255,.22);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
   color: #fff;
+  display: flex; align-items: center; justify-content: center;
 }
-.scene-desc {
-  font-size: 11px;
-  opacity: .7;
-  position: relative;
-  z-index: 1;
-  line-height: 1.4;
-}
-.scene-stats {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  position: relative;
-  z-index: 1;
-}
-.scene-stat {
-  font-size: 11px;
-  font-weight: 700;
-  opacity: .85;
-}
-.scene-stat-sep {
-  font-size: 11px;
-  opacity: .4;
-}
+.scene-desc { font-size: 11px; color: var(--ink-400); line-height: 1.4; }
+.scene-stats { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.scene-stat { font-size: 11px; font-weight: 500; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.scene-stat-sep { font-size: 11px; color: var(--ink-300); }
 </style>

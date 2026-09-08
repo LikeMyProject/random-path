@@ -6,6 +6,7 @@ import { useSuggest } from '../composables/useAutoComplete.js'
 import { tryGenerateRoute, generateCompassLoop, generateMultipleRoutes, MAX_RETRIES, BIKE_SPEED, nameWaypoint, buildNavUrl, openNavigation, buildGPX, fetchOptimalBikeRoute, calcSlopeProfile } from '../composables/useRouteEngine.js'
 import { generateShareImage, shareImage } from '../composables/useShareCard.js'
 import { useRouteContext } from '../composables/useRouteContext.js'
+import Icon from '../components/Icon.vue'
 import RouteThumbnail from '../components/RouteThumbnail.vue'
 import ResultView from './ResultView.vue'
 import SceneCards from '../components/SceneCards.vue'
@@ -142,14 +143,14 @@ onMounted(async () => {
       const { longitude: lng, latitude: lat } = pos.coords
 
       if (!addresses['家'] || !homeAddr.value) {
-        from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+        from.value = { name: `${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
         try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
       } else {
         const dist = calcDistKm({ lat, lng }, homeAddr.value)
         homeDist.value = Math.round(dist * 10) / 10
         if (dist > 2) {
           nearbyMode.value = true
-          from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+          from.value = { name: `${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
           try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
         } else {
           nearbyMode.value = false
@@ -186,7 +187,7 @@ function locateFromSearch() {
   toast('正在定位…')
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const { longitude: lng, latitude: lat } = pos.coords
-    from.value = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+    from.value = { name: `${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
     try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) from.value.name = name; if (city) setDetectedCity(city) } catch(e) {}
     showLocationSearch.value = false
     toast('已获取当前位置')
@@ -203,7 +204,7 @@ function locateMe(target) {
   toast('正在定位…')
   navigator.geolocation.getCurrentPosition(async (pos) => {
     const { longitude: lng, latitude: lat } = pos.coords
-    const obj = { name: `📍 ${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
+    const obj = { name: `${lng.toFixed(4)}, ${lat.toFixed(4)}`, lng: String(lng), lat: String(lat) }
     if (target === 'from') from.value = obj; else to.value = obj
     toast('已获取当前位置')
     try { const [name, city] = await Promise.all([nameWaypoint(lng, lat), detectCityFromGPS(lng, lat)]); if (name?.length > 2) { if (target === 'from') from.value.name = name; else to.value.name = name }; if (city) setDetectedCity(city) } catch(e) {}
@@ -329,7 +330,7 @@ const TRUST_META = {
   grey: { badge: '自动待实测', color: '#5f5e5a' },
 }
 const TRUST_RANK = { grey: 1, yellow: 2, green: 3, blue: 4 }
-function poolLabel(r) { return (r.corridorIds || []).length ? '🏔 廊道合成' : '🔄 随机环' }
+function poolLabel(r) { return (r.corridorIds || []).length ? '廊道合成' : '随机环线' }
 function shapeLabel(r) { return r.shape === 'loop' ? '环线闭合' : '往返折返' }
 function trustOf(r) {
   const ids = r.corridorIds || []
@@ -481,7 +482,7 @@ async function doGenerateDestination() {
         backSegs = r2.segments; backWps = r2.waypoints; backDist = r2.totalDistance; backDur = r2.totalDuration
       }
       segments = [...outSegs, ...backSegs]
-      waypoints = [...outWps, { lng: d.lng, lat: d.lat, poiName: d.name || '🎯 目的地' }, ...backWps]
+      waypoints = [...outWps, { lng: d.lng, lat: d.lat, poiName: d.name || '目的地' }, ...backWps]
       totalDistance = outDist + backDist
       totalDuration = outDur + backDur
     }
@@ -536,7 +537,7 @@ async function doShare() {
   const route = result.value; const h = homeObj.value, w = workObj.value
   const canvas = generateShareImage({ title: (h?.name||'?') + (hasDest.value ? ' → '+(w?.name||'?') : ' ↻ 环线'), subtitle: (route.totalDistance/1000).toFixed(1)+' km · '+Math.round(route.totalDuration/60)+' min', totalDistance: route.totalDistance, totalDuration: route.totalDuration, totalClimb: route.totalClimb, segments: route.segments, waypoints: route.waypoints, home: h, work: w||h, uphillSections: route.uphillSections, downhillSections: route.downhillSections })
   const r = await shareImage(canvas, `mantu_${(h?.name||'route')}_${(route.totalDistance/1000).toFixed(1)}km.png`)
-  if (r === 'shared') toast('已分享 🎉'); else toast('已下载 📥')
+  if (r === 'shared') toast('已分享'); else toast('已下载')
 }
 
 // === 地址管理 ===
@@ -547,7 +548,7 @@ function _decode() { try { const b=atob(_D);const u=new Uint8Array(b.length);for
 const devUnlocked = ref(localStorage.getItem('radompath_dev') === '1')
 if (devUnlocked.value) { const presets = _decode(); let n = false; for (const [k, v] of Object.entries(presets)) { if (!addresses[k] || addresses[k].name?.includes('Ã')) { addresses[k] = { name: v.name, lng: v.lng, lat: v.lat }; n = true } } if (n) saveAddresses(addresses) }
 const showPwdInput = ref(false), pwdValue = ref('')
-async function checkPassword() { const hb = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwdValue.value)); const hx = Array.from(new Uint8Array(hb)).map(b => b.toString(16).padStart(2,'0')).join(''); if (hx === _K) { devUnlocked.value = true; localStorage.setItem('radompath_dev','1'); showPwdInput.value = false; pwdValue.value = ''; const p = _decode(); for (const [k,v] of Object.entries(p)) addresses[k] = { name: v.name, lng: v.lng, lat: v.lat }; saveAddresses(addresses); toast('已解锁 ✅') } else toast('密码错误','err') }
+async function checkPassword() { const hb = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwdValue.value)); const hx = Array.from(new Uint8Array(hb)).map(b => b.toString(16).padStart(2,'0')).join(''); if (hx === _K) { devUnlocked.value = true; localStorage.setItem('radompath_dev','1'); showPwdInput.value = false; pwdValue.value = ''; const p = _decode(); for (const [k,v] of Object.entries(p)) addresses[k] = { name: v.name, lng: v.lng, lat: v.lat }; saveAddresses(addresses); toast('已解锁') } else toast('密码错误','err') }
 function quickFill(t, a) { const ad = addresses[a]; if (!ad) return; if (t === 'from') from.value = { name: ad.name, lng: String(ad.lng), lat: String(ad.lat) }; else to.value = { name: ad.name, lng: String(ad.lng), lat: String(ad.lat) } }
 function saveNewAddr() { const a = newAddr.value; if (!a.alias||!a.name||!a.lng||!a.lat) { toast('请填写完整','warn'); return }; addresses[a.alias] = { name:a.name, lng:parseFloat(a.lng), lat:parseFloat(a.lat) }; saveAddresses(addresses); newAddr.value = { alias:'',name:'',lng:'',lat:'' }; showAddrModal.value = false; toast('地址已保存') }
 function deleteSavedAddr(a) { if (!confirm(`确定删除「${a}」？`)) return; deleteAddress(a) ? toast(`已删除「${a}」`) : toast('删除失败','warn') }
@@ -559,7 +560,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <!-- 位置卡片 -->
   <div class="loc-card">
     <div class="loc-info" @click="openLocationSearch">
-      <span class="loc-pin">📍</span>
+      <span class="loc-pin"><Icon name="pin" :size="16" /></span>
       <div class="loc-text">
         <div class="loc-label">起点</div>
         <div class="loc-name">{{ from.name || '正在定位…' }}</div>
@@ -567,8 +568,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       <span v-if="nearbyMode" class="loc-badge">离家{{ homeDist }}km</span>
     </div>
     <div class="loc-actions">
-      <button v-if="nearbyMode" class="loc-btn" @click.stop="toggleNearby" title="切回家">🏠</button>
-      <button class="loc-btn" @click.stop="locateMe('from')" title="GPS 定位">🎯</button>
+      <button v-if="nearbyMode" class="loc-btn" @click.stop="toggleNearby" title="切回家"><Icon name="home" :size="15" /></button>
+      <button class="loc-btn" @click.stop="locateMe('from')" title="GPS 定位"><Icon name="crosshair" :size="15" /></button>
       <button class="loc-btn primary" @click.stop="openLocationSearch" title="切换位置">切换</button>
     </div>
   </div>
@@ -584,7 +585,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
         @focus="onLocationInput"
         @keyup.enter="confirmLocation"
       />
-      <button class="loc-search-btn" @click="locateFromSearch">🎯</button>
+      <button class="loc-search-btn" @click="locateFromSearch"><Icon name="crosshair" :size="15" /></button>
       <button class="loc-search-btn primary" @click="confirmLocation">搜索</button>
     </div>
     <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop">
@@ -600,7 +601,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   </div>
 
   <!-- 四步出题（聪明骰子）：多远 → 什么路 → 往哪 → 出发 -->
-  <p class="section-title">怎么骑？（点选即出）</p>
+  <p class="section-title">快速合成<span class="st-hint">三步选好，一键出路线</span></p>
   <div class="dice-card">
     <div class="dice-row">
       <span class="dice-label">多远</span>
@@ -617,19 +618,20 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     <div class="dice-row">
       <span class="dice-label">往哪</span>
       <div class="dice-opts cols2">
-        <button :class="['chip',{active:!pool}]" @click="pool=null">🎲 随缘</button>
-        <button v-for="p in pools" :key="p.id" :class="['chip',{active:pool===p.id}]" @click="pool=p.id">{{ p.icon }} {{ p.label }}</button>
+        <button :class="['chip',{active:!pool}]" @click="pool=null">随缘</button>
+        <button v-for="p in pools" :key="p.id" :class="['chip',{active:pool===p.id}]" @click="pool=p.id">{{ p.label }}</button>
       </div>
     </div>
   </div>
   <button class="btn-go" :disabled="loading" @click="doSmart">
-    {{ loading ? '合成中…' : '🎲 合成好路' }}
+    <Icon name="dice" :size="17" v-if="!loading" />
+    {{ loading ? '合成中…' : '合成路线' }}
   </button>
 
   <!-- 经典模式（折叠保留旧入口） -->
   <div class="advanced-toggle" @click="showClassic = !showClassic">
     <span>经典模式（骑到某处 / 环线）</span>
-    <span class="arrow" :class="{ open: showClassic }">▾</span>
+    <span class="arrow" :class="{ open: showClassic }"><Icon name="chevronDown" :size="14" /></span>
   </div>
   <div v-if="showClassic">
   <!-- 模式卡片 -->
@@ -675,19 +677,19 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 
     <!-- 路线策略：最优 / 随机 -->
     <div class="trip-toggle">
-      <button :class="['trip-pill', { active: routeStrategy === 'optimal' }]" @click="routeStrategy = 'optimal'">✨ 最优</button>
-      <button :class="['trip-pill', { active: routeStrategy === 'random' }]" @click="routeStrategy = 'random'">🎲 随机</button>
+      <button :class="['trip-pill', { active: routeStrategy === 'optimal' }]" @click="routeStrategy = 'optimal'">最优</button>
+      <button :class="['trip-pill', { active: routeStrategy === 'random' }]" @click="routeStrategy = 'random'">随机绕行</button>
     </div>
 
     <!-- 单程 / 往返 切换 -->
     <div class="trip-toggle">
-      <button :class="['trip-pill', { active: tripType === 'oneway' }]" @click="tripType = 'oneway'">↗ 单程</button>
-      <button :class="['trip-pill', { active: tripType === 'round' }]" @click="tripType = 'round'">🔁 往返</button>
+      <button :class="['trip-pill', { active: tripType === 'oneway' }]" @click="tripType = 'oneway'">单程</button>
+      <button :class="['trip-pill', { active: tripType === 'round' }]" @click="tripType = 'round'">往返</button>
     </div>
 
     <div v-if="destEstimate" class="dest-estimate">
       <div class="dest-est-row">
-        <span>📍 {{ destCoord?.name }}</span>
+        <span>{{ destCoord?.name }}</span>
       </div>
       <div class="dest-est-row">
         <template v-if="tripType === 'oneway'">
@@ -700,7 +702,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
         </template>
       </div>
     </div>
-    <div v-else class="dest-hint">💡 搜索目的地后，自动规划{{ tripType === 'round' ? '去程 + 返程' : '去程' }}最优路线</div>
+    <div v-else class="dest-hint"><Icon name="info" :size="13" />搜索目的地后，自动规划{{ tripType === 'round' ? '去程 + 返程' : '去程' }}路线</div>
   </div>
 
   <!-- 对比模式开关（非目的地模式） -->
@@ -721,14 +723,15 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
     :disabled="loading || (scene === 'destination' && !destCoord)"
     @click="handleGenerate"
   >
-    {{ loading ? '生成中…' : scene === 'loop' ? '🔄 环线出发！' : (tripType === 'round' ? '🔁 往返出发！' : '🎯 骑过去！') }}
+    <Icon v-if="!loading" :name="scene === 'loop' ? 'refresh' : 'navigation'" :size="16" />
+    {{ loading ? '生成中…' : scene === 'loop' ? '环线出发' : (tripType === 'round' ? '往返出发' : '骑过去') }}
   </button>
   </div><!-- /经典模式 -->
 
   <!-- 高级选项折叠 -->
   <div class="advanced-toggle" @click="showAdvanced = !showAdvanced">
     <span>编辑起终点</span>
-    <span class="arrow" :class="{ open: showAdvanced }">▾</span>
+    <span class="arrow" :class="{ open: showAdvanced }"><Icon name="chevronDown" :size="14" /></span>
   </div>
   <div v-if="showAdvanced" class="advanced-panel">
     <!-- 起终点 -->
@@ -740,8 +743,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       </div>
       <div class="input-row" style="position:relative">
         <input v-model="from.name" placeholder="输入地名搜索" @input="onNameInput('from')" @focus="onNameInput('from')" @blur="setTimeout(closeSuggest,200)">
-        <button class="btn-icon" @click="doGeocode('from')">🔍</button>
-        <button class="btn-icon" @click="locateMe('from')">📍</button>
+        <button class="btn-icon" @click="doGeocode('from')" title="搜索坐标"><Icon name="search" :size="14" /></button>
+        <button class="btn-icon" @click="locateMe('from')" title="GPS 定位"><Icon name="crosshair" :size="14" /></button>
         <div v-if="showSuggest && activeSuggest==='from'" class="suggest-drop"><div v-for="(s,i) in suggestions" :key="i" class="suggest-item" @mousedown.prevent="selectSugg(i)"><span class="s-name">{{ s.name }}</span><span class="s-dist">{{ s.district }}</span></div></div>
       </div>
     </div>
@@ -750,8 +753,8 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
       <label class="field-label">终点 <span class="hint">(不填=环线)</span></label>
       <div class="input-row" style="position:relative">
         <input v-model="to.name" placeholder="可选目的地" @input="onNameInput('to')" @focus="onNameInput('to')" @blur="setTimeout(closeSuggest,200)">
-        <button class="btn-icon" @click="doGeocode('to')">🔍</button>
-        <button class="btn-icon" @click="locateMe('to')">📍</button>
+        <button class="btn-icon" @click="doGeocode('to')" title="搜索坐标"><Icon name="search" :size="14" /></button>
+        <button class="btn-icon" @click="locateMe('to')" title="GPS 定位"><Icon name="crosshair" :size="14" /></button>
       </div>
     </div>
   </div>
@@ -779,11 +782,11 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   </div>
 
   <!-- 钉段：锁定某几段后「换一条」只重掷其余段 -->
-  <div v-if="activeResult?.corridorIds?.length" class="compass-grid lock-row">
+  <div v-if="activeResult?.corridorIds?.length" class="lock-row">
     <span class="lock-hint">钉住不换：</span>
     <button v-for="(cid,i) in activeResult.corridorIds" :key="cid"
       :class="['chip',{active:locked.has(cid)}]"
-      @click="toggleLock(cid)">{{ locked.has(cid) ? '🔒' : '🔓' }} 段{{ i + 1 }}</button>
+      @click="toggleLock(cid)"><Icon :name="locked.has(cid) ? 'lock' : 'unlock'" :size="12" />段{{ i + 1 }}</button>
   </div>
 
   <!-- 结果 -->
@@ -808,16 +811,39 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   <!-- 地址管理弹窗 -->
   <div class="modal" v-if="showAddrModal" @click.self="showAddrModal=false">
     <div class="inner">
-      <div style="display:flex;align-items:center;justify-content:space-between"><h3>管理地址簿</h3><div style="display:flex;align-items:center;gap:4px"><span v-if="devUnlocked" style="font-size:10px;color:#22c55e">🔓</span><button v-if="!showPwdInput" class="btn btn-sm" style="background:transparent;color:#a898b8;font-size:9px;padding:2px 6px" @click="showPwdInput=true">🔧</button><input v-if="showPwdInput" v-model="pwdValue" type="password" placeholder="密码" style="width:80px;font-size:10px;padding:3px 6px" @keyup.enter="checkPassword"><button v-if="showPwdInput" class="btn btn-sm" style="background:var(--accent);color:#fff;font-size:9px;padding:3px 8px" @click="checkPassword">OK</button></div></div>
-      <div v-if="Object.keys(addresses).length>0" style="margin-bottom:10px;max-height:150px;overflow-y:auto"><div v-for="(v,k) in addresses" :key="k" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;margin:3px 0;background:#f7f5fa;border-radius:8px;font-size:12px"><span><strong>{{ k }}</strong> — {{ v.name }} <span style="color:#a898b8;font-size:10px">({{ typeof v.lng==='number'?v.lng.toFixed(4):v.lng }}, {{ typeof v.lat==='number'?v.lat.toFixed(4):v.lat }})</span></span><button class="btn btn-sm" style="background:#ff5252;color:#fff;font-size:9px;padding:2px 6px;flex-shrink:0;margin-left:8px" @click="deleteSavedAddr(k)">🗑</button></div></div>
-      <div v-else style="text-align:center;color:#a898b8;font-size:12px;margin-bottom:10px">还没有保存的地址哦~</div>
-      <hr style="border:none;border-top:1px dashed #ece0ec;margin:10px 0">
-      <h3 style="font-size:13px;color:#8a8098;margin-bottom:4px">添加新地址</h3>
-      <label style="font-size:11px;color:#a898b8">① 别名</label><input v-model="newAddr.alias" placeholder="如：家、公司">
-      <label style="font-size:11px;color:#a898b8">② 名称</label><div class="row"><input v-model="newAddr.name" placeholder="如：西安钟楼" style="flex:1"><button class="btn btn-sm" style="background:#f97316;color:#fff;flex-shrink:0" @click="geocodeNewAddr">🔍 查询坐标</button></div>
-      <label style="font-size:11px;color:#a898b8">③ 坐标</label><input v-model="newAddr.lng" placeholder="经度"><input v-model="newAddr.lat" placeholder="纬度">
-      <p style="font-size:11px;color:#a898b8;margin-bottom:10px">💡 用 <a href="https://lbs.amap.com/tools/picker" target="_blank">高德坐标拾取器</a> 手动获取</p>
-      <div class="btn-row"><button class="btn btn-secondary" @click="showAddrModal=false">关闭</button><button class="btn btn-primary" @click="saveNewAddr">保存地址</button></div>
+      <div class="am-head">
+        <h3>管理地址簿</h3>
+        <div class="am-tools">
+          <span v-if="devUnlocked" class="am-dev">已解锁</span>
+          <button v-if="!showPwdInput" class="btn-sm" @click="showPwdInput=true"><Icon name="lock" :size="12" /></button>
+          <input v-if="showPwdInput" v-model="pwdValue" type="password" placeholder="密码" class="am-pwd" @keyup.enter="checkPassword">
+          <button v-if="showPwdInput" class="btn-sm am-ok" @click="checkPassword">确认</button>
+        </div>
+      </div>
+      <div v-if="Object.keys(addresses).length>0" class="am-list">
+        <div v-for="(v,k) in addresses" :key="k" class="addr-list-item">
+          <span class="addr-list-main"><strong>{{ k }}</strong> — {{ v.name }} <span class="coord">({{ typeof v.lng==='number'?v.lng.toFixed(4):v.lng }}, {{ typeof v.lat==='number'?v.lat.toFixed(4):v.lat }})</span></span>
+          <button class="btn-sm btn-del" @click="deleteSavedAddr(k)"><Icon name="trash" :size="12" /></button>
+        </div>
+      </div>
+      <div v-else class="am-empty">还没有保存的地址</div>
+      <div class="am-divider"></div>
+      <div class="am-form">
+        <h4>添加新地址</h4>
+        <label class="field-label">别名</label><input v-model="newAddr.alias" placeholder="如：家、公司">
+        <label class="field-label">名称</label>
+        <div class="row">
+          <input v-model="newAddr.name" placeholder="如：西安钟楼" style="flex:1">
+          <button class="btn-sm" style="flex-shrink:0" @click="geocodeNewAddr"><Icon name="search" :size="12" /> 查坐标</button>
+        </div>
+        <label class="field-label">坐标</label>
+        <div class="row"><input v-model="newAddr.lng" placeholder="经度"><input v-model="newAddr.lat" placeholder="纬度"></div>
+        <p class="am-tip">坐标可用 <a href="https://lbs.amap.com/tools/picker" target="_blank">高德坐标拾取器</a> 获取</p>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" @click="showAddrModal=false">关闭</button>
+        <button class="btn btn-primary" @click="saveNewAddr">保存地址</button>
+      </div>
     </div>
   </div>
 </div>
@@ -830,10 +856,11 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
-  background: #fff;
-  border-radius: 16px;
-  margin-top: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-top: 12px;
+  box-shadow: 0 1px 2px rgba(22,24,29,.03);
 }
 .loc-info {
   display: flex;
@@ -843,26 +870,32 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   cursor: pointer;
   min-width: 0;
 }
-.loc-pin { font-size: 20px; flex-shrink: 0; }
+.loc-pin {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  flex-shrink: 0;
+}
 .loc-text { min-width: 0; flex: 1; }
 .loc-label {
   font-size: 10px;
-  font-weight: 700;
-  color: #a898b8;
-  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-400);
   letter-spacing: .5px;
 }
 .loc-name {
   font-size: 14px;
-  font-weight: 700;
-  color: #3a3045;
+  font-weight: 600;
+  color: var(--ink-900);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .loc-badge {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
   background: var(--accent-soft);
   padding: 3px 8px;
@@ -873,31 +906,34 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 .loc-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .loc-btn {
   padding: 7px 10px;
-  border: none;
-  border-radius: 10px;
-  background: #f0edf5;
-  font-size: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-600);
+  font-size: 13px;
   cursor: pointer;
   line-height: 1;
   transition: all .15s;
   font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
 }
-.loc-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
-.loc-btn:active { transform: scale(.92); }
+.loc-btn:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.loc-btn:active { transform: scale(.93); }
 .loc-btn.primary {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent);
   padding: 8px 12px;
 }
 
 /* === 位置搜索面板 === */
 .loc-search-panel {
-  padding: 14px;
-  background: #fff;
-  border-radius: 0 0 16px 16px;
-  margin-top: -8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  margin-top: -10px;
 }
 .loc-search-row {
   display: flex;
@@ -906,34 +942,37 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .loc-search-input {
   flex: 1;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   font-size: 13px;
   font-family: inherit;
-  color: #4a3f55;
-  background: #f7f5fa;
-  transition: all .2s;
+  color: var(--ink-900);
+  background: var(--surface-2);
+  transition: all .15s;
 }
-.loc-search-input:focus { background: #fff; outline: none; box-shadow: 0 0 0 4px var(--accent-tint); }
+.loc-search-input:focus { background: var(--surface); outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
 .loc-search-btn {
-  padding: 9px 14px;
-  border: none;
-  border-radius: 12px;
-  background: #f0edf5;
-  font-size: 15px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-600);
   cursor: pointer;
   flex-shrink: 0;
   transition: all .15s;
   font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
 }
-.loc-search-btn:hover { background: var(--accent-soft); }
+.loc-search-btn:hover { border-color: var(--line-strong); color: var(--ink-900); }
 .loc-search-btn.primary {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--accent);
+  border-color: var(--accent);
 }
+.loc-search-btn.primary:hover { background: var(--accent-hover); }
 .loc-quick {
   display: flex;
   align-items: center;
@@ -943,7 +982,7 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 }
 .loc-quick-label {
   font-size: 10px;
-  color: #a898b8;
+  color: var(--ink-400);
   font-weight: 600;
   margin-right: 2px;
 }
@@ -955,9 +994,10 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   left: 0;
   right: 0;
   z-index: 20;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(22,24,29,.10);
   overflow: hidden;
   margin-top: 4px;
 }
@@ -965,515 +1005,42 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  padding: 10px 12px;
   cursor: pointer;
-  transition: background .15s;
+  transition: background .12s;
 }
-.suggest-item:hover { background: var(--accent-soft); }
-.s-name { font-size: 12px; color: #4a3f55; }
-.s-dist { font-size: 10px; color: #a898b8; }
+.suggest-item:hover { background: var(--surface-2); }
+.s-name { font-size: 12px; color: var(--ink-900); }
+.s-dist { font-size: 10px; color: var(--ink-300); }
 
 .section-title {
-  font-size: 17px;
-  font-weight: 800;
-  color: #3a3045;
-  margin: 18px 2px 0;
-  letter-spacing: -.3px;
-}
-
-/* === 距离滑块 === */
-.dist-card {
-  padding: 16px 18px;
-  background: #fff;
-  border-radius: 16px;
-  margin-top: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
-}
-.dist-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 12px;
-}
-.dist-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #5e5468;
-}
-.dist-value {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--accent);
-  letter-spacing: -1px;
-}
-.dist-value small {
-  font-size: 14px;
-  font-weight: 600;
-  opacity: .6;
-}
-.dist-slider {
-  width: 100%;
-  height: 6px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: #ece8f0;
-  border-radius: 3px;
-  outline: none;
-  cursor: pointer;
-}
-.dist-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border: 3px solid #fff;
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.35);
-  cursor: pointer;
-  transition: transform .15s;
-}
-.dist-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
-.dist-slider::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  border: 3px solid #fff;
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.35);
-  cursor: pointer;
-}
-.dist-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-  font-size: 11px;
-  color: #a898b8;
-  font-weight: 600;
-}
-.dist-time {
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 12px;
-}
-
-/* === 按钮区 === */
-.btn-go {
-  display: block;
-  width: 100%;
-  padding: 18px;
-  border: none;
-  border-radius: 18px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  font-size: 19px;
-  font-weight: 800;
-  font-family: inherit;
-  cursor: pointer;
-  transition: transform .15s, box-shadow .15s;
-  margin-top: 18px;
-  letter-spacing: .5px;
-  box-shadow: 0 6px 20px rgba(var(--accent-rgb),.28);
-}
-.btn-go:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(var(--accent-rgb),.35);
-}
-.btn-go:active:not(:disabled) { transform: scale(.97); }
-.btn-go:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-
-.btn-multi {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 14px;
-  border: 2px solid rgba(var(--accent-rgb),.15);
-  border-radius: 16px;
-  background: #fff;
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: all .15s;
-  font-family: inherit;
-}
-.btn-multi:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  transform: translateY(-1px);
-}
-.btn-multi:disabled { opacity: .5; cursor: not-allowed; }
-
-
-/* === 对比模式开关 === */
-.multi-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  margin-top: 14px;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
-}
-.multi-toggle-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.multi-toggle-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #5e5468;
-}
-.multi-toggle-info small {
-  font-size: 11px;
-  color: #a898b8;
-}
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 48px;
-  height: 28px;
-  cursor: pointer;
-}
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.switch .track {
-  position: absolute;
-  inset: 0;
-  background: #e0dae8;
-  border-radius: 14px;
-  transition: background .25s;
-}
-.switch .thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0,0,0,.15);
-  transition: transform .25s cubic-bezier(.34,1.56,.64,1);
-}
-.switch input:checked + .track {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-}
-.switch input:checked + .track .thumb {
-  transform: translateX(20px);
-}
-
-/* === 高级面板 === */
-.advanced-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  margin-top: 14px;
-  background: #fff;
-  border-radius: 14px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #7a6c8a;
-  cursor: pointer;
-  transition: all .15s;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
-}
-.advanced-toggle:hover { background: var(--accent-soft); color: var(--accent); }
-.advanced-toggle .arrow { transition: transform .2s; }
-.advanced-toggle .arrow.open { transform: rotate(180deg); }
-
-.advanced-panel {
-  padding: 16px;
-  background: #fff;
-  border: none;
-  border-radius: 0 0 14px 14px;
-  margin-top: -8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.04);
-}
-
-.field-label {
-  font-size: 12px;
-  color: #5e5468;
-  font-weight: 700;
-  display: block;
-  margin-bottom: 6px;
-}
-.field-label .hint {
-  font-weight: 400;
-  color: #b0a3bc;
-}
-
-.adv-label {
-  font-size: 12px;
-  color: #5e5468;
-  font-weight: 700;
-  display: block;
-  margin: 0 0 8px;
-}
-
-.compass-grid {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-.compass-grid .chip {
-  padding: 7px 12px;
-  border-radius: 10px;
-  border: none;
-  background: #f7f5fa;
-  color: #7a6c8a;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-}
-.compass-grid .chip:hover { background: var(--accent-soft); color: var(--accent); }
-.compass-grid .chip.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25);
-}
-
-.addr-row { margin-bottom: 14px; }
-.addr-quick-row {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-}
-
-.chip-sm {
-  padding: 5px 12px;
-  border-radius: 10px;
-  border: none;
-  background: #f0edf5;
-  color: #5e5468;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-}
-.chip-sm:hover { background: var(--accent-soft); color: var(--accent); }
-.chip-sm.add { background: var(--accent-soft); color: var(--accent); }
-
-.input-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.input-row input {
-  flex: 1;
-  padding: 10px 14px;
-  border: none;
-  border-radius: 12px;
-  font-size: 13px;
-  font-family: inherit;
-  color: #4a3f55;
-  background: #f7f5fa;
-  transition: all .2s;
-}
-.input-row input:focus { background: #fff; outline: none; box-shadow: 0 0 0 4px var(--accent-tint); }
-.btn-icon {
-  padding: 8px 12px;
-  border: none;
-  border-radius: 12px;
-  background: #f0edf5;
-  cursor: pointer;
   font-size: 15px;
-  flex-shrink: 0;
-  transition: all .15s;
-}
-.btn-icon:hover { background: var(--accent-soft); }
-.btn-icon:active { transform: scale(.9); }
-
-/* === 目的地搜索 === */
-.dest-search { margin-top: 12px; }
-
-/* 单程 / 往返 切换 */
-.trip-toggle {
-  display: flex;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 4px;
-  background: #f0edf5;
-  border-radius: 12px;
-}
-.trip-pill {
-  flex: 1;
-  padding: 9px 0;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: #7a6c8a;
-  font-size: 13px;
   font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .18s;
+  color: var(--ink-900);
+  margin: 20px 2px 0;
+  display: flex; align-items: center; gap: 6px;
 }
-.trip-pill:hover { color: var(--accent); }
-.trip-pill.active {
-  background: #fff;
-  color: var(--accent);
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb), .18);
-}
-.dest-estimate {
-  margin-top: 10px;
-  padding: 12px 14px;
-  background: var(--accent-soft);
-  border-radius: 12px;
-}
-.dest-est-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: #4a3f55;
-  margin-bottom: 4px;
-}
-.dest-est-row:last-child { margin-bottom: 0; }
-.dest-total { font-weight: 800; color: var(--accent); }
-.dest-hint {
-  margin-top: 10px;
-  padding: 10px 14px;
-  background: #f7f5fa;
-  border-radius: 10px;
-  font-size: 12px;
-  color: #a898b8;
-  text-align: center;
-}
+.section-title .st-hint { font-size: 11px; font-weight: 500; color: var(--ink-400); margin-left: auto; }
 
-.btn-search {
-  padding: 10px 18px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all .15s;
-  font-family: inherit;
-}
-.btn-search:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(var(--accent-rgb),.25); }
-.btn-search:disabled { opacity: .5; }
-
-/* === Loading === */
-.loading-overlay {
-  text-align: center;
-  padding: 28px 20px;
-  margin-top: 16px;
-}
-.progress-ring {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 14px;
-}
-.progress-ring svg { transform: rotate(-90deg); }
-.progress-ring .bg { fill: none; stroke: #ece8f0; stroke-width: 5; }
-.progress-ring .fg {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 5;
-  stroke-linecap: round;
-  transition: stroke-dashoffset .4s;
-}
-.progress-ring .txt {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%,-50%);
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--accent);
-}
-.loading-hint {
-  font-size: 13px;
-  color: #7a6c8a;
-  font-weight: 600;
-}
-
-/* === 多路线 === */
-.multi-cards {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-.multi-card {
-  flex-shrink: 0;
-  width: 160px;
-  padding: 12px;
-  background: #fff;
-  border-radius: 14px;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all .2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
-}
-.multi-card.active {
-  border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(var(--accent-rgb),.15);
-}
-/* 候选卡徽章行（D2） */
-.mc-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 3px;
-}
-.mc-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #3a3045;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mc-badge {
-  flex-shrink: 0;
-  padding: 2px 7px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 600;
-}
-.mc-meta { font-size: 11px; color: #a898b8; }
-.mc-sub { margin-bottom: 4px; }
-/* 四步出题卡（视觉修整）：行标签 + 等宽网格 */
+/* === 四步出题卡 === */
 .dice-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 14px 12px 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 4px 12px var(--shadow-color);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 14px 4px;
+  box-shadow: 0 1px 2px rgba(22,24,29,.03);
+  margin-top: 10px;
   margin-bottom: 12px;
 }
-.dice-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.dice-row { display: flex; gap: 10px; margin-bottom: 12px; }
 .dice-label {
   flex-shrink: 0;
-  width: 46px;
-  font-size: 11px;
+  width: 44px;
+  font-size: 12px;
   font-weight: 600;
-  color: #a898b8;
+  color: var(--ink-900);
   padding-top: 8px;
+  display: flex; align-items: flex-start; gap: 2px;
 }
 .dice-opts { flex: 1; display: grid; gap: 6px; }
 .dice-opts.cols3 { grid-template-columns: repeat(3, 1fr); }
@@ -1481,24 +1048,325 @@ async function geocodeNewAddr() { const n = newAddr.value.name; if (!n.trim()) {
 .dice-opts .chip {
   width: 100%;
   padding: 8px 4px;
-  border-radius: 10px;
-  border: none;
-  background: #f7f5fa;
-  color: #7a6c8a;
   font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* === 主按钮 === */
+.btn-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  letter-spacing: .3px;
+}
+.btn-go:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-go:active:not(:disabled) { transform: scale(.98); }
+.btn-go:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-multi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-700);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all .15s;
+  font-family: inherit;
+}
+.btn-multi:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-2); }
+.btn-multi:disabled { opacity: .5; cursor: not-allowed; }
+
+/* === 对比模式开关 === */
+.multi-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.multi-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.multi-toggle-label { font-size: 13px; font-weight: 600; color: var(--ink-900); }
+.multi-toggle-info small { font-size: 11px; color: var(--ink-400); }
+.switch { position: relative; display: inline-block; width: 44px; height: 26px; cursor: pointer; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .track { position: absolute; inset: 0; background: var(--line-strong); border-radius: 13px; transition: background .2s; }
+.switch .thumb {
+  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  background: #fff; border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(22,24,29,.2);
+  transition: transform .2s ease;
+}
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track .thumb { transform: translateX(18px); }
+
+/* === 折叠面板 === */
+.advanced-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 14px;
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-600);
+  cursor: pointer;
+  transition: all .15s;
+}
+.advanced-toggle:hover { color: var(--ink-900); }
+.advanced-toggle .arrow { transition: transform .2s; display: inline-flex; color: var(--ink-300); }
+.advanced-toggle .arrow.open { transform: rotate(180deg); }
+.advanced-panel {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  margin-top: -10px;
+}
+.field-label {
+  font-size: 12px;
+  color: var(--ink-700);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+.field-label .hint { font-weight: 400; color: var(--ink-300); }
+
+.addr-row { margin-bottom: 14px; }
+.addr-quick-row { display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap; }
+.chip-sm {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-600);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.chip-sm:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.chip-sm.add { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+.input-row { display: flex; gap: 6px; align-items: center; }
+.input-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink-900);
+  background: var(--surface-2);
+  transition: all .15s;
+}
+.input-row input:focus { background: var(--surface); outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.btn-icon {
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-600);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-icon:hover { border-color: var(--line-strong); color: var(--ink-900); }
+.btn-icon:active { transform: scale(.9); }
+
+/* === 距离滑块（经典模式） === */
+.dist-card {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-top: 12px;
+}
+.dist-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.dist-label { font-size: 13px; font-weight: 600; color: var(--ink-700); }
+.dist-value { font-size: 26px; font-weight: 700; color: var(--ink-900); letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.dist-value small { font-size: 13px; font-weight: 500; color: var(--ink-400); margin-left: 2px; }
+.dist-slider {
+  width: 100%; height: 5px;
+  -webkit-appearance: none; appearance: none;
+  background: var(--line-strong);
+  border-radius: 3px; outline: none; cursor: pointer;
+}
+.dist-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(22,24,29,.25);
+  cursor: pointer;
+}
+.dist-slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(22,24,29,.25);
+  cursor: pointer;
+}
+.dist-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 8px; font-size: 11px; color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+}
+.dist-time { color: var(--ink-900); font-weight: 600; font-size: 12px; }
+
+/* === 目的地搜索 === */
+.dest-search { margin-top: 12px; }
+.trip-toggle {
+  display: flex;
+  gap: 2px;
+  margin-top: 12px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.trip-pill {
+  flex: 1;
+  padding: 8px 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-400);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   transition: all .15s;
-  white-space: nowrap;
 }
-.dice-opts .chip:hover { background: var(--accent-soft); color: var(--accent); }
-.dice-opts .chip.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+.trip-pill:hover { color: var(--ink-700); }
+.trip-pill.active { background: var(--surface); color: var(--ink-900); box-shadow: 0 1px 3px rgba(22,24,29,.08); }
+.dest-estimate {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.dest-est-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--ink-700);
+  margin-bottom: 4px;
+}
+.dest-est-row:last-child { margin-bottom: 0; }
+.dest-total { font-weight: 700; color: var(--accent); }
+.dest-hint {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--ink-400);
+  text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.btn-search {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(var(--accent-rgb),.25);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .15s;
+  font-family: inherit;
 }
-/* 钉段行（D3） */
-.lock-row { align-items: center; margin: 8px 0 0; }
-.lock-hint { font-size: 11px; color: #a898b8; align-self: center; }
+.btn-search:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-search:disabled { opacity: .5; }
+
+/* === Loading === */
+.loading-overlay { text-align: center; padding: 28px 20px; margin-top: 16px; }
+.progress-ring { position: relative; width: 64px; height: 64px; margin: 0 auto 14px; }
+.progress-ring svg { transform: rotate(-90deg); }
+.progress-ring .bg { fill: none; stroke: var(--line); stroke-width: 5; }
+.progress-ring .fg { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset .4s; }
+.progress-ring .txt {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  font-size: 15px; font-weight: 700; color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
+}
+.loading-hint { font-size: 13px; color: var(--ink-400); font-weight: 500; }
+
+/* === 多路线候选卡 === */
+.multi-cards { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; padding-bottom: 4px; }
+.multi-card {
+  flex-shrink: 0;
+  width: 164px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  box-shadow: 0 1px 2px rgba(22,24,29,.03);
+}
+.multi-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.mc-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 3px; }
+.mc-title { font-size: 12px; font-weight: 600; color: var(--ink-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-badge { flex-shrink: 0; padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 600; }
+.mc-meta { font-size: 11px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+.mc-sub { margin-bottom: 4px; }
+
+/* === 钉段行 === */
+.lock-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0 0; }
+.lock-hint { font-size: 11px; color: var(--ink-400); }
+.lock-row .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 6px 10px; }
+
+/* === 地址弹窗微调 === */
+.addr-list-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; margin: 3px 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
+.addr-list-item .coord { color: var(--ink-300); font-size: 10px; }
+.btn-del { background: #fef2f2; color: var(--err); border: 1px solid #fecaca; }
+.am-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.am-tools { display: flex; align-items: center; gap: 5px; }
+.am-dev { font-size: 10px; color: var(--ok); font-weight: 600; }
+.am-pwd { width: 90px; font-size: 11px; padding: 5px 8px; }
+.am-ok { background: var(--accent); color: #fff; border-color: var(--accent); }
+.am-list { max-height: 160px; overflow-y: auto; margin-bottom: 10px; }
+.am-empty { text-align: center; color: var(--ink-300); font-size: 12px; margin-bottom: 10px; }
+.am-divider { border-top: 1px solid var(--line); margin: 10px 0; }
+.am-form h4 { font-size: 13px; color: var(--ink-700); margin-bottom: 8px; font-weight: 600; }
+.am-form .field-label { margin-top: 8px; }
+.am-tip { font-size: 11px; color: var(--ink-400); margin: 8px 0 2px; }
+.am-tip a { color: var(--accent); }
 </style>
